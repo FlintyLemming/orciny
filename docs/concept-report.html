@@ -1,0 +1,920 @@
+<title>Orciny · 项目构思报告</title>
+<style>
+  :root {
+    --bg: #F5F6F9;
+    --surface: #FFFFFF;
+    --surface-2: #EEF0F5;
+    --ink: #1B2230;
+    --muted: #5C6579;
+    --faint: #8B93A6;
+    --line: #DCE0E9;
+    --accent: #2743C7;
+    --accent-soft: #E7EBFB;
+    --rec: #BE5A17;
+    --rec-soft: #FBEEE2;
+    --good: #1E7A44;
+    --good-soft: #E3F2E9;
+    --warn: #9A6A08;
+    --warn-soft: #F7EFDA;
+    --bad: #B3372E;
+    --bad-soft: #F9E7E5;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --serif: "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", "SimSun", serif;
+    --sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0F1219;
+      --surface: #171C26;
+      --surface-2: #1E2431;
+      --ink: #E6E9F0;
+      --muted: #9AA3B8;
+      --faint: #6E7890;
+      --line: #2B3242;
+      --accent: #8CA0F8;
+      --accent-soft: #232C4A;
+      --rec: #E0894A;
+      --rec-soft: #3A2A1B;
+      --good: #5FBF87;
+      --good-soft: #1B3226;
+      --warn: #D9A94A;
+      --warn-soft: #362C15;
+      --bad: #E07A6F;
+      --bad-soft: #3A211F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0F1219; --surface: #171C26; --surface-2: #1E2431; --ink: #E6E9F0;
+    --muted: #9AA3B8; --faint: #6E7890; --line: #2B3242;
+    --accent: #8CA0F8; --accent-soft: #232C4A; --rec: #E0894A; --rec-soft: #3A2A1B;
+    --good: #5FBF87; --good-soft: #1B3226; --warn: #D9A94A; --warn-soft: #362C15;
+    --bad: #E07A6F; --bad-soft: #3A211F;
+  }
+  :root[data-theme="light"] {
+    --bg: #F5F6F9; --surface: #FFFFFF; --surface-2: #EEF0F5; --ink: #1B2230;
+    --muted: #5C6579; --faint: #8B93A6; --line: #DCE0E9;
+    --accent: #2743C7; --accent-soft: #E7EBFB; --rec: #BE5A17; --rec-soft: #FBEEE2;
+    --good: #1E7A44; --good-soft: #E3F2E9; --warn: #9A6A08; --warn-soft: #F7EFDA;
+    --bad: #B3372E; --bad-soft: #F9E7E5;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: var(--sans); font-size: 16px; line-height: 1.85;
+    margin: 0; padding: 0 20px 96px;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; }
+
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  a:focus-visible, button:focus-visible, .opt:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- masthead ---------- */
+  header.mast { padding: 72px 0 40px; border-bottom: 3px solid var(--ink); }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .22em; color: var(--accent); text-transform: uppercase; }
+  h1.title { font-family: var(--serif); font-size: clamp(34px, 6vw, 52px); line-height: 1.2; margin: 14px 0 10px; text-wrap: balance; font-weight: 700; }
+  .subtitle { font-size: 18px; color: var(--muted); max-width: 40em; margin: 0; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-top: 26px; font-family: var(--mono); font-size: 12.5px; color: var(--faint); }
+  .meta b { color: var(--muted); font-weight: 500; }
+
+  /* ---------- sections ---------- */
+  section { margin-top: 64px; }
+  .sec-eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .18em; color: var(--accent); }
+  h2 { font-family: var(--serif); font-size: 28px; line-height: 1.35; margin: 6px 0 18px; text-wrap: balance; }
+  h3 { font-size: 17.5px; margin: 34px 0 10px; }
+  p { margin: 0 0 14px; max-width: 46em; }
+  ul, ol { margin: 0 0 14px; padding-left: 1.4em; max-width: 44em; }
+  li { margin-bottom: 6px; }
+  li::marker { color: var(--accent); }
+  strong { font-weight: 600; }
+  .small { font-size: 13.5px; color: var(--muted); }
+
+  /* ---------- toc ---------- */
+  nav.toc { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 22px 26px; margin-top: 40px; }
+  nav.toc ol { columns: 2; gap: 40px; margin: 8px 0 0; padding-left: 1.2em; max-width: none; }
+  nav.toc li { break-inside: avoid; margin-bottom: 4px; }
+  nav.toc a { color: var(--ink); }
+  nav.toc .t { font-family: var(--mono); font-size: 12px; letter-spacing: .18em; color: var(--faint); text-transform: uppercase; }
+  @media (max-width: 640px) { nav.toc ol { columns: 1; } }
+
+  /* ---------- verdict ---------- */
+  .verdict { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 10px; padding: 26px 30px; margin: 26px 0; }
+  .verdict h3 { margin-top: 0; font-family: var(--serif); font-size: 21px; }
+  .scoreband { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin: 22px 0 6px; }
+  .score { background: var(--surface-2); border-radius: 8px; padding: 14px 18px; }
+  .score .n { font-family: var(--mono); font-size: 26px; font-variant-numeric: tabular-nums; }
+  .score .lbl { font-size: 13px; color: var(--muted); }
+  .score .bar { height: 4px; border-radius: 2px; background: var(--line); margin-top: 10px; overflow: hidden; }
+  .score .bar i { display: block; height: 100%; background: var(--accent); }
+
+  /* ---------- tables ---------- */
+  .tblwrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); margin: 18px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; line-height: 1.6; }
+  th, td { padding: 10px 14px; text-align: left; vertical-align: top; border-top: 1px solid var(--line); }
+  thead th { border-top: none; background: var(--surface-2); font-family: var(--mono); font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+  td.c { text-align: center; }
+  .yes { color: var(--good); font-weight: 600; }
+  .no { color: var(--faint); }
+  .half { color: var(--warn); font-weight: 600; }
+  tr.hl td { background: var(--accent-soft); }
+
+  /* ---------- badges / chips ---------- */
+  .chip { display: inline-block; font-family: var(--mono); font-size: 11px; letter-spacing: .06em; padding: 2px 9px; border-radius: 999px; vertical-align: 2px; }
+  .chip.rec { background: var(--rec-soft); color: var(--rec); }
+  .chip.good { background: var(--good-soft); color: var(--good); }
+  .chip.warn { background: var(--warn-soft); color: var(--warn); }
+  .chip.bad { background: var(--bad-soft); color: var(--bad); }
+  .chip.dim { background: var(--surface-2); color: var(--muted); }
+
+  /* ---------- decision blocks ---------- */
+  .decision { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 26px 28px 22px; margin: 26px 0; }
+  .decision > .dhead { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .dletter { font-family: var(--mono); font-size: 13px; color: var(--bg); background: var(--ink); border-radius: 6px; padding: 3px 10px; letter-spacing: .1em; }
+  .decision h3 { margin: 0; font-size: 19px; font-family: var(--serif); }
+  .decision .dq { color: var(--muted); margin: 10px 0 18px; max-width: 46em; }
+  .opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(232px, 1fr)); gap: 14px; }
+  .opt { position: relative; border: 1.5px solid var(--line); border-radius: 10px; padding: 16px 18px 14px; cursor: pointer; background: var(--bg); transition: border-color .15s, box-shadow .15s; }
+  .opt:hover { border-color: var(--accent); }
+  .opt.sel { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .opt.sel::after { content: "✓ 已选"; position: absolute; top: 10px; right: 12px; font-family: var(--mono); font-size: 11px; color: var(--accent); }
+  .opt .oname { font-weight: 600; font-size: 15px; margin-bottom: 2px; padding-right: 52px; }
+  .opt .oid { font-family: var(--mono); font-size: 11px; color: var(--faint); letter-spacing: .08em; }
+  .opt .odesc { font-size: 13.5px; color: var(--muted); margin: 6px 0 10px; }
+  .opt .pl { list-style: none; padding: 0; margin: 0; font-size: 13px; }
+  .opt .pl li { padding-left: 1.15em; text-indent: -1.15em; margin-bottom: 3px; }
+  .opt .pl li.p::before { content: "+ "; color: var(--good); font-family: var(--mono); font-weight: 700; }
+  .opt .pl li.m::before { content: "− "; color: var(--bad); font-family: var(--mono); font-weight: 700; }
+  .opt .effort { margin-top: 10px; font-family: var(--mono); font-size: 11px; color: var(--faint); }
+  .drec { margin-top: 16px; background: var(--rec-soft); border-radius: 8px; padding: 12px 16px; font-size: 14px; }
+  .drec b { color: var(--rec); }
+
+  /* ---------- flow ---------- */
+  .flow { counter-reset: step; list-style: none; padding: 0; margin: 18px 0; max-width: none; }
+  .flow li { position: relative; padding: 0 0 18px 52px; margin: 0; }
+  .flow li::before { counter-increment: step; content: counter(step); position: absolute; left: 0; top: 2px; width: 30px; height: 30px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-family: var(--mono); font-size: 13px; display: flex; align-items: center; justify-content: center; }
+  .flow li:not(:last-child)::after { content: ""; position: absolute; left: 14.5px; top: 36px; bottom: 2px; width: 1px; background: var(--line); }
+  .flow b { display: block; }
+  .flow span { color: var(--muted); font-size: 14px; }
+
+  /* ---------- callout ---------- */
+  .callout { border-left: 3px solid var(--accent); background: var(--surface); border-radius: 0 8px 8px 0; padding: 14px 20px; margin: 18px 0; font-size: 14.5px; max-width: 46em; }
+  .callout.warn { border-left-color: var(--warn); }
+  .callout .ct { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); display: block; margin-bottom: 4px; }
+  .callout.warn .ct { color: var(--warn); }
+
+  /* ---------- name cards ---------- */
+  .names { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin: 18px 0; }
+  .name { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; }
+  .name.first { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .name .nm { font-family: var(--mono); font-size: 20px; letter-spacing: .04em; }
+  .name .src { font-size: 12.5px; color: var(--faint); margin: 2px 0 8px; }
+  .name p { font-size: 13.5px; color: var(--muted); margin: 0; }
+
+  /* ---------- summary / picker ---------- */
+  .summary { background: var(--surface); border: 2px solid var(--accent); border-radius: 12px; padding: 24px 28px; margin: 26px 0; }
+  .summary h3 { margin-top: 0; }
+  .summary table { font-size: 14px; }
+  .summary .empty { color: var(--faint); font-size: 14px; }
+  .btn { font-family: var(--mono); font-size: 13px; background: var(--accent); color: var(--bg); border: none; border-radius: 7px; padding: 9px 18px; cursor: pointer; }
+  .btn:hover { opacity: .88; }
+  .btn.ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+  .btnrow { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; align-items: center; }
+  #copiedNote { font-size: 13px; color: var(--good); display: none; }
+
+  footer { margin-top: 80px; padding-top: 24px; border-top: 1px solid var(--line); font-size: 13px; color: var(--faint); }
+  .srcs { font-size: 13px; columns: 2; gap: 36px; max-width: none; }
+  .srcs li { break-inside: avoid; }
+  @media (max-width: 640px) { .srcs { columns: 1; } }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .opt { transition: none; } }
+</style>
+
+<div class="wrap">
+
+<header class="mast">
+  <div class="eyebrow">Project Proposal · Confidential Draft</div>
+  <h1 class="title">Orciny<span style="font-family:var(--sans);font-weight:300;color:var(--faint);"> ｜ </span>个人版 Coding&nbsp;Agent 机队中台</h1>
+  <p class="subtitle">面向个人与微型团队的自托管 hub + 无界面 agent：集中管理多台机器上的 <code style="font-family:var(--mono);font-size:.9em;">~/.claude</code>，聚合 Token 用量与订阅余额。beszel 之于服务器监控，Orciny 之于 Coding Agent 管理。</p>
+  <div class="meta">
+    <span><b>日期</b> 2026-07-21</span>
+    <span><b>性质</b> 业务构思 · 不含实现</span>
+    <span><b>输入</b> leycode-hub / leycode-client / ai-plan-insight / beszel</span>
+    <span><b>决策点</b> 7 组选型（可点选）</span>
+  </div>
+</header>
+
+<nav class="toc">
+  <span class="t">目录</span>
+  <ol>
+    <li><a href="#verdict">结论先行：有没有搞头</a></li>
+    <li><a href="#assets">资产盘点：你手里已经有什么</a></li>
+    <li><a href="#market">需求验证与竞品格局</a></li>
+    <li><a href="#position">产品定位与边界</a></li>
+    <li><a href="#flow">核心业务流</a></li>
+    <li><a href="#decisions">七组选型决策（A–G）</a></li>
+    <li><a href="#mvp">MVP 与路线图</a></li>
+    <li><a href="#risks">风险与对冲</a></li>
+    <li><a href="#naming">命名提案</a></li>
+    <li><a href="#picker">决策速查与你的选择</a></li>
+  </ol>
+</nav>
+
+<!-- ================= 1. VERDICT ================= -->
+<section id="verdict">
+  <div class="sec-eyebrow">§01</div>
+  <h2>结论先行：有没有搞头</h2>
+
+  <div class="verdict">
+    <h3>判断：有搞头，值得做——前提是把范围卡死在「配置 + 观测」。</h3>
+    <p>这个项目在三个维度上的价值并不均等，分开评估更诚实：</p>
+    <div class="scoreband">
+      <div class="score"><div class="n">9<span style="color:var(--faint);font-size:15px;">/10</span></div><div class="lbl">自用价值 — 第一天就解决你自己的真实痛点</div><div class="bar"><i style="width:90%"></i></div></div>
+      <div class="score"><div class="n">7.5<span style="color:var(--faint);font-size:15px;">/10</span></div><div class="lbl">开源影响力 — 需求已验证、形态空缺、有先例</div><div class="bar"><i style="width:75%"></i></div></div>
+      <div class="score"><div class="n">3<span style="color:var(--faint);font-size:15px;">/10</span></div><div class="lbl">直接商业化 — 个人工具付费转化极低</div><div class="bar"><i style="width:30%"></i></div></div>
+    </div>
+  </div>
+
+  <p><strong>支撑判断的四个事实</strong>（详细论据见 <a href="#market">§03</a>）：</p>
+  <ul>
+    <li><strong>需求真实且官方未满足。</strong>Anthropic 仓库至少四个 open 状态的 feature request 在要「跨设备同步 <code>~/.claude</code>」，社区里 rsync 脚本、Syncthing 挂载、git dotfiles、加密云 CLI 等 DIY 方案层出不穷——痛点广泛存在，但没有一个「自托管 + 面板 + 在线状态 + 用量」的完整形态。</li>
+    <li><strong>参照物已经成功。</strong>beszel 用「轻量自托管 + hub/agent + 好看面板」在两年内做到约 2.3 万 star，证明这个产品气质在 self-hosted 社区能起量；ccusage 等 Claude Code 周边工具则证明这个品类自带流量。</li>
+    <li><strong>你有不对称优势。</strong>这个项目 80% 的难点——配置物化与回执对账、漂移检测、会话 JSONL 解析、多工具适配器、十几家订阅抓取——你在 leycode 两个仓库和 ai-plan-insight 里已经各解决过一遍。别人从零起步，你是做减法。</li>
+    <li><strong>有天然的差异化切口。</strong>海外没有任何工具覆盖 GLM / Kimi / 火山方舟这类中文 Coding Plan 的订阅聚合；ai-plan-insight 并入后，Orciny 在中文社区有独占卖点。</li>
+  </ul>
+
+  <div class="callout warn">
+    <span class="ct">最大的反方论点</span>
+    Anthropic 随时可能上线官方 cloud sync（相关 issue 热度很高）。对冲方式写在 <a href="#risks">§08</a>：多工具支持、self-hosted 隐私立场、以及「第三方中转 + 多家订阅聚合」这类官方永远不会做的部分。结论：官方 sync 会削弱「配置同步」单点卖点，但打不掉整个形态。
+  </div>
+</section>
+
+<!-- ================= 2. ASSETS ================= -->
+<section id="assets">
+  <div class="sec-eyebrow">§02</div>
+  <h2>资产盘点：你手里已经有什么</h2>
+  <p>新项目不是从零开始，而是对四个现有代码库做「减法 + 重组」。下表按「可直接复用的资产」视角盘点：</p>
+
+  <div class="tblwrap"><table>
+    <thead><tr><th>项目</th><th>技术形态</th><th>对 Orciny 可复用的资产</th><th>不带走的部分</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>leycode-hub</strong><br><span class="small">企业配置中台，实装至块八</span></td>
+        <td>Fastify 5 + Drizzle + PG<br><span class="small">测试 234 例</span></td>
+        <td>Profile / Revision / 发布物化模型、设备接入协议（注册码、长轮询、复合 ETag、apply 回执对账）、凭据下发注入、技能库设计、会话日志表结构与上传协议、<strong>AgentAdapter 抽象（Claude + OpenCode 已实现）</strong></td>
+        <td>RBAC 四级守卫、newapi / Casdoor 耦合、GPU 监控、公告系统、企业审计</td>
+      </tr>
+      <tr>
+        <td><strong>leycode-client</strong><br><span class="small">Windows+WSL 客户端</span></td>
+        <td>Electron 壳 + <strong>Go daemon</strong></td>
+        <td>daemon 的 Go 包基本整体可移植：<code style="font-family:var(--mono);font-size:.9em;">applier</code>（配置落盘）、<code style="font-family:var(--mono);font-size:.9em;">poller</code>、<code style="font-family:var(--mono);font-size:.9em;">sessionlog</code>（JSONL 增量解析、compact 重排、Cursor 支持）、<code style="font-family:var(--mono);font-size:.9em;">hubapi</code>、<code style="font-family:var(--mono);font-size:.9em;">state</code></td>
+        <td>Electron 壳、托盘 UI、WSL 桥接（Orciny 是 Linux/macOS 原生无界面）</td>
+      </tr>
+      <tr>
+        <td><strong>ai-plan-insight</strong><br><span class="small">订阅用量面板，生产运行中</span></td>
+        <td>Python + SQLite</td>
+        <td>14+ 家 Provider 的抓取逻辑与 payload 协议（GLM / Kimi / 火山 / Claude / Cursor / Grok…）、push/fetch 双模式设计、模型别名归并、来源存活告警</td>
+        <td>独立 Web 面板（并入后由 Orciny 承载）；Python 运行时是否保留见决策 E</td>
+      </tr>
+      <tr>
+        <td><strong>beszel</strong><br><span class="small">参照物（非你的代码）</span></td>
+        <td>Go + PocketBase</td>
+        <td>形态范本：agent 外拨 WebSocket + token/指纹注册、SSH 兜底、单二进制 + docker 双发行、agent 自更新、hub 内嵌前端</td>
+        <td>—</td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <div class="callout">
+    <span class="ct">关键洞察</span>
+    合并 ai-plan-insight 的业务逻辑是自洽的：它的 push 类 Provider（Claude、Cursor、Grok…）本来就要求每台机器装一个抓取 agent。Orciny 的 agent 装上后，一个进程同时承担<strong>配置管理 + 用量上报 + 订阅抓取</strong>三个角色——「装一个东西解决三件事」正是合并的业务理由，而不只是代码归拢。
+  </div>
+</section>
+
+<!-- ================= 3. MARKET ================= -->
+<section id="market">
+  <div class="sec-eyebrow">§03</div>
+  <h2>需求验证与竞品格局</h2>
+
+  <h3>需求信号（联网核实，2026-07）</h3>
+  <ul>
+    <li>Anthropic 官方仓库的同类 feature request 至少四个且均为 open：<a href="https://github.com/anthropics/claude-code/issues/22648">#22648 账号级设置同步</a>、<a href="https://github.com/anthropics/claude-code/issues/36693">#36693 无原生方式同步配置与 skills</a>、<a href="https://github.com/anthropics/claude-code/issues/38970">#38970 用户级配置云同步</a>、<a href="https://github.com/anthropics/claude-code/issues/57678">#57678 skills/记忆跨机同步</a>。</li>
+    <li>独立博客反复出现同一主题：<a href="https://www.steeman.be/posts/syncing-claude-code-across-multiple-machines/">steeman.be</a>（NAS + symlink + Syncthing）、<a href="https://brianlovin.com/writing/syncing-claude-code-settings-between-computers-am7lNQ8">Brian Lovin</a>（git dotfiles + LaunchAgent）、<a href="https://nickang.com/how-to-sync-claude-code-global-files-across-machines-if-you-work-on-multiple-computers/">Nick Ang</a>（git 仓库 + install 脚本）。每篇都是各自造轮子。</li>
+    <li>多机用量聚合同样有人在 DIY：<a href="https://dev.to/ryantech00/how-i-track-claude-code-costs-across-multiple-pcs-13bl">用 ccusage + Supabase 自建跨机看板</a>、<a href="https://github.com/ColeMurray/claude-code-otel">claude-code-otel</a>（企业级 OTel 全家桶）。</li>
+    <li>Claude Code <a href="https://code.claude.com/docs/en/monitoring-usage">原生支持 OpenTelemetry 导出</a>（<code style="font-family:var(--mono);font-size:.9em;">CLAUDE_CODE_ENABLE_TELEMETRY=1</code>）——官方留好了数据出口，缺的是轻量的接收端。</li>
+  </ul>
+
+  <h3>竞品格局：没有人占住这个交叉点</h3>
+  <div class="tblwrap"><table>
+    <thead><tr><th>方案</th><th>形态</th><th class="c">配置同步</th><th class="c">面板/在线状态</th><th class="c">用量聚合</th><th class="c">订阅余额</th><th class="c">自托管</th></tr></thead>
+    <tbody>
+      <tr><td>dotfiles / chezmoi 手搓</td><td>Git + 脚本</td><td class="c half">手动</td><td class="c no">无</td><td class="c no">无</td><td class="c no">无</td><td class="c yes">—</td></tr>
+      <tr><td><a href="https://github.com/miwidot/ccms">ccms</a></td><td>rsync over SSH 脚本</td><td class="c half">点对点</td><td class="c no">无</td><td class="c no">无</td><td class="c no">无</td><td class="c yes">是</td></tr>
+      <tr><td>claude-sync</td><td>CLI + 加密云存储</td><td class="c yes">双向</td><td class="c no">无</td><td class="c no">无</td><td class="c no">无</td><td class="c no">否</td></tr>
+      <tr><td><a href="https://github.com/ruanyf/weekly/issues/9017">Codes CLI</a></td><td>本地 CLI，SSH 推送</td><td class="c half">单向推</td><td class="c no">无中心</td><td class="c no">无</td><td class="c no">无</td><td class="c yes">—</td></tr>
+      <tr><td><a href="https://dev.to/ryantech00/how-i-track-claude-code-costs-across-multiple-pcs-13bl">claude-telemetry 类 DIY</a></td><td>脚本 + Supabase</td><td class="c no">无</td><td class="c half">仅图表</td><td class="c yes">有</td><td class="c no">无</td><td class="c half">半</td></tr>
+      <tr><td><a href="https://github.com/ColeMurray/claude-code-otel">claude-code-otel</a></td><td>OTel + Grafana 全家桶</td><td class="c no">无</td><td class="c half">Grafana</td><td class="c yes">有</td><td class="c no">无</td><td class="c yes">重</td></tr>
+      <tr><td><a href="https://github.com/ding113/claude-code-hub">claude-code-hub 等代理类</a></td><td>API 网关</td><td class="c no">无</td><td class="c half">账号维度</td><td class="c yes">有</td><td class="c no">无</td><td class="c yes">是</td></tr>
+      <tr><td>ai-plan-insight（你）</td><td>Web 面板</td><td class="c no">无</td><td class="c half">卡片</td><td class="c yes">有</td><td class="c yes">有</td><td class="c yes">是</td></tr>
+      <tr><td>leycode（你）</td><td>企业中台 + GUI 客户端</td><td class="c yes">单向下发</td><td class="c yes">有</td><td class="c yes">有</td><td class="c no">无</td><td class="c yes">企业</td></tr>
+      <tr class="hl"><td><strong>Orciny（拟）</strong></td><td>hub + 无界面 agent</td><td class="c yes">声明式+收编</td><td class="c yes">有</td><td class="c yes">有</td><td class="c yes">有</td><td class="c yes">单二进制</td></tr>
+    </tbody>
+  </table></div>
+
+  <p class="small">另注意区隔：多 Agent「会话编排/任务调度」类工具（Multica、agent-fleet 等）是拥挤赛道，Orciny 刻意不进入——见 §04 的不做清单。</p>
+</section>
+
+<!-- ================= 4. POSITION ================= -->
+<section id="position">
+  <div class="sec-eyebrow">§04</div>
+  <h2>产品定位与边界</h2>
+
+  <p><strong>一句话定位：</strong>自托管的 Coding Agent 机队中台——一个 hub 管住你所有机器上的 Coding Agent 配置，顺带看清它们的用量和订阅余额。</p>
+
+  <h3>目标用户（由近及远）</h3>
+  <ul>
+    <li><strong>P0 · 你自己</strong>：多台 Linux/macOS 机器 + 多个订阅（Claude / GLM / Kimi…），配置漂移、用量分散。第一里程碑只服务这一层。</li>
+    <li><strong>P1 · 同类个人开发者</strong>：self-hosted / homelab 人群 + 重度 Claude Code 用户，§03 证明这个群体存在且在自己造轮子。</li>
+    <li><strong>P2 · 微型团队（2–10 人）</strong>：不需要 RBAC 和审计，但想共享 skills、CLAUDE.md 约定和配置基线。</li>
+    <li><strong>P3 ·（远期）企业</strong>：不由 Orciny 承接，导流给 leycode——「团队大了？看这边」。</li>
+  </ul>
+
+  <h3>设计哲学（继承 leycode）</h3>
+  <p>「不接管 Agent 执行，只统一治理配置与观测。」Agent 仍在本地跑，Orciny 决定的是：<strong>每台机器用什么配置、装什么 skills、数据汇总到哪里看</strong>。</p>
+
+  <h3>明确不做（范围护栏，也是与红海的分界线）</h3>
+  <ul>
+    <li><strong>不做模型路由 / API 网关</strong>——不站在请求链路上（claude-code-hub 类产品的地盘，且引入可用性责任）。</li>
+    <li><strong>不做 GUI 客户端</strong>——agent 无界面，systemd / launchd 常驻，一切交互在 hub 的 Web UI。</li>
+    <li><strong>不做会话执行编排</strong>——不派任务、不开会话、不当「任务调度台」（Multica / vibe-kanban 们的红海）。</li>
+    <li><strong>不做企业治理</strong>——无多租户 RBAC、无合规审计（那是 leycode）。单管理员起步，微团队最多加「成员只读/可编辑」两档。</li>
+    <li><strong>Windows 缓做</strong>——WSL 场景 leycode-client 已覆盖，Orciny 首发 Linux + macOS。</li>
+  </ul>
+
+  <h3>管什么、不管什么（<code style="font-family:var(--mono);font-size:.85em;">~/.claude</code> 的选择性管控）</h3>
+  <div class="tblwrap"><table>
+    <thead><tr><th>纳入管控（配置集）</th><th>永不纳入</th><th>单独通道</th></tr></thead>
+    <tbody><tr>
+      <td><code style="font-family:var(--mono);font-size:.9em;">settings.json</code>（permissions / hooks / env）、<code style="font-family:var(--mono);font-size:.9em;">CLAUDE.md</code>、<code style="font-family:var(--mono);font-size:.9em;">agents/</code>、<code style="font-family:var(--mono);font-size:.9em;">commands/</code>、<code style="font-family:var(--mono);font-size:.9em;">skills/</code>、<code style="font-family:var(--mono);font-size:.9em;">keybindings.json</code>、MCP 服务器声明</td>
+      <td>会话历史 <code style="font-family:var(--mono);font-size:.9em;">projects/</code>、<code style="font-family:var(--mono);font-size:.9em;">todos/</code>、缓存与遥测状态、<code style="font-family:var(--mono);font-size:.9em;">.credentials.json</code>（OAuth 登录态，机器私有）</td>
+      <td>API Key / Token 走凭据库：版本库里只存占位符，agent 落盘时注入真实值（leycode 4b 已有同款实现），换 key 不产生配置版本</td>
+    </tr></tbody>
+  </table></div>
+</section>
+
+<!-- ================= 5. FLOW ================= -->
+<section id="flow">
+  <div class="sec-eyebrow">§05</div>
+  <h2>核心业务流</h2>
+
+  <h3>Day-1：从零到全机队上线</h3>
+  <ol class="flow">
+    <li><b>起 hub</b><span>一条 docker run（或单二进制直跑），打开 Web UI 设好管理员。</span></li>
+    <li><b>从现状导入</b><span>在第一台机器装 agent 时，引导「把这台机器现有的 ~/.claude 采集为初始配置集」。个人场景是「先有配置、后有中台」，与企业自上而下相反——这个导入向导是体验成败的关键。</span></li>
+    <li><b>其余机器一行接入</b><span>curl 安装脚本 + 一次性注册 token，agent 以 systemd/launchd 常驻，外拨连接 hub，机器列表即刻显示在线状态、agent 版本、Claude Code 版本。</span></li>
+    <li><b>下发对齐</b><span>把配置集指派给各机器，agent 落盘、回执；面板显示每台机器「已对齐 / 待应用 / 漂移」。</span></li>
+    <li><b>数据自动汇入</b><span>agent 顺带解析本地会话 JSONL 上报 token 用量；订阅抓取器按配置拉取各家余额。首页 = 机器状态 + 用量趋势 + 订阅卡片。</span></li>
+  </ol>
+
+  <h3>日常循环：改配置的两条路径</h3>
+  <ul>
+    <li><strong>面板改</strong>：Web 上编辑配置集 → 发布新版本 → 全机队秒级对齐（长连接推送）。</li>
+    <li><strong>机器上改</strong>（个人场景更常见——顺手 <code style="font-family:var(--mono);font-size:.9em;">/config</code>、装了个插件、写了个 skill）：agent 侦测到本地与已发布版本的差异 → 面板出现漂移提示 → 一键「<strong>收编为新版本</strong>」（这台机器的改动成为新基线，同步给其他机器）或「恢复」（回到基线）。可对某类路径设自动收编。</li>
+  </ul>
+  <p>「收编」是 Orciny 与企业中台在产品语义上的分水岭：企业把漂移当违规，个人把漂移当创作。详见决策 C。</p>
+
+  <h3>业务对象（一览）</h3>
+  <p class="small">Machine（机器）· ConfigSet（配置集）· Revision(版本) · Assignment（机器⇄配置集指派）· DriftEvent（漂移）· Credential（凭据）· UsagePoint（模型用量点）· SubscriptionCard（订阅卡片）· Alert(告警)。前六者来自 leycode 模型的裁剪，后三者来自 ai-plan-insight 的并入。</p>
+</section>
+
+<!-- ================= 6. DECISIONS ================= -->
+<section id="decisions">
+  <div class="sec-eyebrow">§06</div>
+  <h2>七组选型决策</h2>
+  <p>每组给出可选方案与我的推荐。<strong>点击方案卡可记录你的倾向</strong>，页面底部（<a href="#picker">§10</a>）汇总成结果，可一键复制发回给我。工作量标记：S ≈ 数个周末 · M ≈ 一两个月业余 · L ≈ 一个季度以上。</p>
+
+  <!-- A -->
+  <div class="decision" data-group="A" data-title="与 leycode 的关系">
+    <div class="dhead"><span class="dletter">决策 A</span><h3>与 leycode 的关系</h3></div>
+    <p class="dq">新项目和已投入大量工作的企业版是什么关系？决定仓库、品牌与长期维护结构。</p>
+    <div class="opts">
+      <div class="opt" tabindex="0" data-opt="A1" data-name="独立新项目，协议对齐">
+        <div class="oid">A1 <span class="chip rec">推荐</span></div>
+        <div class="oname">独立新项目，协议对齐</div>
+        <div class="odesc">新仓库新品牌；agent 协议、Profile 概念与 leycode 有意同构，代码选择性搬运，不共享运行时。</div>
+        <ul class="pl">
+          <li class="p">轻装上阵，开源干净（leycode 耦合企业内部 newapi/Casdoor，不宜直接开源）</li>
+          <li class="p">两边受众、技术气质本就不同，分开反而互不拖累</li>
+          <li class="p">协议同构给未来互通留门</li>
+          <li class="m">部分逻辑双份维护</li>
+        </ul>
+        <div class="effort">额外成本：协议对齐的自律</div>
+      </div>
+      <div class="opt" tabindex="0" data-opt="A2" data-name="leycode 同仓双形态（lite 模式）">
+        <div class="oid">A2</div>
+        <div class="oname">leycode 同仓双形态</div>
+        <div class="odesc">在 leycode 里加「个人版」部署形态，一套代码两种打包。</div>
+        <ul class="pl">
+          <li class="p">不分叉，一处修两处得</li>
+          <li class="m">栈不匹配：个人版要单二进制+SQLite，leycode 是 Node+PG+企业依赖</li>
+          <li class="m">开源即暴露企业实现；个人版永远被企业需求拖着走</li>
+        </ul>
+        <div class="effort">工作量：M（改造）+ 长期约束</div>
+      </div>
+      <div class="opt" tabindex="0" data-opt="A3" data-name="Orciny 为内核，leycode 变企业外壳">
+        <div class="oid">A3</div>
+        <div class="oname">Orciny 为开源内核，leycode 重构为企业外壳</div>
+        <div class="odesc">倒置 open-core：新项目是核心，企业能力叠加其上。</div>
+        <ul class="pl">
+          <li class="p">终局最优雅，一个内核两条产品线</li>
+          <li class="m">现在做代价大：leycode 已有生产部署，重构风险高</li>
+          <li class="m">在想清楚 Orciny 形态前就绑死架构，为时过早</li>
+        </ul>
+        <div class="effort">工作量：L（现在）；可作为远期方向</div>
+      </div>
+    </div>
+    <div class="drec"><b>推荐 A1：</b>独立起步 + 协议自律。A3 不是被否决而是被推迟——A1 把协议对齐做好，两年后若 Orciny 成立，随时可以走向 A3。</div>
+  </div>
+
+  <!-- B -->
+  <div class="decision" data-group="B" data-title="技术底座">
+    <div class="dhead"><span class="dletter">决策 B</span><h3>技术底座</h3></div>
+    <p class="dq">hub 用什么写？这决定部署形态，而部署形态就是 self-hosted 产品的第一印象。</p>
+    <div class="opts">
+      <div class="opt" tabindex="0" data-opt="B1" data-name="Go 全家桶（PocketBase hub + Go agent）">
+        <div class="oid">B1 <span class="chip rec">推荐</span></div>
+        <div class="oname">Go 全家桶：PocketBase hub + Go agent</div>
+        <div class="odesc">beszel 同构：hub = PocketBase（内嵌 SQLite、auth、realtime、admin）+ 内嵌 React 前端，单二进制；agent 纯 Go。</div>
+        <ul class="pl">
+          <li class="p">部署气质 = beszel：一个文件跑起来，内存以 MB 计，self-hosted 社区审美</li>
+          <li class="p">leycode-client 的 Go daemon（applier/sessionlog/poller）近乎直接移植</li>
+          <li class="p">有 beszel 整个仓库当施工参考</li>
+          <li class="m">hub 业务逻辑（Profile/发布/对账）要从 TS 重写为 Go</li>
+        </ul>
+        <div class="effort">工作量：M</div>
+      </div>
+      <div class="opt" tabindex="0" data-opt="B2" data-name="裁剪 leycode-hub（TS）+ 新 Go agent">
+        <div class="oid">B2</div>
+        <div class="oname">裁剪 leycode-hub + 新 Go agent</div>
+        <div class="odesc">把 Fastify+Drizzle 的 hub 砍掉企业模块、PG 换 SQLite，agent 另写。</div>
+        <ul class="pl">
+          <li class="p">复用最多现成业务代码与测试</li>
+          <li class="m">部署要 Node 运行时或较大镜像，与「轻」的定位相悖</li>
+          <li class="m">从企业代码里做减法，砍耦合的工夫未必比重写省</li>
+        </ul>
+        <div class="effort">工作量：M（省在逻辑，费在解耦）</div>
+      </div>
+      <div class="opt" tabindex="0" data-opt="B3" data-name="纯 Go 自研 hub（不用 PocketBase）">
+        <div class="oid">B3</div>
+        <div class="oname">纯 Go 自研 hub</div>
+        <div class="odesc">chi/echo + SQLite 自己搭，不依赖 PocketBase 框架。</div>
+        <ul class="pl">
+          <li class="p">零框架绑定，长期自由度最高</li>
+          <li class="m">auth、realtime、admin、备份全部自己造，MVP 周期显著拉长</li>
+        </ul>
+        <div class="effort">工作量：L</div>
+      </div>
+    </div>
+    <div class="drec"><b>推荐 B1：</b>你要的形态（参考 beszel）已经替你选好了栈。PocketBase 若日后成为瓶颈，届时业务已验证，迁移是幸福的烦恼。</div>
+  </div>
+
+  <!-- C -->
+  <div class="decision" data-group="C" data-title="配置同步模型">
+    <div class="dhead"><span class="dletter">决策 C</span><h3>配置同步模型（最核心的产品决策）</h3></div>
+    <p class="dq">「谁是真相」决定整个产品的交互性格。企业答案是「中台是真相」，个人场景没有现成答案。</p>
+    <div class="opts">
+      <div class="opt" tabindex="0" data-opt="C1" data-name="中台为准 + 漂移收编">
+        <div class="oid">C1 <span class="chip rec">推荐</span></div>
+        <div class="oname">中台为准 + 漂移收编</div>
+        <div class="odesc">hub 是唯一基线；机器上的改动被侦测为漂移，面板一键「收编为新版本」或「恢复」，可按路径设自动收编。</div>
+        <ul class="pl">
+          <li class="p">多机一致性语义清晰，永远知道基线是什么</li>
+          <li class="p">「收编」把个人的顺手改动变成正式版本——尊重个人工作流而非对抗它</li>
+          <li class="p">与 leycode 协议天然同构（A1 的对齐要求）</li>
+          <li class="m">本机改动要多一次确认（自动收编规则可缓解）</li>
+        </ul>
+        <div class="effort">复用：leycode 漂移/对账逻辑</div>
+      </div>
+      <div class="opt" tabindex="0" data-opt="C2" data-name="机器为准（自动双向同步）">
+        <div class="oid">C2</div>
+        <div class="oname">机器为准，自动双向</div>
+        <div class="odesc">hub 只是同步中继 + 备份，任一台的改动自动成为最新状态（Syncthing 心智）。</div>
+        <ul class="pl">
+          <li class="p">最省心，零确认</li>
+          <li class="m">两台各改一处怎么合？冲突语义天生模糊</li>
+          <li class="m">错误配置会静默传染全机队，难回溯</li>
+          <li class="m">与企业协议不同构，A3 的门关掉一半</li>
+        </ul>
+        <div class="effort">工作量：M，但边界情况长尾</div>
+      </div>
+      <div class="opt" tabindex="0" data-opt="C3" data-name="Git 仓库为准">
+        <div class="oid">C3</div>
+        <div class="oname">Git 仓库为准</div>
+        <div class="odesc">配置集 = git repo（hub 内建或外部 GitHub），agent 负责 auto-commit / pull。</div>
+        <ul class="pl">
+          <li class="p">版本、diff、回滚、历史免费；极客好感度高</li>
+          <li class="m">合并冲突直接暴露给用户，面板编辑体验要绕着 git 走</li>
+          <li class="m">秘密管理与 git 历史天然打架</li>
+        </ul>
+        <div class="effort">工作量：M</div>
+      </div>
+    </div>
+    <div class="drec"><b>推荐 C1：</b>产品语义用「声明式 + 收编」，底层存储不妨用 git（或 content-addressed 存储）实现版本与 diff——取 C3 的实现红利，不取它的用户心智负担。</div>
+  </div>
+
+  <!-- D -->
+  <div class="decision" data-group="D" data-title="用量数据采集">
+    <div class="dhead"><span class="dletter">决策 D</span><h3>用量数据采集通道</h3></div>
+    <p class="dq">「数据收集要留扩展余地」——用量数据从哪条管道来？</p>
+    <div class="opts">
+      <div class="opt" tabindex="0" data-opt="D1" data-name="会话 JSONL 解析上报（MVP）">
+        <div class="oid">D1 <span class="chip rec">推荐 MVP</span></div>
+        <div class="oname">会话 JSONL 解析上报</div>
+        <div class="odesc">agent 解析本地 <code style="font-family:var(--mono);font-size:.9em;">~/.claude/projects/</code> 会话文件，增量上报 token 用量（ccusage 思路）。</div>
+        <ul class="pl">
+          <li class="p">零配置、可回灌历史、离线补报</li>
+          <li class="p">leycode-client 的 sessionlog 管道是现成的（含 compact 重排、Cursor 双根）</li>
+          <li class="m">解析逻辑要跟着 Claude Code 版本走（ccusage 同病，社区可分摊）</li>
+        </ul>
+        <div class="effort">复用度：高</div>
+      </div>
+      <div class="opt" tabindex="0" data-opt="D2" data-name="OpenTelemetry 通道（v1 扩展）">
+        <div class="oid">D2 <span class="chip dim">v1 扩展</span></div>
+        <div class="oname">OpenTelemetry 通道</div>
+        <div class="odesc">利用 Claude Code 原生 OTel 导出，agent（或 hub）内置轻量 OTLP 接收端。</div>
+        <ul class="pl">
+          <li class="p">官方支持的标准出口，指标丰富（活跃时长、工具调用等）</li>
+          <li class="p">协同优势：telemetry env 正好由 Orciny 的配置下发顺手注入</li>
+          <li class="m">无历史回灌；需改用户 env；实时性依赖会话进行中</li>
+        </ul>
+        <div class="effort">工作量：S–M（在 D1 之上叠加）</div>
+      </div>
+      <div class="opt" tabindex="0" data-opt="D3" data-name="订阅余额抓取（并入即有）">
+        <div class="oid">D3 <span class="chip good">随决策 E 并入</span></div>
+        <div class="oname">订阅余额抓取</div>
+        <div class="odesc">ai-plan-insight 的 fetch/push 双模式整体并入：hub 拉 API 类（GLM/Kimi/火山…），agent 抓本地类（Claude/Cursor…）。</div>
+        <ul class="pl">
+          <li class="p">中文 Coding Plan 覆盖是独占卖点</li>
+          <li class="p">协议成熟且已在生产运行</li>
+        </ul>
+        <div class="effort">见决策 E</div>
+      </div>
+    </div>
+    <div class="drec"><b>推荐 D1 + D3 进 MVP，D2 作为 v1 扩展点</b>——三条通道不互斥，是分期问题而非取舍问题。会话日志「全文」上传（leycode 块八能力）另作 v2 可选开关：跨机器搜索历史会话对个人是杀手锏，但先把用量跑通。</div>
+  </div>
+
+  <!-- E -->
+  <div class="decision" data-group="E" data-title="ai-plan-insight 合并路径">
+    <div class="dhead"><span class="dletter">决策 E</span><h3>ai-plan-insight 合并路径</h3></div>
+    <p class="dq">Python 面板如何进入 Go 新世界？它还在生产运行，迁移不能断档。</p>
+    <div class="opts">
+      <div class="opt" tabindex="0" data-opt="E1" data-name="一次性 Go 重写">
+        <div class="oid">E1</div>
+        <div class="oname">一次性 Go 重写</div>
+        <div class="odesc">14+ 家 Provider 抓取逻辑全部移植进 hub/agent，Python 项目退役。</div>
+        <ul class="pl">
+          <li class="p">终态干净，单一技术栈</li>
+          <li class="m">一次性移植量大，长尾 Provider 的调试成本高</li>
+          <li class="m">迁移期你自己的面板断档</li>
+        </ul>
+        <div class="effort">工作量：M–L</div>
+      </div>
+      <div class="opt" tabindex="0" data-opt="E2" data-name="保留 Python 作为采集 sidecar">
+        <div class="oid">E2</div>
+        <div class="oname">保留 Python 采集 sidecar</div>
+        <div class="odesc">ai-plan-insight 去掉前端，作为采集服务把数据推给 Orciny hub。</div>
+        <ul class="pl">
+          <li class="p">几乎零迁移成本，立即可用</li>
+          <li class="m">永久多一个服务与一个运行时，违背单二进制气质</li>
+        </ul>
+        <div class="effort">工作量：S</div>
+      </div>
+      <div class="opt" tabindex="0" data-opt="E3" data-name="协议先行，分阶段吸收">
+        <div class="oid">E3 <span class="chip rec">推荐</span></div>
+        <div class="oname">协议先行，分阶段吸收</div>
+        <div class="odesc">第一步：hub 原生实现 ai-plan-insight 的 push API 兼容层——现有各家 *-usage-agent 与 Python 服务不改一行就能把数据打进来；第二步：按使用频率逐个把 Provider 移植进 Go，直到 Python 退役。</div>
+        <ul class="pl">
+          <li class="p">不断档：面板第一天就有数据</li>
+          <li class="p">push 协议兼容顺带成为公开生态接口（第三方可自写 pusher）</li>
+          <li class="p">移植节奏完全自主</li>
+          <li class="m">过渡期存在双轨</li>
+        </ul>
+        <div class="effort">工作量：S 起步，M 收尾</div>
+      </div>
+    </div>
+    <div class="drec"><b>推荐 E3：</b>把「兼容 push API」升格为产品特性而不只是迁移手段——它让 Orciny 天生就有一个开放的数据摄入口。</div>
+  </div>
+
+  <!-- F -->
+  <div class="decision" data-group="F" data-title="连接与安全模型">
+    <div class="dhead"><span class="dletter">决策 F</span><h3>Agent 连接与安全模型</h3></div>
+    <p class="dq">agent 与 hub 怎么连、怎么信任？家庭 NAT 后的 Mac mini 和云上 VPS 都要能接入。</p>
+    <div class="opts">
+      <div class="opt" tabindex="0" data-opt="F1" data-name="agent 外拨 WebSocket（beszel 模式）">
+        <div class="oid">F1 <span class="chip rec">推荐</span></div>
+        <div class="oname">agent 外拨 WebSocket</div>
+        <div class="odesc">agent 主动连 hub（一次性注册 token + 指纹），长连接推送下发，断线重连。beszel 同款。</div>
+        <ul class="pl">
+          <li class="p">NAT 友好：机器在哪都能连，hub 无需触达 agent</li>
+          <li class="p">在线状态、秒级下发天然免费</li>
+          <li class="m">hub 需要一个可达地址（个人场景通常有：内网或小 VPS）</li>
+        </ul>
+        <div class="effort">工作量：S–M（beszel 有完整参考）</div>
+      </div>
+      <div class="opt" tabindex="0" data-opt="F2" data-name="HTTP 长轮询（leycode 现状）">
+        <div class="oid">F2</div>
+        <div class="oname">HTTP 长轮询</div>
+        <div class="odesc">leycode 已验证的复合 ETag 长轮询协议直接平移。</div>
+        <ul class="pl">
+          <li class="p">实现最简单，协议已被 20+ 集成测试验证</li>
+          <li class="p">与企业协议完全同构</li>
+          <li class="m">实时性与在线状态弱于长连接（秒级 vs 轮询间隔）</li>
+        </ul>
+        <div class="effort">工作量：S</div>
+      </div>
+      <div class="opt" tabindex="0" data-opt="F3" data-name="hub 拨 SSH（beszel 兜底模式）">
+        <div class="oid">F3</div>
+        <div class="oname">hub 主动 SSH 连 agent</div>
+        <div class="odesc">hub 侧发起连接，agent 监听。</div>
+        <ul class="pl">
+          <li class="p">hub 不需要公网可达</li>
+          <li class="m">要求每台机器可被 hub 触达，NAT 场景反而更麻烦</li>
+          <li class="m">个人机器（笔记本）IP 漂移，管理负担在错的一侧</li>
+        </ul>
+        <div class="effort">工作量：M</div>
+      </div>
+    </div>
+    <div class="drec"><b>推荐 F1</b>，接口层留出 F2 作为受限网络的降级路径（两者可共存，beszel 就是双通道）。安全基线：一次性注册 token、agent 指纹绑定、凭据只在下发注入时经手且不落审计、TLS 交给反代。</div>
+  </div>
+
+  <!-- G -->
+  <div class="decision" data-group="G" data-title="开源与商业策略">
+    <div class="dhead"><span class="dletter">决策 G</span><h3>开源与商业策略</h3></div>
+    <p class="dq">§01 的三维评分已经给出方向感：这决定投入预期与宣发动作。</p>
+    <div class="opts">
+      <div class="opt" tabindex="0" data-opt="G1" data-name="纯自用，不发布">
+        <div class="oid">G1</div>
+        <div class="oname">纯自用</div>
+        <div class="odesc">解决自己的问题就收工。</div>
+        <ul class="pl">
+          <li class="p">零维护压力、零宣发成本</li>
+          <li class="m">浪费差异化资产与已验证的社区需求</li>
+        </ul>
+        <div class="effort">机会成本：高</div>
+      </div>
+      <div class="opt" tabindex="0" data-opt="G2" data-name="MIT 开源，社区驱动（beszel 路线）">
+        <div class="oid">G2 <span class="chip rec">推荐</span></div>
+        <div class="oname">MIT 开源，社区驱动</div>
+        <div class="odesc">英文 README 面向 self-hosted 社区 + 中文 README 面向国内生态，不承诺 SLA，接受贡献。</div>
+        <ul class="pl">
+          <li class="p">star / 影响力 / 简历价值；Provider 适配这类长尾正适合社区共建</li>
+          <li class="p">「自托管、数据不出家门」的立场与开源互为背书</li>
+          <li class="m">issue 维护是真实的时间税</li>
+        </ul>
+        <div class="effort">附加成本：宣发 + 维护节奏管理</div>
+      </div>
+      <div class="opt" tabindex="0" data-opt="G3" data-name="Open-core：个人免费 + 团队付费">
+        <div class="oid">G3</div>
+        <div class="oname">Open-core 收费</div>
+        <div class="odesc">个人免费，团队功能（成员、共享库）收费或闭源。</div>
+        <ul class="pl">
+          <li class="p">理论上有变现路径</li>
+          <li class="m">个人工具付费转化极低；付费墙会掐死早期增长</li>
+          <li class="m">你已经有企业变现载体——它叫 leycode</li>
+        </ul>
+        <div class="effort">建议：不设计付费墙，只留 hook</div>
+      </div>
+    </div>
+    <div class="drec"><b>推荐 G2：</b>把「商业化」明确让渡给 leycode（Orciny 页脚一行「Need teams &amp; governance? → leycode」就是全部商业动作）。Orciny 挣的是影响力与入口，不是钱。</div>
+  </div>
+</section>
+
+<!-- ================= 7. MVP ================= -->
+<section id="mvp">
+  <div class="sec-eyebrow">§07</div>
+  <h2>MVP 与路线图</h2>
+
+  <p><strong>MVP 只做四件事</strong>（按推荐组合 A1·B1·C1·D1+D3·E3·F1·G2 展开）：</p>
+  <div class="tblwrap"><table>
+    <thead><tr><th style="width:32px;">#</th><th>能力</th><th>验收标准（对你自己）</th><th>主要复用</th></tr></thead>
+    <tbody>
+      <tr><td class="c">1</td><td><strong>机器清单与在线状态</strong></td><td>所有机器一行命令接入，面板可见在线/版本/最后心跳</td><td>beszel 连接模型</td></tr>
+      <tr><td class="c">2</td><td><strong>配置集：导入 → 下发 → 漂移收编</strong></td><td>从主力机导入现有 ~/.claude；改动可发布到全机队；机器上顺手的改动能被收编或恢复</td><td>leycode Profile/对账 + client applier</td></tr>
+      <tr><td class="c">3</td><td><strong>Token 用量聚合</strong></td><td>按机器/模型/日查看用量与估算成本，含历史回灌</td><td>client sessionlog 管道</td></tr>
+      <tr><td class="c">4</td><td><strong>订阅余额面板</strong></td><td>现有 ai-plan-insight 卡片全部点亮，数据不断档</td><td>push API 兼容层（E3 第一步）</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>里程碑（按序不按期）</h3>
+  <ol>
+    <li><strong>M0 · 骨架</strong>：hub 起得来 + agent 注册上线 + 机器列表。<span class="small">（打通 beszel 式管道）</span></li>
+    <li><strong>M1 · 配置闭环</strong>：导入 / 编辑 / 发布 / 落盘回执 / 漂移收编。<span class="small">（产品成立与否看这里）</span></li>
+    <li><strong>M2 · 数据面</strong>：JSONL 用量上报 + push API 兼容 + 订阅卡片。<span class="small">（此时可替换线上 ai-plan-insight）</span></li>
+    <li><strong>M3 · 自用毕业</strong>：你所有机器迁移完毕，旧方案下线 → 打磨安装体验后开源发布。</li>
+  </ol>
+
+  <h3>发布后的扩展序列（预留而不预支）</h3>
+  <ul>
+    <li><strong>v1</strong>：告警通知（订阅阈值 / 机器离线 / 应用失败 → ntfy · Telegram · Bark）；OTel 接收端（D2）。</li>
+    <li><strong>v2</strong>：会话日志全文可选上传 + 跨机器检索（leycode 块八移植，个人版杀手锏）；OpenCode / Codex 等多工具适配（AgentAdapter 已就绪）。</li>
+    <li><strong>v3</strong>：微团队（邀请成员、共享 skills 库）；与 leycode 的互通/迁移通道（A3 是否启动在此时决策）。</li>
+  </ul>
+</section>
+
+<!-- ================= 8. RISKS ================= -->
+<section id="risks">
+  <div class="sec-eyebrow">§08</div>
+  <h2>风险与对冲</h2>
+  <div class="tblwrap"><table>
+    <thead><tr><th>风险</th><th class="c">等级</th><th>分析与对冲</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>官方推出原生 sync</strong></td><td class="c"><span class="chip warn">中</span></td>
+        <td>四个高热度 issue 意味着 Anthropic 迟早会做「账号级云同步」。对冲：① 自托管隐私立场（不想把 CLAUDE.md 和公司项目路径传给任何云的人群恒在）；② 多工具覆盖（官方只会同步自家）；③ 订阅聚合、第三方中转用量、机队观测是官方永远不做的。官方 sync 出现后 Orciny 的重心自然滑向「观测 + 多工具 + 订阅」，形态仍然成立。</td>
+      </tr>
+      <tr>
+        <td><strong>做成红海里的又一个编排工具</strong></td><td class="c"><span class="chip warn">中</span></td>
+        <td>「顺手加个远程开会话」的诱惑会一直存在。对冲：§04 不做清单是护栏——不碰执行链路，这也是与 Multica/agent-fleet 们的清晰区隔。</td>
+      </tr>
+      <tr>
+        <td><strong>追版本的维护税</strong></td><td class="c"><span class="chip warn">中</span></td>
+        <td>settings schema、JSONL 格式、各家订阅 API 都会变。对冲：解析层独立成包 + 契约测试；这类长尾正是开源社区最愿意贡献的部分（ccusage、ai-plan-insight 的 Provider 生态已证明）。</td>
+      </tr>
+      <tr>
+        <td><strong>个人精力，三线作战</strong></td><td class="c"><span class="chip bad">高</span></td>
+        <td>leycode 尚有客户端收尾（C1/C2），Orciny 是新战线。对冲：① MVP 卡死四件事；② M2 完成即替换 ai-plan-insight——新项目上线同时旧项目下线，净维护面不增反减；③ leycode 与 Orciny 共享协议心智，切换成本低。</td>
+      </tr>
+      <tr>
+        <td><strong>秘密管理出安全事故</strong></td><td class="c"><span class="chip bad">高（影响）/ 低（概率）</span></td>
+        <td>hub 集中保管各家 API key，一旦泄露伤害集中。对冲：凭据加密落库、版本库只存占位符、agent 侧 0600 落盘（leycode 已有实践）、公开安全模型文档。这是开源前必须过的关，不是 v2 作业。</td>
+      </tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ================= 9. NAMING ================= -->
+<section id="naming">
+  <div class="sec-eyebrow">§09</div>
+  <h2>命名提案</h2>
+  <p>beszel 取自 China Miéville 小说《The City &amp; The City》中的城市 Besźel——两座城市物理上重叠、居民却被训练「视而不见」对方。沿这个思路给出四个候选：</p>
+
+  <div class="names">
+    <div class="name first">
+      <div class="nm">orciny <span class="chip rec">主推</span></div>
+      <div class="src">同书 · 传说中的第三座城</div>
+      <p>Orciny 是传说里存在于双城「缝隙」中的隐形之城，据说在暗中治理着两座可见的城市——一个不可见的层，治理你所有可见的机器。与 beszel 同宇宙致敬（你的形态参照正是 beszel），拼写独特，六个字母适合 CLI，GitHub / npm 均无重名冲突（已查）。彩蛋空间：数据脱敏开关可叫 <code style="font-family:var(--mono);font-size:.9em;">unsee</code>（书中「视而不见」的术语）。</p>
+    </div>
+    <div class="name">
+      <div class="nm">uqbar</div>
+      <div class="src">博尔赫斯《特隆、乌克巴尔、奥比斯·特蒂乌斯》</div>
+      <p>一部描述虚构世界的百科全书，最终重塑了现实——「配置即真相」的完美隐喻。缺点：有区块链项目重名，Tlön 系词汇被 Urbit 生态占用过。</p>
+    </div>
+    <div class="name">
+      <div class="nm">armada</div>
+      <div class="src">Miéville《The Scar》· 浮动海盗城</div>
+      <p>由无数被掳船只拼成的移动城市——「机队（fleet）」的直白隐喻，同属 Miéville 宇宙。缺点：常用词，重名多，搜索引擎不友好。</p>
+    </div>
+    <div class="name">
+      <div class="nm">erewhon</div>
+      <div class="src">塞缪尔·巴特勒《埃瑞璜》</div>
+      <p>「nowhere」的变位词，书中「机器之书」章节是最早的机器演化论。文学梗极佳，但七个字母 + 发音不直观（err-e-hwon）。</p>
+    </div>
+  </div>
+  <p class="small">弃选说明：Breach（同书中跨城执法机构，语义极贴）因在安全语境里是「入侵/泄露」，对一个保管 API key 的工具是灾难性联想，放弃。</p>
+</section>
+
+<!-- ================= 10. PICKER ================= -->
+<section id="picker">
+  <div class="sec-eyebrow">§10</div>
+  <h2>决策速查与你的选择</h2>
+  <p>推荐组合一览：<strong>A1 独立项目 · B1 Go/PocketBase · C1 声明式+收编 · D1+D3 起步 · E3 协议先行 · F1 外拨长连 · G2 MIT 开源</strong>。你在 §06 点选的倾向会汇总在下面（保存在本机浏览器，刷新不丢）：</p>
+  <div class="summary">
+    <h3>我的选择</h3>
+    <div id="pickList"><p class="empty">尚未选择——回到 §06 点击方案卡即可记录。也可以 <button class="btn ghost" id="pickRec" type="button">一键采用推荐组合</button></p></div>
+    <div class="btnrow">
+      <button class="btn" id="copyBtn" type="button">复制选择结果</button>
+      <button class="btn ghost" id="clearBtn" type="button">清空</button>
+      <span id="copiedNote">已复制，粘贴回对话即可。</span>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p><strong>资料来源</strong></p>
+  <ul class="srcs">
+    <li><a href="https://github.com/anthropics/claude-code/issues/22648">anthropics/claude-code #22648 · 账号级设置同步请求</a></li>
+    <li><a href="https://github.com/anthropics/claude-code/issues/36693">anthropics/claude-code #36693 · 无原生配置同步</a></li>
+    <li><a href="https://github.com/anthropics/claude-code/issues/38970">anthropics/claude-code #38970 · 用户级配置云同步</a></li>
+    <li><a href="https://github.com/anthropics/claude-code/issues/57678">anthropics/claude-code #57678 · skills/记忆云同步</a></li>
+    <li><a href="https://www.steeman.be/posts/syncing-claude-code-across-multiple-machines/">steeman.be · 多机同步实践</a></li>
+    <li><a href="https://brianlovin.com/writing/syncing-claude-code-settings-between-computers-am7lNQ8">Brian Lovin · 双机同步方案</a></li>
+    <li><a href="https://nickang.com/how-to-sync-claude-code-global-files-across-machines-if-you-work-on-multiple-computers/">Nick Ang · git 同步方案</a></li>
+    <li><a href="https://github.com/miwidot/ccms">ccms · rsync 同步脚本</a></li>
+    <li><a href="https://dev.to/ryantech00/how-i-track-claude-code-costs-across-multiple-pcs-13bl">跨机用量看板 DIY（ccusage+Supabase）</a></li>
+    <li><a href="https://github.com/ColeMurray/claude-code-otel">claude-code-otel · OTel 观测栈</a></li>
+    <li><a href="https://code.claude.com/docs/en/monitoring-usage">Claude Code 官方 · OpenTelemetry 监控文档</a></li>
+    <li><a href="https://signoz.io/docs/claude-code-monitoring/">SigNoz · Claude Code OTel 接入</a></li>
+    <li><a href="https://github.com/ruanyf/weekly/issues/9017">Codes CLI · 多环境管理工具（自荐帖）</a></li>
+    <li><a href="https://github.com/ding113/claude-code-hub">claude-code-hub · API 代理类竞品</a></li>
+    <li><a href="https://github.com/henrygd/beszel">beszel · 形态参照（约 2.3 万 star）</a></li>
+  </ul>
+  <p style="margin-top:18px;">Orciny 项目构思报告 · 2026-07-21 · 由 Claude 调研并撰写，供决策参考；star 数等市场数据为检索结果，未逐一复核。</p>
+</footer>
+
+</div>
+
+<script>
+(function () {
+  var KEY = "orciny-choices";
+  var groups = document.querySelectorAll(".decision");
+  var listEl = document.getElementById("pickList");
+  var note = document.getElementById("copiedNote");
+  var REC = { A: "A1", B: "B1", C: "C1", D: "D1", E: "E3", F: "F1", G: "G2" };
+
+  function load() {
+    try { return JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) { return {}; }
+  }
+  function save(state) {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+  }
+  function apply(state) {
+    groups.forEach(function (g) {
+      var gid = g.getAttribute("data-group");
+      g.querySelectorAll(".opt").forEach(function (o) {
+        o.classList.toggle("sel", state[gid] === o.getAttribute("data-opt"));
+      });
+    });
+    render(state);
+  }
+  function render(state) {
+    var rows = [];
+    groups.forEach(function (g) {
+      var gid = g.getAttribute("data-group");
+      var title = g.getAttribute("data-title");
+      if (state[gid]) {
+        var o = g.querySelector('[data-opt="' + state[gid] + '"]');
+        var name = o ? o.getAttribute("data-name") : state[gid];
+        rows.push({ gid: gid, title: title, opt: state[gid], name: name });
+      }
+    });
+    if (!rows.length) {
+      listEl.innerHTML = '<p class="empty">尚未选择——回到 §06 点击方案卡即可记录。也可以 <button class="btn ghost" id="pickRec" type="button">一键采用推荐组合</button></p>';
+      bindRec();
+      return;
+    }
+    var html = '<div class="tblwrap" style="margin:0 0 4px;"><table><thead><tr><th>决策</th><th>选择</th><th>方案</th></tr></thead><tbody>';
+    rows.forEach(function (r) {
+      html += "<tr><td>" + r.title + '</td><td class="c" style="font-family:var(--mono);">' + r.opt + "</td><td>" + r.name + "</td></tr>";
+    });
+    html += "</tbody></table></div>";
+    if (rows.length < groups.length) {
+      html += '<p class="empty">还有 ' + (groups.length - rows.length) + " 组未选。</p>";
+    }
+    listEl.innerHTML = html;
+  }
+  function bindRec() {
+    var b = document.getElementById("pickRec");
+    if (b) b.addEventListener("click", function () { save(REC); apply(REC); });
+  }
+  function text(state) {
+    var out = ["我的 Orciny 选型："];
+    groups.forEach(function (g) {
+      var gid = g.getAttribute("data-group");
+      var title = g.getAttribute("data-title");
+      if (state[gid]) {
+        var o = g.querySelector('[data-opt="' + state[gid] + '"]');
+        out.push("决策" + gid + "（" + title + "）：" + state[gid] + " " + (o ? o.getAttribute("data-name") : ""));
+      } else {
+        out.push("决策" + gid + "（" + title + "）：未定");
+      }
+    });
+    return out.join("\n");
+  }
+
+  groups.forEach(function (g) {
+    var gid = g.getAttribute("data-group");
+    g.querySelectorAll(".opt").forEach(function (o) {
+      function toggle() {
+        var state = load();
+        state[gid] = state[gid] === o.getAttribute("data-opt") ? undefined : o.getAttribute("data-opt");
+        if (!state[gid]) delete state[gid];
+        save(state); apply(state);
+      }
+      o.addEventListener("click", toggle);
+      o.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
+    });
+  });
+
+  document.getElementById("copyBtn").addEventListener("click", function () {
+    var t = text(load());
+    function done() { note.style.display = "inline"; setTimeout(function () { note.style.display = "none"; }, 2500); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(t).then(done, function () { window.prompt("复制以下内容：", t); });
+    } else { window.prompt("复制以下内容：", t); }
+  });
+  document.getElementById("clearBtn").addEventListener("click", function () { save({}); apply({}); });
+
+  bindRec();
+  apply(load());
+})();
+</script>

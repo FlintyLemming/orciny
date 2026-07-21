@@ -1,0 +1,1054 @@
+<title>Orciny · UI Mock</title>
+<style>
+  :root {
+    --page: #faf9f6; --surface: #fffefb; --wash: #f0eee8; --wash2: #e9e6df;
+    --ink: #1c1b18; --ink2: #57544c; --ink3: #8c887e;
+    --line: #e6e3dc; --hair: rgba(28,27,24,.10);
+    --accent: #b45309; --accent-bright: #c2540f; --accent-soft: rgba(194,84,15,.09);
+    --pri-bg: #c2540f; --pri-ink: #fff8f2;
+    --good: #0ca30c; --good-text: #21691f; --good-bg: rgba(12,163,12,.10);
+    --warn: #d9a94a; --warn-text: #8a6414; --warn-bg: rgba(217,169,74,.16);
+    --crit: #d03b3b; --crit-text: #b3372e; --crit-bg: rgba(208,59,59,.10);
+    --info-text: #1c5cab; --info-bg: rgba(42,120,214,.10);
+    --s1: #2a78d6; --s2: #008300; --s3: #e87ba4; --s4: #eda100; --s5: #1baf7a;
+    --brand-fill: #b45309;
+    --grid: #e6e3dc; --axis: #cfccc3;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      --page: #131210; --surface: #1c1a17; --wash: #262320; --wash2: #2e2b26;
+      --ink: #f2efe9; --ink2: #b6b2aa; --ink3: #8c887e;
+      --line: #2e2b26; --hair: rgba(242,239,233,.10);
+      --accent: #f08c4a; --accent-bright: #e8721e; --accent-soft: rgba(232,114,30,.13);
+      --pri-bg: #c2540f; --pri-ink: #fff8f2;
+      --good-text: #4fbf5e; --good-bg: rgba(12,163,12,.16);
+      --warn-text: #d9a94a; --warn-bg: rgba(217,169,74,.13);
+      --crit: #d03b3b; --crit-text: #e66767; --crit-bg: rgba(208,59,59,.16);
+      --info-text: #86b6ef; --info-bg: rgba(57,135,229,.14);
+      --s1: #3987e5; --s2: #008300; --s3: #d55181; --s4: #c98500; --s5: #199e70;
+      --brand-fill: #e8721e;
+      --grid: #2e2b26; --axis: #3c3832;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page: #131210; --surface: #1c1a17; --wash: #262320; --wash2: #2e2b26;
+    --ink: #f2efe9; --ink2: #b6b2aa; --ink3: #8c887e;
+    --line: #2e2b26; --hair: rgba(242,239,233,.10);
+    --accent: #f08c4a; --accent-bright: #e8721e; --accent-soft: rgba(232,114,30,.13);
+    --pri-bg: #c2540f; --pri-ink: #fff8f2;
+    --good-text: #4fbf5e; --good-bg: rgba(12,163,12,.16);
+    --warn-text: #d9a94a; --warn-bg: rgba(217,169,74,.13);
+    --crit: #d03b3b; --crit-text: #e66767; --crit-bg: rgba(208,59,59,.16);
+    --info-text: #86b6ef; --info-bg: rgba(57,135,229,.14);
+    --s1: #3987e5; --s2: #008300; --s3: #d55181; --s4: #c98500; --s5: #199e70;
+    --brand-fill: #e8721e;
+    --grid: #2e2b26; --axis: #3c3832;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: var(--page); color: var(--ink); font-family: var(--sans); font-size: 14px; line-height: 1.6; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  button { font-family: inherit; }
+  :focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 2px; }
+
+  .app { display: flex; min-height: 100vh; }
+
+  /* ---------- sidebar ---------- */
+  .sb { width: 218px; flex: none; background: var(--surface); border-right: 1px solid var(--line); padding: 18px 12px 14px; display: flex; flex-direction: column; gap: 2px; position: sticky; top: 0; height: 100vh; }
+  .logo { display: flex; align-items: center; gap: 10px; padding: 4px 10px 18px; }
+  .logo .mark { width: 28px; height: 28px; border-radius: 8px; background: var(--pri-bg); color: var(--pri-ink); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 14px; font-weight: 700; }
+  .logo .nm { font-weight: 650; letter-spacing: .02em; }
+  .logo .tg { display: block; font-size: 10.5px; color: var(--ink3); font-weight: 400; margin-top: -2px; }
+  .nav-btn { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: none; border: none; border-radius: 8px; padding: 7px 10px; font-size: 13.5px; color: var(--ink2); cursor: pointer; }
+  .nav-btn svg { flex: none; opacity: .75; }
+  .nav-btn:hover { background: var(--wash); color: var(--ink); }
+  .nav-btn.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .nav-btn.on svg { opacity: 1; }
+  .nav-btn .cnt { margin-left: auto; font-family: var(--mono); font-size: 11px; background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 1px 8px; }
+  .sb .foot { margin-top: auto; padding: 10px 10px 0; font-size: 12px; color: var(--ink3); border-top: 1px solid var(--line); }
+  .sb .foot .on-line { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; color: var(--ink2); }
+  .sb .foot .ver { font-family: var(--mono); font-size: 10.5px; margin-top: 6px; }
+
+  /* ---------- topbar ---------- */
+  .main { flex: 1; min-width: 0; }
+  .top { display: flex; align-items: center; gap: 14px; padding: 12px 28px; border-bottom: 1px solid var(--line); background: var(--surface); position: sticky; top: 0; z-index: 5; }
+  .top h1 { font-size: 15.5px; margin: 0; font-weight: 650; white-space: nowrap; }
+  .top .psub { font-size: 12px; color: var(--ink3); white-space: nowrap; }
+  .top .search { margin-left: auto; flex: 0 1 300px; display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--page); border-radius: 8px; padding: 5.5px 12px; color: var(--ink3); font-size: 12.5px; cursor: text; }
+  .top .tools { display: flex; align-items: center; gap: 8px; }
+  .lang { display: flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+  .lang button { border: none; background: none; padding: 4px 9px; font-size: 11.5px; color: var(--ink3); cursor: pointer; }
+  .lang button.on { background: var(--pri-bg); color: var(--pri-ink); }
+  .iconbtn { width: 30px; height: 30px; border: 1px solid var(--line); background: var(--surface); border-radius: 7px; cursor: pointer; color: var(--ink2); font-size: 14px; line-height: 1; }
+  .iconbtn:hover { background: var(--wash); }
+  .avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--pri-bg); color: var(--pri-ink); border: none; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+  .content { padding: 24px 28px 80px; max-width: 1240px; }
+
+  section[data-view] { display: none; }
+  section[data-view].on { display: block; }
+
+  /* ---------- primitives ---------- */
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+  .card .hd { display: flex; align-items: center; gap: 10px; padding: 14px 18px 0; }
+  .card .hd h3 { margin: 0; font-size: 13.5px; font-weight: 600; }
+  .card .hd .sub { font-size: 12px; color: var(--ink3); }
+  .card .bd { padding: 14px 18px 16px; }
+
+  .btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 6px 13px; font-size: 13px; cursor: pointer; }
+  .btn:hover { background: var(--wash); }
+  .btn.pri { background: var(--pri-bg); color: var(--pri-ink); border-color: var(--pri-bg); }
+  .btn.pri:hover { opacity: .9; background: var(--pri-bg); }
+  .btn.sm { padding: 3.5px 10px; font-size: 12.5px; border-radius: 7px; }
+  .btn.ghost { border-color: transparent; background: none; color: var(--ink2); }
+  .btn.ghost:hover { background: var(--wash); color: var(--ink); }
+
+  .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; border-radius: 999px; padding: 2px 9px; font-weight: 550; white-space: nowrap; }
+  .chip.good { background: var(--good-bg); color: var(--good-text); }
+  .chip.warn { background: var(--warn-bg); color: var(--warn-text); }
+  .chip.crit { background: var(--crit-bg); color: var(--crit-text); }
+  .chip.info { background: var(--info-bg); color: var(--info-text); }
+  .chip.dim  { background: var(--wash); color: var(--ink2); }
+  .chip.brand { background: var(--accent-soft); color: var(--accent); }
+  .chip .st { font-size: 10px; }
+
+  .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tbl th { text-align: left; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink3); font-weight: 600; padding: 8px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .tbl td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  .tbl tr:last-child td { border-bottom: none; }
+  .tbl tbody tr:hover td { background: var(--wash); }
+  .tbl tr.click { cursor: pointer; }
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 12.5px; }
+  .mono { font-family: var(--mono); font-size: 12px; }
+  .mut { color: var(--ink3); } .sec { color: var(--ink2); }
+  .scroll { overflow-x: auto; }
+  .mdot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 7px; vertical-align: 0; }
+  .host { font-family: var(--mono); font-size: 11px; color: var(--ink3); }
+
+  /* ---------- dashboard ---------- */
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 14px; }
+  .kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; }
+  .kpi .l { font-size: 12px; color: var(--ink2); }
+  .kpi .v { font-size: 24px; font-weight: 650; margin-top: 2px; }
+  .kpi .v small { font-size: 13px; font-weight: 500; color: var(--ink3); }
+  .kpi .v.mono-v { font-family: var(--mono); font-size: 22px; }
+  .kpi .d { font-size: 12px; margin-top: 2px; }
+  .up { color: var(--good-text); }
+  .grid2 { display: grid; grid-template-columns: 1.35fr 1fr; gap: 14px; margin-top: 14px; }
+  @media (max-width: 980px) { .grid2 { grid-template-columns: 1fr; } }
+
+  .mrow { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px; cursor: pointer; }
+  .mrow:last-child { border-bottom: none; }
+  .mrow .nm { font-weight: 550; }
+  .mrow .os { color: var(--ink3); font-size: 11.5px; font-family: var(--mono); }
+  .mrow .chip { margin-left: auto; }
+
+  .ev { display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+  .ev:last-child { border-bottom: none; }
+  .ev .t { font-family: var(--mono); font-size: 11px; color: var(--ink3); flex: none; width: 52px; padding-top: 2px; }
+
+  /* ---------- charts ---------- */
+  .chartwrap { position: relative; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; padding: 4px 0 10px; font-size: 12px; color: var(--ink2); }
+  .legend span { display: inline-flex; align-items: center; }
+  .tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.14); padding: 8px 12px; font-size: 12px; display: none; z-index: 9; min-width: 150px; }
+  .tip .d { font-weight: 600; margin-bottom: 4px; }
+  .tip .r { display: flex; gap: 8px; align-items: center; }
+  .tip .r .v { margin-left: auto; font-family: var(--mono); font-size: 11.5px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { border: none; background: none; padding: 5px 13px; font-size: 12.5px; color: var(--ink2); cursor: pointer; }
+  .seg button.on { background: var(--wash); color: var(--ink); font-weight: 600; }
+  .seg button + button { border-left: 1px solid var(--line); }
+
+  /* ---------- machines ---------- */
+  .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+  .ftabs { display: inline-flex; gap: 2px; background: var(--wash); border-radius: 8px; padding: 3px; }
+  .ftabs button { border: none; background: none; border-radius: 6px; padding: 4px 12px; font-size: 12.5px; color: var(--ink2); cursor: pointer; }
+  .ftabs button.on { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+
+  /* ---------- machine detail ---------- */
+  .backlink { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; margin-bottom: 12px; cursor: pointer; color: var(--accent); background: none; border: none; padding: 0; }
+  .mhead { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .mhead h2 { margin: 0; font-size: 20px; font-weight: 650; }
+  .kv { font-size: 13px; }
+  .kv .row { display: flex; padding: 7px 0; border-bottom: 1px solid var(--line); gap: 12px; }
+  .kv .row:last-child { border-bottom: none; }
+  .kv .k { color: var(--ink2); flex: none; width: 96px; }
+  .kv .v { margin-left: auto; font-family: var(--mono); font-size: 12px; text-align: right; word-break: break-all; }
+  .varrow .k2 { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+
+  /* ---------- inbox / drift ---------- */
+  .drift { margin-bottom: 14px; transition: opacity .3s, transform .3s; }
+  .drift.gone { opacity: 0; transform: translateX(16px); }
+  .drift .hd { padding-top: 12px; }
+  .diff { font-family: var(--mono); font-size: 12px; line-height: 1.7; white-space: pre; background: var(--page); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; overflow-x: auto; margin: 10px 0 12px; }
+  .diff .add { color: var(--good-text); } .diff .del { color: var(--crit-text); } .diff .ctx { color: var(--ink3); }
+  .drift .acts, .acts { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .conflict-note { display: flex; gap: 8px; align-items: flex-start; background: var(--warn-bg); color: var(--warn-text); border-radius: 8px; padding: 8px 12px; font-size: 12.5px; margin: 10px 0 12px; }
+  .dstat { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--page); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin-bottom: 8px; font-size: 12.5px; }
+  .dstat .mono { color: var(--ink); }
+  .dstat .pm { font-family: var(--mono); font-size: 11.5px; }
+  .dstat .pm .add { color: var(--good-text); } .dstat .pm .del { color: var(--crit-text); margin-left: 6px; }
+
+  /* ---------- config editor ---------- */
+  .ed { display: grid; grid-template-columns: 200px 1fr 264px; gap: 0; min-height: 480px; }
+  @media (max-width: 1020px) { .ed { grid-template-columns: 1fr; } .ed .files, .ed .meta { border-right: none !important; border-left: none !important; border-bottom: 1px solid var(--line); } }
+  .ed .files { border-right: 1px solid var(--line); padding: 12px 8px; font-size: 12.5px; }
+  .files .cap { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink3); padding: 0 10px 8px; }
+  .file { display: flex; align-items: center; gap: 7px; padding: 4.5px 10px; border-radius: 7px; cursor: pointer; color: var(--ink2); font-family: var(--mono); font-size: 12px; }
+  .file:hover { background: var(--wash); }
+  .file.on { background: var(--accent-soft); color: var(--accent); font-weight: 550; }
+  .file .m { margin-left: auto; width: 6px; height: 6px; border-radius: 50%; background: var(--accent-bright); }
+  .file.dir { color: var(--ink3); margin-top: 6px; cursor: default; font-family: var(--sans); font-size: 11.5px; }
+  .file.dir:hover { background: none; }
+  .ed .code { min-width: 0; }
+  .dhead { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-bottom: 1px solid var(--line); font-family: var(--mono); font-size: 12px; }
+  .dhead .pm .add { color: var(--good-text); } .dhead .pm .del { color: var(--crit-text); margin-left: 6px; }
+  .dbody { overflow-x: auto; padding: 8px 0 14px; }
+  .drow { display: flex; font-family: var(--mono); font-size: 12px; line-height: 1.9; white-space: pre; }
+  .drow .ln { flex: none; width: 44px; text-align: right; padding-right: 12px; color: var(--ink3); user-select: none; font-size: 10.5px; line-height: 2.1; }
+  .drow .cd { padding-right: 18px; }
+  .drow.add { background: var(--good-bg); } .drow.add .cd::before { content: "+ "; color: var(--good-text); }
+  .drow.del { background: var(--crit-bg); } .drow.del .cd::before { content: "- "; color: var(--crit-text); }
+  .drow.ctx .cd::before { content: "  "; }
+  .drow.ctx .cd { color: var(--ink2); }
+  .tok-c { color: var(--accent); font-weight: 600; }
+  .ed .meta { border-left: 1px solid var(--line); padding: 14px 16px; font-size: 12.5px; }
+  .meta h4 { margin: 0 0 8px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink3); }
+  .meta .blk { margin-bottom: 20px; }
+  .rev { padding: 8px 10px; border-radius: 8px; margin: 0 -10px; }
+  .rev.cur { background: var(--accent-soft); }
+  .rev .l1 { display: flex; align-items: center; gap: 8px; }
+  .rev .v { font-family: var(--mono); font-size: 12.5px; font-weight: 650; }
+  .rev .desc { font-size: 12px; color: var(--ink2); margin-top: 1px; }
+  .rev .when { font-size: 10.5px; color: var(--ink3); font-family: var(--mono); margin-top: 1px; }
+  .rev .l1 a { margin-left: auto; font-size: 11.5px; }
+  .tagrow { display: flex; flex-wrap: wrap; gap: 6px; }
+
+  /* ---------- subscriptions ---------- */
+  .subgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+  .sub .hd { padding-top: 14px; }
+  .sub .av { width: 34px; height: 34px; border-radius: 9px; background: var(--accent-soft); color: var(--accent); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-weight: 700; font-size: 14px; flex: none; }
+  .sub .ttl b { display: block; font-size: 13.5px; line-height: 1.3; }
+  .sub .ttl .src { font-size: 11px; color: var(--ink3); font-family: var(--mono); }
+  .sub .health { margin-left: auto; width: 8px; height: 8px; border-radius: 50%; background: var(--good); }
+  .sub .health.warn { background: var(--warn); } .sub .health.crit { background: var(--crit); }
+  .sub .mid { display: flex; align-items: center; gap: 16px; padding: 4px 0 2px; }
+  .ring { flex: none; }
+  .ring text { font-family: var(--mono); font-weight: 650; fill: var(--ink); }
+  .sub .facts { font-size: 12.5px; color: var(--ink2); }
+  .sub .facts b { display: block; color: var(--ink); font-size: 13px; }
+  .spark { display: block; margin-top: 6px; width: 100%; height: 30px; }
+  .subsum { display: flex; align-items: center; gap: 14px; font-size: 12.5px; color: var(--ink2); margin-bottom: 14px; flex-wrap: wrap; }
+  .subsum .hd-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; }
+
+  /* ---------- settings ---------- */
+  .set-row { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .set-row:last-child { border-bottom: none; }
+  .set-row .l b { display: block; font-size: 13.5px; font-weight: 600; }
+  .set-row .l span { font-size: 12.5px; color: var(--ink3); }
+  .set-row .r { margin-left: auto; }
+  .tog { width: 34px; height: 20px; border-radius: 999px; background: var(--pri-bg); position: relative; border: none; cursor: pointer; }
+  .tog::after { content: ""; position: absolute; top: 2px; right: 2px; width: 16px; height: 16px; background: #fff; border-radius: 50%; }
+  .tog.off { background: var(--wash2); } .tog.off::after { right: auto; left: 2px; }
+
+  /* ---------- toast & dialog ---------- */
+  #toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(20px); background: var(--ink); color: var(--page); border-radius: 9px; padding: 9px 18px; font-size: 13px; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; z-index: 99; max-width: 90vw; }
+  #toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+  dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); padding: 22px 26px; max-width: 560px; width: calc(100vw - 48px); }
+  dialog::backdrop { background: rgba(0,0,0,.4); }
+  dialog h3 { margin: 0 0 6px; font-size: 15px; }
+  dialog p { margin: 0 0 12px; font-size: 13px; color: var(--ink2); }
+  .cmd { font-family: var(--mono); font-size: 12px; background: var(--page); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; overflow-x: auto; white-space: nowrap; margin-bottom: 14px; }
+
+  @media (max-width: 860px) {
+    .app { flex-direction: column; }
+    .sb { width: 100%; height: auto; position: static; flex-direction: row; overflow-x: auto; align-items: center; padding: 8px 12px; }
+    .logo { padding: 0 8px 0 0; } .logo .nm, .logo .tg { display: none; }
+    .nav-btn { width: auto; white-space: nowrap; } .nav-btn svg { display: none; }
+    .sb .foot { display: none; }
+    .top .search { display: none; }
+    .content { padding: 18px 16px 60px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .drift, #toast { transition: none; } }
+</style>
+
+<div class="app">
+  <aside class="sb">
+    <div class="logo"><span class="mark">O</span><span><span class="nm">Orciny</span><span class="tg">机队中台</span></span></div>
+    <button class="nav-btn on" data-nav="dashboard">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.5"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1.5"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1.5"/><rect x="9" y="9" width="5.5" height="5.5" rx="1.5"/></svg>
+      总览</button>
+    <button class="nav-btn" data-nav="machines">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="2.5" width="13" height="4.5" rx="1.5"/><rect x="1.5" y="9" width="13" height="4.5" rx="1.5"/><circle cx="4.2" cy="4.75" r=".4" fill="currentColor"/><circle cx="4.2" cy="11.25" r=".4" fill="currentColor"/></svg>
+      机器<span class="cnt">5</span></button>
+    <button class="nav-btn" data-nav="configs">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1.8 14.5 5 8 8.2 1.5 5Z"/><path d="M1.5 8.2 8 11.4l6.5-3.2"/><path d="M1.5 11.4 8 14.6l6.5-3.2"/></svg>
+      配置集</button>
+    <button class="nav-btn" data-nav="inbox">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1.5 9.5h3.6l1.2 2h3.4l1.2-2h3.6"/><path d="M3 2.5h10l1.5 7v3.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1V9.5Z"/></svg>
+      收件箱<span class="cnt" id="inboxCnt">3</span></button>
+    <button class="nav-btn" data-nav="usage">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 13.5v-4"/><path d="M6.2 13.5V6"/><path d="M9.8 13.5V8.5"/><path d="M13.5 13.5v-10"/></svg>
+      用量</button>
+    <button class="nav-btn" data-nav="subs">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="3" width="13" height="10" rx="1.5"/><path d="M1.5 6.5h13"/><path d="M4 10.5h3"/></svg>
+      订阅</button>
+    <button class="nav-btn" data-nav="creds">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="5.5" cy="8" r="3"/><path d="M8.5 8h6M12 8v2.5M14.5 8v1.8"/></svg>
+      凭据</button>
+    <button class="nav-btn" data-nav="settings">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 4.5h8M12.5 4.5H14"/><circle cx="11" cy="4.5" r="1.6"/><path d="M2 11.5h1.5M6 11.5h8"/><circle cx="4.5" cy="11.5" r="1.6"/></svg>
+      设置</button>
+    <div class="foot">
+      <div class="on-line"><span class="hd-dot" style="width:7px;height:7px;border-radius:50%;background:var(--good);display:inline-block;"></span><b>4</b>&nbsp;/ 5 在线</div>
+      <div>需要团队与治理？<a href="#" data-toast="mock：前往 leycode（企业版）">→ leycode</a></div>
+      <div class="ver">v0.1.0-mock</div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="top">
+      <h1 id="pageTitle">总览</h1><span class="psub" id="pageSub">机队一览</span>
+      <div class="search" data-toast="mock：全局搜索（机器 / 配置 / 凭据…）">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg>
+        搜索机器、配置、凭据…
+      </div>
+      <div class="tools">
+        <div class="lang"><button class="on">中</button><button data-toast="mock：English UI 随开源版提供">EN</button></div>
+        <button class="iconbtn" id="themeBtn" title="切换深浅主题">☀︎</button>
+        <button class="avatar" data-toast="mock：账户菜单">m</button>
+      </div>
+    </header>
+
+    <div class="content">
+
+      <!-- ============ DASHBOARD ============ -->
+      <section data-view="dashboard" class="on">
+        <div class="kpis">
+          <div class="kpi"><div class="l">在线机器</div><div class="v">4<small> / 5</small></div><div class="d mut">thinkpad-x1 离线 2 小时</div></div>
+          <div class="kpi"><div class="l">今日 Tokens</div><div class="v" id="kpiToday">–</div><div class="d mut">全机队 · 含缓存读写</div></div>
+          <div class="kpi"><div class="l">近 7 日 Tokens</div><div class="v" id="kpi7d">–</div><div class="d up">↑ 12% 对比上周</div></div>
+          <div class="kpi"><div class="l">待处理漂移</div><div class="v" id="kpiDrift">3</div><div class="d"><a href="#" data-goto="inbox">前往收件箱 →</a></div></div>
+        </div>
+
+        <div class="card">
+          <div class="hd"><h3>近 7 日 Token 用量</h3><span class="sub">全机队合计</span></div>
+          <div class="bd chartwrap" id="dashChart"></div>
+        </div>
+
+        <div class="grid2">
+          <div class="card">
+            <div class="hd"><h3>机器状态</h3><a href="#" data-goto="machines" style="margin-left:auto;font-size:12px;">全部 →</a></div>
+            <div class="bd" id="dashMachines"></div>
+          </div>
+          <div class="card">
+            <div class="hd"><h3>最近事件</h3></div>
+            <div class="bd">
+              <div class="ev"><span class="t">14:02</span><span>发布 <b>base-mac r10</b>（收编自 macbook-pro），2 台已对齐</span></div>
+              <div class="ev"><span class="t">13:58</span><span>macbook-pro 漂移：<span class="mono">CLAUDE.md</span> · 已进收件箱</span></div>
+              <div class="ev"><span class="t">12:10</span><span class="sec">thinkpad-x1 离线（心跳超时）</span></div>
+              <div class="ev"><span class="t">09:31</span><span>vps-hetzner 应用 <b>base-linux r14</b> 成功</span></div>
+              <div class="ev"><span class="t">昨天</span><span class="sec">workstation 用量历史回灌完成（182 个会话）</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ MACHINES ============ -->
+      <section data-view="machines">
+        <div class="toolbar">
+          <div class="ftabs" id="mFilter">
+            <button class="on" data-f="all">全部</button>
+            <button data-f="online">在线</button>
+            <button data-f="drift">有漂移</button>
+            <button data-f="offline">离线</button>
+          </div>
+          <span style="flex:1"></span>
+          <button class="btn pri" id="addMachine">＋ 添加机器</button>
+        </div>
+        <div class="card scroll">
+          <table class="tbl" id="mTable">
+            <thead><tr><th>机器</th><th>状态</th><th>配置集</th><th>对齐</th><th>Agent</th><th>Claude Code</th><th>最后心跳</th><th></th></tr></thead>
+            <tbody>
+              <tr class="click" data-state="online" data-detail>
+                <td><span class="mdot" style="background:var(--s1)"></span><b>workstation</b><div class="host">arch-ws.local · linux/amd64</div></td>
+                <td><span class="chip good"><span class="st">●</span>在线</span></td>
+                <td class="mono">base-linux · r14</td>
+                <td><span class="chip good">已对齐</span></td>
+                <td class="num">0.4.2</td><td class="num">2.1.34</td><td class="mut num">12s</td>
+                <td><button class="btn ghost sm" data-toast="mock：已向 workstation 发送同步指令">同步</button></td>
+              </tr>
+              <tr class="click" data-state="online drift" data-detail>
+                <td><span class="mdot" style="background:var(--s2)"></span><b>macbook-pro</b><div class="host">mbp-m3.local · darwin/arm64</div></td>
+                <td><span class="chip good"><span class="st">●</span>在线</span></td>
+                <td class="mono">base-mac · r9</td>
+                <td><span class="chip warn"><span class="st">▲</span>2 项漂移</span></td>
+                <td class="num">0.4.2</td><td class="num">2.1.34</td><td class="mut num">8s</td>
+                <td><button class="btn ghost sm" data-goto="inbox">查看漂移</button></td>
+              </tr>
+              <tr class="click" data-state="online" data-detail>
+                <td><span class="mdot" style="background:var(--s3)"></span><b>mac-mini</b><div class="host">mini.home · darwin/arm64</div></td>
+                <td><span class="chip good"><span class="st">●</span>在线</span></td>
+                <td class="mono">base-mac · r9</td>
+                <td><span class="chip good">已对齐</span></td>
+                <td class="num mut">0.4.1 ↺</td><td class="num">2.1.30</td><td class="mut num">30s</td>
+                <td><button class="btn ghost sm" data-toast="mock：agent 将自更新到 0.4.2">更新</button></td>
+              </tr>
+              <tr class="click" data-state="online" data-detail>
+                <td><span class="mdot" style="background:var(--s4)"></span><b>vps-hetzner</b><div class="host">cx41.hel1 · linux/amd64</div></td>
+                <td><span class="chip good"><span class="st">●</span>在线</span></td>
+                <td class="mono">base-linux · r13</td>
+                <td><span class="chip info">待应用 r14</span></td>
+                <td class="num">0.4.2</td><td class="num">2.1.34</td><td class="mut num">5s</td>
+                <td><button class="btn ghost sm" data-toast="mock：vps-hetzner 正在应用 r14…">立即应用</button></td>
+              </tr>
+              <tr class="click" data-state="offline" data-detail>
+                <td><span class="mdot" style="background:var(--s5)"></span><b>thinkpad-x1</b><div class="host">x1.lan · linux/amd64</div></td>
+                <td><span class="chip dim">○ 离线</span></td>
+                <td class="mono">base-linux · r14</td>
+                <td><span class="chip dim">上次已对齐</span></td>
+                <td class="num">0.4.2</td><td class="num">2.1.34</td><td class="mut num">2h</td>
+                <td><button class="btn ghost sm" data-toast="mock：thinkpad-x1 当前离线">⋯</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="mut" style="font-size:12.5px;margin-top:10px;">机器颜色与用量图表中的系列颜色一一对应 · 点击行进入机器详情。</p>
+      </section>
+
+      <!-- ============ MACHINE DETAIL ============ -->
+      <section data-view="mdetail">
+        <button class="backlink" data-goto="machines">← 返回机器列表</button>
+        <div class="mhead">
+          <h2>macbook-pro</h2>
+          <span class="chip good"><span class="st">●</span>在线</span>
+          <span class="chip warn"><span class="st">▲</span>2 项漂移</span>
+          <span style="flex:1"></span>
+          <button class="btn" data-toast="mock：已发送同步指令">↻ 立即同步</button>
+        </div>
+        <div class="grid2" style="margin-top:0;">
+          <div>
+            <div class="card">
+              <div class="hd"><h3>基本信息</h3></div>
+              <div class="bd kv">
+                <div class="row"><span class="k">主机名</span><span class="v">mbp-m3.local</span></div>
+                <div class="row"><span class="k">OS / arch</span><span class="v">darwin/arm64</span></div>
+                <div class="row"><span class="k">Agent 版本</span><span class="v">0.4.2</span></div>
+                <div class="row"><span class="k">Claude Code</span><span class="v">2.1.34</span></div>
+                <div class="row"><span class="k">最后心跳</span><span class="v">8s</span></div>
+                <div class="row"><span class="k">指纹</span><span class="v mut">ed25519:4f9a…c1e0</span></div>
+                <div class="row"><span class="k">指派配置集</span><span class="v">base-mac · r9</span></div>
+              </div>
+            </div>
+            <div class="card" style="margin-top:14px;">
+              <div class="hd"><h3>Apply 回执历史</h3></div>
+              <div class="bd">
+                <div class="ev"><span class="t">07-20</span><span><b class="mono">r9</b> <span class="chip good">成功</span> <span class="mut">14:22</span></span></div>
+                <div class="ev"><span class="t">07-17</span><span><b class="mono">r8</b> <span class="chip good">成功</span> <span class="mut">09:03</span></span></div>
+                <div class="ev"><span class="t">07-15</span><span><b class="mono">r7</b> <span class="chip crit">失败 · 已回滚</span> <span class="mut">settings.json 目录只读</span></span></div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="card">
+              <div class="hd"><h3>检测到漂移</h3><span class="sub">本地改动尚未收编</span></div>
+              <div class="bd">
+                <div class="dstat"><span><span class="chip warn" style="margin-right:8px;">修改</span><span class="mono">CLAUDE.md</span></span><span class="pm"><span class="add">+6</span><span class="del">−1</span></span></div>
+                <div class="dstat"><span><span class="chip brand" style="margin-right:8px;">新增</span><span class="mono">skills/pdf-extract/SKILL.md</span></span><span class="pm"><span class="add">+41</span><span class="del">−0</span></span></div>
+                <div class="acts" style="margin-top:12px;">
+                  <button class="btn pri sm" data-toast="已收编为 base-mac r10 · 正在同步 2 台机器…">收编</button>
+                  <button class="btn sm" data-toast="已指令 macbook-pro 恢复基线">恢复基线</button>
+                  <button class="btn ghost sm" data-toast="已忽略（仅本机）">忽略</button>
+                </div>
+                <p class="mut" style="font-size:11.5px;margin:10px 0 0;">以本机现状生成新版本并下发全机队</p>
+              </div>
+            </div>
+            <div class="card" style="margin-top:14px;">
+              <div class="hd"><h3>机器变量</h3><button class="btn ghost sm" style="margin-left:auto;" data-toast="mock：编辑变量">编辑</button></div>
+              <div class="bd kv varrow">
+                <div class="row"><span class="k2">workspace_root</span><span class="v">/Users/mucr/code</span></div>
+                <div class="row"><span class="k2">preferred_model</span><span class="v">claude-sonnet-5</span></div>
+                <div class="row"><span class="k2">statusline_cmd</span><span class="v">~/.orciny/bin/sl</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ CONFIG SETS ============ -->
+      <section data-view="configs">
+        <div class="toolbar">
+          <div class="seg"><button class="on">base-linux</button><button data-toast="mock：切换到 base-mac 配置集">base-mac</button></div>
+          <span class="chip brand"><span class="st">●</span>草稿</span>
+          <span style="flex:1"></span>
+          <span class="chip dim">指派 · 3 台</span>
+          <button class="btn pri" data-toast="已发布 base-linux r15 · 正在向 3 台机器下发…">发布</button>
+        </div>
+        <div class="card ed">
+          <div class="files">
+            <div class="cap">文件</div>
+            <div class="file on">settings.json<span class="m" title="草稿有改动"></span></div>
+            <div class="file">CLAUDE.md</div>
+            <div class="file">keybindings.json</div>
+            <div class="file dir">agents /</div>
+            <div class="file" style="padding-left:22px;">code-reviewer.md</div>
+            <div class="file dir">commands /</div>
+            <div class="file" style="padding-left:22px;">deploy.md</div>
+            <div class="file dir">skills /（12 个）</div>
+            <div class="file" style="padding-left:22px;">pdf-extract/</div>
+            <div class="file" style="padding-left:22px;">web-research/</div>
+            <div class="file dir">~/.claude.json</div>
+            <div class="file" style="padding-left:22px;">mcpServers <span class="mut" style="font-size:10px;margin-left:4px;font-family:var(--sans);">键级</span></div>
+          </div>
+          <div class="code">
+            <div class="dhead">settings.json · r14 → 草稿 <span class="pm" style="margin-left:auto;"><span class="add">+4</span><span class="del">−2</span></span></div>
+            <div class="dbody">
+              <div class="drow ctx"><span class="ln">1</span><span class="cd">{</span></div>
+              <div class="drow ctx"><span class="ln">2</span><span class="cd">  "env": {</span></div>
+              <div class="drow del"><span class="ln">3</span><span class="cd">    "ANTHROPIC_AUTH_TOKEN": "sk-ant-oat01-8f3k…"</span></div>
+              <div class="drow add"><span class="ln">3</span><span class="cd">    "ANTHROPIC_BASE_URL": "https://gw.home.lan",</span></div>
+              <div class="drow add"><span class="ln">4</span><span class="cd">    "ANTHROPIC_AUTH_TOKEN": <span class="tok-c">"{{cred.gateway_token}}"</span></span></div>
+              <div class="drow ctx"><span class="ln">5</span><span class="cd">  },</span></div>
+              <div class="drow ctx"><span class="ln">6</span><span class="cd">  "permissions": {</span></div>
+              <div class="drow ctx"><span class="ln">7</span><span class="cd">    "allow": ["Bash(pnpm test:*)", "Bash(go test:*)"],</span></div>
+              <div class="drow del"><span class="ln">8</span><span class="cd">    "deny": []</span></div>
+              <div class="drow add"><span class="ln">8</span><span class="cd">    "deny": ["Read(.env*)", "Read(~/.orciny/**)"]</span></div>
+              <div class="drow ctx"><span class="ln">9</span><span class="cd">  },</span></div>
+              <div class="drow ctx"><span class="ln">10</span><span class="cd">  "hooks": { "PostToolUse": [ … ] },</span></div>
+              <div class="drow add"><span class="ln">11</span><span class="cd">  "statusLine": { "command": <span class="tok-c">"{{var.statusline_cmd}}"</span> }</span></div>
+              <div class="drow ctx"><span class="ln">12</span><span class="cd">}</span></div>
+            </div>
+          </div>
+          <div class="meta">
+            <div class="blk">
+              <h4>版本历史</h4>
+              <div class="rev cur">
+                <div class="l1"><span class="v">r14</span><span class="chip brand">当前</span></div>
+                <div class="desc">抽取 API key 为凭据 · 加 BASE_URL</div>
+                <div class="when">2h</div>
+              </div>
+              <div class="rev">
+                <div class="l1"><span class="v">r13</span><a href="#" data-toast="mock：r13 ↔ r14 diff">diff</a></div>
+                <div class="desc">收编 workstation 的 rust skill</div>
+                <div class="when">1d</div>
+              </div>
+              <div class="rev">
+                <div class="l1"><span class="v">r12</span><a href="#" data-toast="已发布 r15（内容 = r12）">回滚</a></div>
+                <div class="desc">CLAUDE.md 提交规范收紧</div>
+                <div class="when">3d</div>
+              </div>
+              <div class="rev">
+                <div class="l1"><span class="v">r11</span></div>
+                <div class="desc">permissions deny 列表</div>
+                <div class="when">8d</div>
+              </div>
+            </div>
+            <div class="blk">
+              <h4>指派机器 · 3 台</h4>
+              <div class="tagrow">
+                <span class="chip good">workstation</span><span class="chip info">vps-hetzner</span><span class="chip dim">thinkpad-x1</span>
+              </div>
+            </div>
+            <div class="blk">
+              <h4>引用</h4>
+              <div style="line-height:1.9;">凭据 <span class="mono" style="color:var(--accent);">gateway_token</span><br>变量 <span class="mono" style="color:var(--accent);">statusline_cmd</span></div>
+            </div>
+            <div class="blk">
+              <h4>下发</h4>
+              <div>状态 <span class="chip good">开启</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ INBOX ============ -->
+      <section data-view="inbox">
+        <p class="sec" style="margin:0 0 14px;">3 条待处理漂移。「收编」会把机器上的改动发布为配置集新版本并同步到其余机器。</p>
+
+        <div class="card drift">
+          <div class="hd"><h3>macbook-pro · 新增 skill</h3><span class="chip warn"><span class="st">▲</span>漂移</span><span class="sub" style="margin-left:auto;">13:58 · base-mac @ r9</span></div>
+          <div class="bd">
+            <div class="mono sec">+ skills/pdf-extract/SKILL.md（新文件，41 行）</div>
+            <div class="diff"><span class="add">+ ---</span>
+<span class="add">+ name: pdf-extract</span>
+<span class="add">+ description: 抽取 PDF 表格与文本，输出结构化 markdown</span>
+<span class="add">+ ---</span>
+<span class="ctx">  …（37 行）</span></div>
+            <div class="acts">
+              <button class="btn pri sm" data-adopt="已收编为 base-mac r10 · 正在同步 2 台机器…">收编并同步</button>
+              <button class="btn sm" data-adopt="已指令 macbook-pro 恢复基线（删除该文件）">恢复基线</button>
+              <button class="btn ghost sm" data-adopt="已忽略：skills/pdf-extract/**（仅 macbook-pro）">忽略</button>
+              <span class="mut" style="font-size:12px;">提示：可在设置中将 <span class="mono">skills/**</span> 设为自动收编</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card drift">
+          <div class="hd"><h3>macbook-pro · 修改 CLAUDE.md</h3><span class="chip warn"><span class="st">▲</span>漂移</span><span class="sub" style="margin-left:auto;">13:58 · base-mac @ r9</span></div>
+          <div class="bd">
+            <div class="diff"><span class="ctx">  ## 提交规范</span>
+<span class="del">- 提交信息用中文</span>
+<span class="add">+ 提交信息用中文，首行不超过 50 字</span>
+<span class="add">+ 禁止在提交信息中出现 emoji</span>
+<span class="ctx">  …（+4 行）</span></div>
+            <div class="acts">
+              <button class="btn pri sm" data-adopt="已收编为 base-mac r10 · 正在同步 2 台机器…">收编并同步</button>
+              <button class="btn sm" data-adopt="已指令 macbook-pro 恢复基线">恢复基线</button>
+              <button class="btn ghost sm" data-adopt="已忽略此路径（仅 macbook-pro）">忽略</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card drift">
+          <div class="hd"><h3>settings.json · 两台机器同时漂移</h3><span class="chip crit"><span class="st">▲</span>冲突</span><span class="sub" style="margin-left:auto;">11:20 · base-linux @ r14</span></div>
+          <div class="bd">
+            <div class="conflict-note"><span>▲</span><span><b>workstation</b> 与 <b>vps-hetzner</b> 都修改了 <span class="mono">settings.json</span>。收编任意一台会覆盖另一台的改动——请先用三方对比确认（基线 / workstation / vps-hetzner）。</span></div>
+            <div class="acts">
+              <button class="btn pri sm" data-toast="mock：打开三方对比视图">三方对比</button>
+              <button class="btn sm" data-adopt="已收编 workstation 版本为 base-linux r15（vps-hetzner 的改动被覆盖）">收编 workstation</button>
+              <button class="btn sm" data-adopt="已收编 vps-hetzner 版本为 base-linux r15（workstation 的改动被覆盖）">收编 vps-hetzner</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="inboxEmpty" style="display:none;" class="card"><div class="bd" style="text-align:center;color:var(--ink3);padding:40px;">收件箱已清空 ✓</div></div>
+      </section>
+
+      <!-- ============ USAGE ============ -->
+      <section data-view="usage">
+        <div class="toolbar">
+          <div class="seg" id="rangeSeg">
+            <button data-range="7">7 天</button>
+            <button data-range="14" class="on">14 天</button>
+            <button data-range="30">30 天</button>
+          </div>
+          <span style="flex:1"></span>
+          <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink2);cursor:pointer;">成本估算
+            <button class="tog" id="costTog" aria-label="成本估算开关"></button>
+          </label>
+        </div>
+
+        <div class="kpis">
+          <div class="kpi"><div class="l">总用量 · Tokens</div><div class="v" id="uTotal">–</div><div class="d mut" id="uWin">近 14 天窗口</div></div>
+          <div class="kpi cost-kpi"><div class="l">成本估算（等效）</div><div class="v">$487</div><div class="d mut">仅供横向比较</div></div>
+          <div class="kpi"><div class="l">峰值机器</div><div class="v mono-v" id="uPeak">–</div><div class="d mut" id="uPeakPct">–</div></div>
+          <div class="kpi"><div class="l">主力模型</div><div class="v mono-v">fable-5</div><div class="d mut">claude-fable-5 · 61%</div></div>
+        </div>
+
+        <div class="card">
+          <div class="hd"><h3>Token 用量 · 按机器</h3><span class="sub" style="margin-left:auto;">与本机 ccusage 口径一致</span></div>
+          <div class="bd chartwrap" id="usageChart"></div>
+        </div>
+
+        <div class="grid2" style="margin-top:14px;">
+          <div class="card scroll">
+            <div class="hd"><h3>按机器</h3><span class="sub" id="rangeLabel">近 14 天</span></div>
+            <div class="bd" style="padding-top:6px;"><table class="tbl" id="byMachine"></table></div>
+          </div>
+          <div class="card scroll">
+            <div class="hd"><h3>按模型</h3><span class="sub">近 14 天</span></div>
+            <div class="bd" style="padding-top:6px;">
+              <table class="tbl">
+                <thead><tr><th>模型</th><th style="text-align:right;">输入</th><th style="text-align:right;">输出</th><th style="text-align:right;">缓存读</th><th style="text-align:right;" class="costcol">估算</th></tr></thead>
+                <tbody>
+                  <tr><td>claude-fable-5</td><td class="num" style="text-align:right;">41.2M</td><td class="num" style="text-align:right;">6.8M</td><td class="num" style="text-align:right;">203M</td><td class="num costcol" style="text-align:right;">$96.4</td></tr>
+                  <tr><td>claude-sonnet-5</td><td class="num" style="text-align:right;">18.9M</td><td class="num" style="text-align:right;">3.1M</td><td class="num" style="text-align:right;">88M</td><td class="num costcol" style="text-align:right;">$31.2</td></tr>
+                  <tr><td>glm-5.1</td><td class="num" style="text-align:right;">12.4M</td><td class="num" style="text-align:right;">2.2M</td><td class="num" style="text-align:right;">31M</td><td class="num costcol" style="text-align:right;">¥58.7</td></tr>
+                  <tr><td>kimi-k2.5</td><td class="num" style="text-align:right;">5.1M</td><td class="num" style="text-align:right;">0.9M</td><td class="num" style="text-align:right;">12M</td><td class="num costcol" style="text-align:right;">¥21.3</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SUBSCRIPTIONS ============ -->
+      <section data-view="subs">
+        <div class="subsum">
+          <span><span class="hd-dot" style="background:var(--good);"></span><b>6</b>&nbsp;健康</span>
+          <span><span class="hd-dot" style="background:var(--crit);"></span><b>1</b>&nbsp;沉默</span>
+          <span style="flex:1"></span>
+          <span class="mut">阈值：7 日窗口 &gt;80% 标黄</span>
+        </div>
+        <div class="subgrid" id="subGrid"></div>
+      </section>
+
+      <!-- ============ CREDENTIALS ============ -->
+      <section data-view="creds">
+        <div class="toolbar">
+          <span class="sec">凭据只存密文，配置里以 <span class="mono" style="color:var(--accent);">{{cred.名称}}</span> 引用，agent 落盘时注入。轮换不产生配置新版本。</span>
+          <span style="flex:1"></span>
+          <button class="btn pri" data-toast="mock：新建凭据">＋ 新建凭据</button>
+        </div>
+        <div class="card scroll">
+          <table class="tbl">
+            <thead><tr><th>名称</th><th>值</th><th>被引用</th><th>覆盖机器</th><th>更新时间</th><th></th></tr></thead>
+            <tbody>
+              <tr><td class="mono" style="color:var(--accent);">gateway_token</td><td class="mono mut">····a4f2</td><td>base-linux · base-mac / settings.json</td><td class="num">5</td><td class="mut">3 天前</td><td><button class="btn ghost sm" data-toast="mock：轮换后将通知 5 台机器重注入">轮换</button></td></tr>
+              <tr><td class="mono" style="color:var(--accent);">glm_api_key</td><td class="mono mut">····9k1c</td><td>采集器 · GLM</td><td class="num">—</td><td class="mut">2 周前</td><td><button class="btn ghost sm" data-toast="mock：轮换">轮换</button></td></tr>
+              <tr><td class="mono" style="color:var(--accent);">kimi_api_key</td><td class="mono mut">····x83m</td><td>采集器 · Kimi</td><td class="num">—</td><td class="mut">2 周前</td><td><button class="btn ghost sm" data-toast="mock：轮换">轮换</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============ SETTINGS ============ -->
+      <section data-view="settings">
+        <div class="card" style="max-width:640px;">
+          <div class="hd"><h3>通用</h3></div>
+          <div class="bd">
+            <div class="set-row"><div class="l"><b>Agent 自动更新</b><span>hub 发布新版本后，各机器 agent 自替换重启</span></div><div class="r"><button class="tog" aria-label="开" data-toast="mock：已切换"></button></div></div>
+            <div class="set-row"><div class="l"><b>自动收编规则</b><span>skills/** 自动收编 · 其余路径手动确认</span></div><div class="r"><button class="btn sm" data-toast="mock：编辑规则">编辑</button></div></div>
+            <div class="set-row"><div class="l"><b>备份</b><span>每日 04:00 → S3（minio.home.lan）· 最近成功：今天 04:00</span></div><div class="r"><button class="btn sm" data-toast="mock：立即备份已开始">立即备份</button></div></div>
+            <div class="set-row"><div class="l"><b>模型定价表</b><span>12 个模型 · 用于用量页成本估算</span></div><div class="r"><button class="btn sm" data-toast="mock：编辑定价表">编辑</button></div></div>
+            <div class="set-row"><div class="l"><b>Push 上报端点</b><span>兼容 ai-plan-insight payload · Bearer ····t7q2</span></div><div class="r"><button class="btn sm" data-toast="mock：复制端点地址">复制地址</button></div></div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<div id="toast" role="status"></div>
+
+<dialog id="enrollDlg">
+  <h3>添加机器</h3>
+  <p>在目标机器上执行以下命令。注册 token 一次性有效，15 分钟后过期。</p>
+  <div class="cmd">curl -fsSL https://hub.home.lan/install.sh | sh -s -- --token orc_5f3a…e91b</div>
+  <div style="display:flex;gap:10px;justify-content:flex-end;">
+    <button class="btn" id="dlgClose">关闭</button>
+    <button class="btn pri" data-toast="已复制安装命令">复制命令</button>
+  </div>
+</dialog>
+
+<script>
+(function () {
+  /* ---------- theme toggle ---------- */
+  var themeBtn = document.getElementById("themeBtn");
+  function curTheme() {
+    var t = document.documentElement.getAttribute("data-theme");
+    if (t) return t;
+    return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  function paintThemeBtn() { themeBtn.textContent = curTheme() === "dark" ? "☀︎" : "☾"; }
+  try {
+    var savedT = localStorage.getItem("orciny-theme");
+    if (savedT) document.documentElement.setAttribute("data-theme", savedT);
+  } catch (e) {}
+  paintThemeBtn();
+  themeBtn.addEventListener("click", function () {
+    var next = curTheme() === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    try { localStorage.setItem("orciny-theme", next); } catch (e) {}
+    paintThemeBtn();
+    drawAll();
+  });
+
+  /* ---------- data ---------- */
+  var MACHINES = [
+    { id: "workstation", v: "--s1" },
+    { id: "macbook-pro", v: "--s2" },
+    { id: "mac-mini",    v: "--s3" },
+    { id: "vps-hetzner", v: "--s4" },
+    { id: "thinkpad-x1", v: "--s5" }
+  ];
+  var DATA = [], LABELS = [];
+  var today = new Date(2026, 6, 21);
+  for (var d = 0; d < 30; d++) {
+    var dt = new Date(today); dt.setDate(dt.getDate() - (29 - d));
+    LABELS.push((dt.getMonth() + 1) + "/" + dt.getDate());
+    var wk = dt.getDay(), row = [];
+    for (var m = 0; m < 5; m++) {
+      var base = [1.6, 1.1, 0.9, 0.5, 0.4][m];
+      var wave = Math.sin((d * 2.3 + m * 7.1)) * 0.35 + Math.sin(d * 0.9 + m) * 0.2;
+      var weekend = (wk === 0 || wk === 6) ? 0.45 : 1;
+      var val = Math.max(0.05, (base + wave * base) * weekend);
+      if (m === 4 && d > 27) val = 0.06; // thinkpad 离线
+      row.push(Math.round(val * 100) / 100);
+    }
+    DATA.push(row);
+  }
+  function sum(a) { return a.reduce(function (x, y) { return x + y; }, 0); }
+  function fmtM(v) { return v >= 10 ? v.toFixed(0) + "M" : v.toFixed(1) + "M"; }
+
+  /* ---------- KPI ---------- */
+  var totals = DATA.map(sum);
+  document.getElementById("kpiToday").textContent = fmtM(totals[29]);
+  document.getElementById("kpi7d").textContent = fmtM(sum(totals.slice(23)));
+
+  /* ---------- dashboard machine list ---------- */
+  var MROWS = [
+    { i: 0, os: "linux/amd64",  chip: "<span class='chip good'><span class='st'>●</span>已对齐</span>" },
+    { i: 1, os: "darwin/arm64", chip: "<span class='chip warn'><span class='st'>▲</span>2 项漂移</span>" },
+    { i: 2, os: "darwin/arm64", chip: "<span class='chip good'><span class='st'>●</span>已对齐</span>" },
+    { i: 3, os: "linux/amd64",  chip: "<span class='chip info'>待应用 r14</span>" },
+    { i: 4, os: "linux/amd64",  chip: "<span class='chip dim'>○ 离线 2h</span>" }
+  ];
+  document.getElementById("dashMachines").innerHTML = MROWS.map(function (r) {
+    return "<div class='mrow' data-detail><span class='mdot' style='background:var(" + MACHINES[r.i].v + ")'></span>" +
+      "<span class='nm'>" + MACHINES[r.i].id + "</span><span class='os'>" + r.os + "</span>" + r.chip + "</div>";
+  }).join("");
+
+  /* ---------- nav ---------- */
+  var titles = {
+    dashboard: ["总览", "机队一览"],
+    machines: ["机器", "5 台 · 4 在线"],
+    mdetail: ["macbook-pro", "mbp-m3.local"],
+    configs: ["配置集", "单层 · 变量与凭据表达差异"],
+    inbox: ["收件箱", "漂移待处理"],
+    usage: ["用量", "会话 JSONL 解析 · 聚合上报"],
+    subs: ["订阅", "fetch / local / push 三型采集"],
+    creds: ["凭据", "下发时注入 · 永不进版本"],
+    settings: ["设置", ""]
+  };
+  function go(view) {
+    document.querySelectorAll("section[data-view]").forEach(function (s) { s.classList.toggle("on", s.getAttribute("data-view") === view); });
+    document.querySelectorAll(".nav-btn").forEach(function (b) {
+      var nv = b.getAttribute("data-nav");
+      b.classList.toggle("on", nv === view || (view === "mdetail" && nv === "machines"));
+    });
+    document.getElementById("pageTitle").textContent = titles[view][0];
+    document.getElementById("pageSub").textContent = titles[view][1];
+    window.scrollTo(0, 0);
+  }
+  document.querySelectorAll(".nav-btn").forEach(function (b) { b.addEventListener("click", function () { go(b.getAttribute("data-nav")); }); });
+  document.addEventListener("click", function (e) {
+    var g = e.target.closest("[data-goto]");
+    if (g) { e.preventDefault(); e.stopPropagation(); go(g.getAttribute("data-goto")); return; }
+    var det = e.target.closest("[data-detail]");
+    if (det && !e.target.closest("button")) { go("mdetail"); }
+  });
+
+  /* ---------- machine filter tabs ---------- */
+  document.querySelectorAll("#mFilter button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll("#mFilter button").forEach(function (x) { x.classList.remove("on"); });
+      b.classList.add("on");
+      var f = b.getAttribute("data-f");
+      document.querySelectorAll("#mTable tbody tr").forEach(function (tr) {
+        var st = tr.getAttribute("data-state") || "";
+        tr.style.display = (f === "all" || st.indexOf(f) >= 0) ? "" : "none";
+      });
+    });
+  });
+
+  /* ---------- toast ---------- */
+  var toastEl = document.getElementById("toast"), toastTimer;
+  function toast(msg) {
+    toastEl.textContent = msg; toastEl.classList.add("on");
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { toastEl.classList.remove("on"); }, 2600);
+  }
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("[data-toast]");
+    if (t) { e.preventDefault(); e.stopPropagation(); toast(t.getAttribute("data-toast")); }
+  });
+
+  /* ---------- inbox actions ---------- */
+  var inboxCnt = 3;
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-adopt]");
+    if (!b) return;
+    e.preventDefault();
+    toast(b.getAttribute("data-adopt"));
+    var card = b.closest(".drift");
+    card.classList.add("gone");
+    setTimeout(function () {
+      card.style.display = "none";
+      inboxCnt--;
+      var c = document.getElementById("inboxCnt");
+      c.textContent = inboxCnt;
+      if (inboxCnt <= 0) { c.style.display = "none"; document.getElementById("inboxEmpty").style.display = "block"; }
+      document.getElementById("kpiDrift").textContent = inboxCnt;
+    }, 300);
+  });
+
+  /* ---------- dialog ---------- */
+  var dlg = document.getElementById("enrollDlg");
+  document.getElementById("addMachine").addEventListener("click", function () { dlg.showModal(); });
+  document.getElementById("dlgClose").addEventListener("click", function () { dlg.close(); });
+
+  /* ---------- cost toggle ---------- */
+  var costOn = true;
+  var costTog = document.getElementById("costTog");
+  costTog.addEventListener("click", function () {
+    costOn = !costOn;
+    costTog.classList.toggle("off", !costOn);
+    document.querySelectorAll(".costcol, .cost-kpi").forEach(function (el) { el.style.visibility = costOn ? "visible" : "hidden"; });
+  });
+
+  /* ---------- charts ---------- */
+  function seriesColor(i) { return "var(" + MACHINES[i].v + ")"; }
+  function roundTop(x, y, w, h, r) {
+    if (h <= 0) return "";
+    r = Math.min(r, h, w / 2);
+    return "M" + x + " " + (y + h) + " V" + (y + r) + " Q" + x + " " + y + " " + (x + r) + " " + y +
+           " H" + (x + w - r) + " Q" + (x + w) + " " + y + " " + (x + w) + " " + (y + r) + " V" + (y + h) + " Z";
+  }
+
+  function drawChart(host, opts) {
+    var W = 720, H = 230, padL = 40, padR = 8, padT = 14, padB = 26;
+    var n = opts.days;
+    var data = DATA.slice(30 - n), labels = LABELS.slice(30 - n);
+    var dayTotals = data.map(sum);
+    var maxV = Math.max.apply(null, dayTotals) * 1.12;
+    var iw = W - padL - padR, ih = H - padT - padB;
+    var slot = iw / n, barW = Math.min(34, slot * 0.62);
+    var html = '<svg viewBox="0 0 ' + W + " " + H + '" width="100%" style="display:block;" role="img" aria-label="Token 用量图">';
+    for (var gi = 1; gi <= 3; gi++) {
+      var gv = maxV * gi / 3.3, gy = padT + ih - (gv / maxV) * ih;
+      html += '<line x1="' + padL + '" y1="' + gy + '" x2="' + (W - padR) + '" y2="' + gy + '" stroke="var(--grid)" stroke-width="1"/>';
+      html += '<text x="' + (padL - 6) + '" y="' + (gy + 3.5) + '" text-anchor="end" font-size="10" fill="var(--ink3)" font-family="var(--mono)">' + fmtM(gv) + "</text>";
+    }
+    var GAP = 2;
+    for (var d2 = 0; d2 < n; d2++) {
+      var x = padL + slot * d2 + (slot - barW) / 2;
+      if (opts.stacked) {
+        var yCursor = padT + ih;
+        for (var s = 0; s < 5; s++) {
+          var hgt = (data[d2][s] / maxV) * ih;
+          if (hgt < 0.8) continue;
+          var isTop = true;
+          for (var s2 = s + 1; s2 < 5; s2++) if ((data[d2][s2] / maxV) * ih >= 0.8) { isTop = false; break; }
+          var segH = Math.max(1.5, hgt - (isTop ? 0 : GAP));
+          var yTopSeg = yCursor - hgt;
+          if (isTop) {
+            html += '<path d="' + roundTop(x, yTopSeg, barW, segH, 4) + '" fill="' + seriesColor(s) + '"/>';
+          } else {
+            html += '<rect x="' + x + '" y="' + yTopSeg + '" width="' + barW + '" height="' + segH + '" fill="' + seriesColor(s) + '"/>';
+          }
+          yCursor = yTopSeg;
+        }
+      } else {
+        var th = (dayTotals[d2] / maxV) * ih;
+        html += '<path d="' + roundTop(x, padT + ih - th, barW, th, 4) + '" fill="var(--brand-fill)"/>';
+        if (d2 === n - 1) {
+          html += '<text x="' + (x + barW / 2) + '" y="' + (padT + ih - th - 6) + '" text-anchor="middle" font-size="10.5" font-weight="600" fill="var(--ink2)">' + fmtM(dayTotals[d2]) + "</text>";
+        }
+      }
+      html += '<rect x="' + (padL + slot * d2) + '" y="' + padT + '" width="' + slot + '" height="' + ih + '" fill="transparent" data-hit="' + d2 + '"/>';
+    }
+    html += '<line x1="' + padL + '" y1="' + (padT + ih) + '" x2="' + (W - padR) + '" y2="' + (padT + ih) + '" stroke="var(--axis)" stroke-width="1"/>';
+    var every = n > 20 ? 5 : (n > 8 ? 2 : 1);
+    for (var li = 0; li < n; li++) {
+      if (li % every !== 0 && li !== n - 1) continue;
+      html += '<text x="' + (padL + slot * li + slot / 2) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="10" fill="var(--ink3)">' + labels[li] + "</text>";
+    }
+    html += "</svg>";
+    var legendHtml = "";
+    if (opts.stacked) {
+      legendHtml = '<div class="legend">' + MACHINES.map(function (mm, i) {
+        return "<span><span class='mdot' style='background:" + seriesColor(i) + "'></span>" + mm.id + "</span>";
+      }).join("") + "</div>";
+    }
+    host.innerHTML = legendHtml + html + '<div class="tip"></div>';
+
+    var tip = host.querySelector(".tip");
+    host.querySelectorAll("[data-hit]").forEach(function (hit) {
+      hit.addEventListener("mousemove", function (ev) {
+        var i = +hit.getAttribute("data-hit");
+        var rows;
+        if (opts.stacked) {
+          rows = MACHINES.map(function (mm, si) {
+            return "<div class='r'><span class='mdot' style='background:" + seriesColor(si) + "'></span>" + mm.id + "<span class='v'>" + fmtM(data[i][si]) + "</span></div>";
+          }).join("");
+          rows += "<div class='r' style='margin-top:4px;border-top:1px solid var(--line);padding-top:4px;'>合计<span class='v'>" + fmtM(dayTotals[i]) + "</span></div>";
+        } else {
+          rows = "<div class='r'>全机队<span class='v'>" + fmtM(dayTotals[i]) + "</span></div>";
+        }
+        tip.innerHTML = "<div class='d'>" + labels[i] + "</div>" + rows;
+        tip.style.display = "block";
+        var hostRect = host.getBoundingClientRect();
+        var tx = ev.clientX - hostRect.left + 14, ty = ev.clientY - hostRect.top - 10;
+        if (tx + 180 > hostRect.width) tx -= 200;
+        tip.style.left = tx + "px"; tip.style.top = ty + "px";
+      });
+      hit.addEventListener("mouseleave", function () { tip.style.display = "none"; });
+    });
+  }
+
+  var usageDays = 14;
+  function renderUsage() {
+    drawChart(document.getElementById("usageChart"), { days: usageDays, stacked: true });
+    document.getElementById("rangeLabel").textContent = "近 " + usageDays + " 天";
+    document.getElementById("uWin").textContent = "近 " + usageDays + " 天窗口";
+    var data = DATA.slice(30 - usageDays);
+    var rows = MACHINES.map(function (mm, i) {
+      return { id: mm.id, v: mm.v, t: sum(data.map(function (r) { return r[i]; })) };
+    });
+    var total = sum(rows.map(function (r) { return r.t; }));
+    document.getElementById("uTotal").textContent = fmtM(total);
+    var peak = rows.slice().sort(function (a, b) { return b.t - a.t; })[0];
+    document.getElementById("uPeak").textContent = peak.id.split("-")[0];
+    document.getElementById("uPeakPct").textContent = peak.id + " · " + Math.round(peak.t / total * 100) + "%";
+    var tbl = "<thead><tr><th>机器</th><th style='text-align:right;'>Tokens</th><th style='text-align:right;'>占比</th></tr></thead><tbody>";
+    rows.forEach(function (r) {
+      tbl += "<tr><td><span class='mdot' style='background:var(" + r.v + ")'></span>" + r.id + "</td><td class='num' style='text-align:right;'>" + fmtM(r.t) + "</td><td class='num' style='text-align:right;'>" + Math.round(r.t / total * 100) + "%</td></tr>";
+    });
+    tbl += "</tbody>";
+    document.getElementById("byMachine").innerHTML = tbl;
+  }
+  document.querySelectorAll("#rangeSeg button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll("#rangeSeg button").forEach(function (x) { x.classList.remove("on"); });
+      b.classList.add("on");
+      usageDays = +b.getAttribute("data-range");
+      renderUsage();
+    });
+  });
+
+  /* ---------- subscriptions ---------- */
+  function ring(pct, cls) {
+    var R = 26, C = 2 * Math.PI * R, off = C * (1 - pct / 100);
+    var col = cls === "warn" ? "var(--warn)" : cls === "crit" ? "var(--crit)" : "var(--good)";
+    if (cls === "brand") col = "var(--brand-fill)";
+    return '<svg class="ring" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="' + pct + '%">' +
+      '<circle cx="32" cy="32" r="' + R + '" fill="none" stroke="var(--wash2)" stroke-width="6"/>' +
+      '<circle cx="32" cy="32" r="' + R + '" fill="none" stroke="' + col + '" stroke-width="6" stroke-linecap="round" stroke-dasharray="' + C + '" stroke-dashoffset="' + off + '" transform="rotate(-90 32 32)"/>' +
+      '<text x="32" y="36.5" text-anchor="middle" font-size="13">' + pct + "%</text></svg>";
+  }
+  function spark(vals, col) {
+    var w = 200, h = 30, mx = Math.max.apply(null, vals) * 1.15;
+    var pts = vals.map(function (v, i) { return (i * w / (vals.length - 1)).toFixed(1) + "," + (h - 3 - (v / mx) * (h - 8)).toFixed(1); }).join(" ");
+    return '<svg class="spark" viewBox="0 0 ' + w + " " + h + '" preserveAspectRatio="none" aria-hidden="true"><polyline points="' + pts + '" fill="none" stroke="' + col + '" stroke-width="2" stroke-linejoin="round"/></svg>';
+  }
+  function sv(seed) {
+    var a = []; for (var i = 0; i < 14; i++) a.push(3 + Math.sin(i * 1.1 + seed) * 1.6 + Math.sin(i * 0.4 + seed * 2) * 0.8);
+    return a;
+  }
+  var SUBS = [
+    { av: "C",  name: "Claude Pro · 个人号", src: "本机 · macbook-pro", pct: 62, cls: "ok",   f1: "已用", f2: "5h 窗口 · 重置 2h14m", sp: 1 },
+    { av: "C",  name: "Claude · 工作号",     src: "本机 · workstation",  pct: 41, cls: "ok",   f1: "已用", f2: "7 日窗口 · 重置周六", sp: 2 },
+    { av: "G",  name: "GLM Coding",          src: "Hub 拉取 · bigmodel", pct: 38, cls: "ok",   f1: "已用", f2: "月配额 · 重置 12d", sp: 3 },
+    { av: "K",  name: "Kimi · 主账号",       src: "Hub 拉取 · moonshot", pct: 82, cls: "warn", f1: "已用 <span class='chip warn'><span class='st'>▲</span>预警</span>", f2: "周配额 · 重置周一", sp: 4 },
+    { av: "V",  name: "火山方舟",            src: "Hub 拉取 · volcengine", balance: "¥128.4", cls: "brand", f1: "余额", f2: "余额充足", sp: 5 },
+    { av: "Cu", name: "Cursor · Pro",        src: "本机 · workstation",  pct: 45, cls: "ok",   f1: "Auto 额度", f2: "重置 08-03", sp: 6 },
+    { av: "Gr", name: "Grok · SuperGrok",    src: "push · devbox",       pct: 3,  cls: "crit", stale: true, f1: "月 Credits 448/15000", f2: "26h 未上报 · 检查推送来源", sp: 7 }
+  ];
+  document.getElementById("subGrid").innerHTML = SUBS.map(function (s) {
+    var mid;
+    var sparkCol = s.cls === "warn" ? "var(--warn)" : s.cls === "crit" ? "var(--ink3)" : s.cls === "brand" ? "var(--brand-fill)" : "var(--good)";
+    if (s.balance) {
+      mid = "<div class='mid'><div style='font-size:22px;font-weight:650;font-family:var(--mono);'>" + s.balance + "</div><div class='facts'><b>" + s.f1 + "</b>" + s.f2 + "</div></div>";
+    } else {
+      mid = "<div class='mid'>" + ring(s.pct, s.cls === "ok" ? "good" : s.cls) + "<div class='facts'><b>" + s.f1 + "</b>" + s.f2 + "</div></div>";
+    }
+    var health = s.stale ? "crit" : (s.cls === "warn" ? "warn" : "");
+    return "<div class='card sub'><div class='hd'><span class='av'>" + s.av + "</span><span class='ttl'><b>" + s.name + "</b><span class='src'>" + s.src + "</span></span><span class='health " + health + "' title='来源健康'></span></div><div class='bd'>" + mid + spark(sv(s.sp), sparkCol) + "</div></div>";
+  }).join("");
+
+  /* ---------- draw ---------- */
+  function drawAll() {
+    drawChart(document.getElementById("dashChart"), { days: 7, stacked: false });
+    renderUsage();
+  }
+  drawAll();
+})();
+</script>

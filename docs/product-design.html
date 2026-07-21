@@ -1,0 +1,653 @@
+<title>Orciny · 产品设计文档 v0.1</title>
+<style>
+  :root {
+    --bg: #F5F6F9; --surface: #FFFFFF; --surface-2: #EEF0F5;
+    --ink: #1B2230; --muted: #5C6579; --faint: #8B93A6; --line: #DCE0E9;
+    --accent: #2743C7; --accent-soft: #E7EBFB;
+    --rec: #BE5A17; --rec-soft: #FBEEE2;
+    --good: #1E7A44; --good-soft: #E3F2E9;
+    --warn: #9A6A08; --warn-soft: #F7EFDA;
+    --bad: #B3372E; --bad-soft: #F9E7E5;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --serif: "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", "SimSun", serif;
+    --sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0F1219; --surface: #171C26; --surface-2: #1E2431; --ink: #E6E9F0;
+      --muted: #9AA3B8; --faint: #6E7890; --line: #2B3242;
+      --accent: #8CA0F8; --accent-soft: #232C4A; --rec: #E0894A; --rec-soft: #3A2A1B;
+      --good: #5FBF87; --good-soft: #1B3226; --warn: #D9A94A; --warn-soft: #362C15;
+      --bad: #E07A6F; --bad-soft: #3A211F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0F1219; --surface: #171C26; --surface-2: #1E2431; --ink: #E6E9F0;
+    --muted: #9AA3B8; --faint: #6E7890; --line: #2B3242;
+    --accent: #8CA0F8; --accent-soft: #232C4A; --rec: #E0894A; --rec-soft: #3A2A1B;
+    --good: #5FBF87; --good-soft: #1B3226; --warn: #D9A94A; --warn-soft: #362C15;
+    --bad: #E07A6F; --bad-soft: #3A211F;
+  }
+  :root[data-theme="light"] {
+    --bg: #F5F6F9; --surface: #FFFFFF; --surface-2: #EEF0F5; --ink: #1B2230;
+    --muted: #5C6579; --faint: #8B93A6; --line: #DCE0E9;
+    --accent: #2743C7; --accent-soft: #E7EBFB; --rec: #BE5A17; --rec-soft: #FBEEE2;
+    --good: #1E7A44; --good-soft: #E3F2E9; --warn: #9A6A08; --warn-soft: #F7EFDA;
+    --bad: #B3372E; --bad-soft: #F9E7E5;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 16px; line-height: 1.85; margin: 0; padding: 0 20px 96px; }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: .88em; background: var(--surface-2); border-radius: 4px; padding: 1px 5px; }
+  pre { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 20px; overflow-x: auto; font-family: var(--mono); font-size: 13px; line-height: 1.7; }
+  pre code { background: none; padding: 0; }
+
+  header.mast { padding: 72px 0 40px; border-bottom: 3px solid var(--ink); }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .22em; color: var(--accent); text-transform: uppercase; }
+  h1.title { font-family: var(--serif); font-size: clamp(32px, 6vw, 48px); line-height: 1.22; margin: 14px 0 10px; text-wrap: balance; font-weight: 700; }
+  .subtitle { font-size: 18px; color: var(--muted); max-width: 40em; margin: 0; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-top: 26px; font-family: var(--mono); font-size: 12.5px; color: var(--faint); }
+  .meta b { color: var(--muted); font-weight: 500; }
+
+  .baseline { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 10px; padding: 20px 26px; margin-top: 34px; }
+  .baseline .t { font-family: var(--mono); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--accent); }
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .pill { font-size: 13px; background: var(--surface-2); border-radius: 999px; padding: 4px 14px; }
+  .pill b { font-family: var(--mono); font-size: 12px; color: var(--accent); margin-right: 6px; }
+
+  nav.toc { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 22px 26px; margin-top: 28px; }
+  nav.toc ol { columns: 2; gap: 40px; margin: 8px 0 0; padding-left: 1.2em; }
+  nav.toc li { break-inside: avoid; margin-bottom: 4px; }
+  nav.toc a { color: var(--ink); }
+  nav.toc .t { font-family: var(--mono); font-size: 12px; letter-spacing: .18em; color: var(--faint); text-transform: uppercase; }
+  @media (max-width: 640px) { nav.toc ol { columns: 1; } }
+
+  section { margin-top: 64px; }
+  .sec-eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .18em; color: var(--accent); }
+  h2 { font-family: var(--serif); font-size: 27px; line-height: 1.35; margin: 6px 0 18px; text-wrap: balance; }
+  h3 { font-size: 17.5px; margin: 32px 0 10px; }
+  h4 { font-size: 15.5px; margin: 24px 0 8px; color: var(--muted); }
+  p { margin: 0 0 14px; max-width: 46em; }
+  ul, ol { margin: 0 0 14px; padding-left: 1.4em; max-width: 44em; }
+  li { margin-bottom: 6px; }
+  li::marker { color: var(--accent); }
+  strong { font-weight: 600; }
+  .small { font-size: 13.5px; color: var(--muted); }
+
+  .tblwrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); margin: 18px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; line-height: 1.6; }
+  th, td { padding: 10px 14px; text-align: left; vertical-align: top; border-top: 1px solid var(--line); }
+  thead th { border-top: none; background: var(--surface-2); font-family: var(--mono); font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+  td.c, th.c { text-align: center; }
+  tr.hl td { background: var(--accent-soft); }
+
+  .chip { display: inline-block; font-family: var(--mono); font-size: 11px; letter-spacing: .06em; padding: 2px 9px; border-radius: 999px; vertical-align: 2px; }
+  .chip.good { background: var(--good-soft); color: var(--good); }
+  .chip.warn { background: var(--warn-soft); color: var(--warn); }
+  .chip.bad { background: var(--bad-soft); color: var(--bad); }
+  .chip.dim { background: var(--surface-2); color: var(--muted); }
+  .chip.rec { background: var(--rec-soft); color: var(--rec); }
+
+  .callout { border-left: 3px solid var(--accent); background: var(--surface); border-radius: 0 8px 8px 0; padding: 14px 20px; margin: 18px 0; font-size: 14.5px; max-width: 46em; }
+  .callout .ct { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); display: block; margin-bottom: 4px; }
+  .callout.warn { border-left-color: var(--warn); }
+  .callout.warn .ct { color: var(--warn); }
+
+  .flow { counter-reset: step; list-style: none; padding: 0; margin: 18px 0; max-width: none; }
+  .flow li { position: relative; padding: 0 0 18px 52px; margin: 0; }
+  .flow li::before { counter-increment: step; content: counter(step); position: absolute; left: 0; top: 2px; width: 30px; height: 30px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-family: var(--mono); font-size: 13px; display: flex; align-items: center; justify-content: center; }
+  .flow li:not(:last-child)::after { content: ""; position: absolute; left: 14.5px; top: 36px; bottom: 2px; width: 1px; background: var(--line); }
+  .flow b { display: block; }
+  .flow span { color: var(--muted); font-size: 14px; }
+
+  footer { margin-top: 80px; padding-top: 24px; border-top: 1px solid var(--line); font-size: 13px; color: var(--faint); }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+
+<div class="wrap">
+
+<header class="mast">
+  <div class="eyebrow">Product Design · v0.1 Draft</div>
+  <h1 class="title">Orciny 产品设计文档</h1>
+  <p class="subtitle">面向个人与微型团队的自托管 Coding Agent 机队中台——集中管理多台机器上的 <code>~/.claude</code>，聚合 Token 用量与订阅余额。</p>
+  <div class="meta">
+    <span><b>版本</b> v0.1 草案 · 待评审</span>
+    <span><b>日期</b> 2026-07-21</span>
+    <span><b>作者</b> Claude（撰写）· mucr（决策）</span>
+    <span><b>前置</b> 《Orciny 项目构思报告》</span>
+  </div>
+
+  <div class="baseline">
+    <span class="t">决策基线 · 已拍板，本文一律以此为前提</span>
+    <div class="pills">
+      <span class="pill"><b>A1</b>独立新项目，协议对齐</span>
+      <span class="pill"><b>B1</b>Go + PocketBase hub + Go agent</span>
+      <span class="pill"><b>C1</b>中台为准 + 漂移收编</span>
+      <span class="pill"><b>D1</b>JSONL 解析上报（OTel 留 v1）</span>
+      <span class="pill"><b>E1</b>ai-plan-insight 一次性 Go 重写</span>
+      <span class="pill"><b>F1</b>agent 外拨 WebSocket</span>
+      <span class="pill"><b>G2</b>MIT 开源，社区驱动</span>
+    </div>
+    <p class="small" style="margin:10px 0 0;">E1 与报告推荐（E3）不同，差异影响分析见<a href="#appendix">附录 B</a>。</p>
+  </div>
+</header>
+
+<nav class="toc">
+  <span class="t">目录</span>
+  <ol>
+    <li><a href="#overview">产品概述</a></li>
+    <li><a href="#glossary">术语表</a></li>
+    <li><a href="#arch">系统形态与架构</a></li>
+    <li><a href="#features">功能规格</a></li>
+    <li><a href="#agent">Agent 设计</a></li>
+    <li><a href="#data">数据模型</a></li>
+    <li><a href="#protocol">协议与 leycode 对齐</a></li>
+    <li><a href="#security">安全与隐私</a></li>
+    <li><a href="#nfr">非功能要求</a></li>
+    <li><a href="#mvp">MVP 与里程碑</a></li>
+    <li><a href="#roadmap">版本路线图</a></li>
+    <li><a href="#oss">开源与社区计划</a></li>
+    <li><a href="#metrics">成功指标</a></li>
+    <li><a href="#risks">风险登记册</a></li>
+    <li><a href="#appendix">附录：命名 · 差异记录 · 参考</a></li>
+  </ol>
+</nav>
+
+<!-- ============ 1 OVERVIEW ============ -->
+<section id="overview">
+  <div class="sec-eyebrow">§01</div>
+  <h2>产品概述</h2>
+
+  <h3>1.1 一句话定位</h3>
+  <p><strong>Orciny 是一个自托管的 Coding Agent 机队中台：一个 hub 管住你所有机器上的 Coding Agent 配置，顺带看清它们的用量和订阅余额。</strong></p>
+  <p class="small">类比：beszel 之于服务器监控，Orciny 之于 Coding Agent 管理。</p>
+
+  <h3>1.2 背景与要解决的问题</h3>
+  <p>一个重度 Claude Code 用户通常拥有多台 Linux/macOS 机器（工作站、笔记本、家里的 Mac mini、云上 VPS），并同时持有多个 AI Coding 订阅（Claude、GLM、Kimi、火山方舟……）。由此产生三个长期痛点：</p>
+  <ul>
+    <li><strong>配置漂移</strong>：<code>~/.claude</code> 下的 settings、CLAUDE.md、skills、agents、MCP 声明在各台机器上各自演化，好用的改动留在一台机器上，坏掉的配置不知道何时引入。</li>
+    <li><strong>用量黑盒</strong>：Token 消耗分散在每台机器的本地会话文件里，没有跨机器视角。</li>
+    <li><strong>订阅分散</strong>：多家 Coding Plan 的余额要逐家查看；部分服务只能在装有本地凭据的机器上查询。</li>
+  </ul>
+  <p class="small">现状方案（rsync 脚本、Syncthing、git dotfiles、各家独立 usage agent）都是单点的、无状态面板的、各管一段的；Anthropic 官方无原生多机同步（截至 2026-07 至少 4 个 open feature request）。论证详见构思报告。</p>
+
+  <h3>1.3 设计哲学</h3>
+  <p><strong>不接管 Agent 执行，只统一治理配置与观测。</strong>Coding Agent 仍在每台机器本地运行；Orciny 决定的是：每台机器用什么配置、装什么 skills、数据汇总到哪里看。Orciny 永远不站在模型请求链路上。</p>
+  <p>个人版特有的第二哲学：<strong>漂移不是违规，是创作。</strong>个人在机器上顺手改配置、装插件、写 skill 是主要的创作方式。核心交互「收编」（把某台机器的本地改动一键提升为全机队新基线）就是为此设计的。</p>
+
+  <h3>1.4 目标用户</h3>
+  <div class="tblwrap"><table>
+    <thead><tr><th>层级</th><th>用户</th><th>需求特征</th><th>优先级</th></tr></thead>
+    <tbody>
+      <tr><td class="c">P0</td><td>项目作者本人</td><td>多台 Linux/macOS + 多订阅，全部痛点的原型</td><td>MVP 唯一服务对象</td></tr>
+      <tr><td class="c">P1</td><td>同类个人开发者</td><td>self-hosted / homelab 人群 + 重度 Coding Agent 用户</td><td>开源发布目标</td></tr>
+      <tr><td class="c">P2</td><td>微型团队（2–10 人）</td><td>共享 skills / 配置基线，不需要 RBAC 与审计</td><td>v2</td></tr>
+      <tr><td class="c">P3</td><td>企业</td><td>治理、合规、多租户</td><td>不承接，导流 leycode</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>1.5 非目标（范围护栏）</h3>
+  <ul>
+    <li><strong>不做模型路由 / API 网关</strong>——不站在请求链路上。</li>
+    <li><strong>不做 GUI 客户端</strong>——agent 无界面，一切交互在 hub Web UI。</li>
+    <li><strong>不做会话执行编排</strong>——不派任务、不开会话、不做任务看板。</li>
+    <li><strong>不做企业治理</strong>——无多租户 RBAC、无合规审计；单管理员起步。</li>
+    <li><strong>Windows 缓做</strong>——WSL 场景由 leycode-client 覆盖；首发 Linux + macOS。</li>
+  </ul>
+</section>
+
+<!-- ============ 2 GLOSSARY ============ -->
+<section id="glossary">
+  <div class="sec-eyebrow">§02</div>
+  <h2>术语表</h2>
+  <div class="tblwrap"><table>
+    <thead><tr><th>术语</th><th>英文</th><th>定义</th></tr></thead>
+    <tbody>
+      <tr><td>机器</td><td>Machine</td><td>接入 hub 的一台主机（安装了 agent）</td></tr>
+      <tr><td>配置集</td><td>ConfigSet</td><td>一组受管配置文件的逻辑单元，对应 leycode 的 Profile</td></tr>
+      <tr><td>版本</td><td>Revision</td><td>配置集的一次不可变发布快照，带 checksum</td></tr>
+      <tr><td>指派</td><td>Assignment</td><td>机器与配置集的绑定关系（MVP 为一机一配置集）</td></tr>
+      <tr><td>受管清单</td><td>Manifest</td><td>定义配置集管理 <code>~/.claude</code> 下哪些路径（含排除规则）</td></tr>
+      <tr><td>漂移</td><td>Drift</td><td>机器本地受管文件与已应用版本之间的差异</td></tr>
+      <tr><td>收编</td><td>Adopt</td><td>把某台机器的漂移提升为配置集新版本的动作（个人版核心交互）</td></tr>
+      <tr><td>恢复</td><td>Restore</td><td>丢弃本地漂移、回到已发布基线的动作</td></tr>
+      <tr><td>凭据</td><td>Credential</td><td>API key / token 等秘密，独立于配置版本管理，下发时注入</td></tr>
+      <tr><td>机器变量</td><td>Variable</td><td>机器级键值对，配置文件中以占位符引用，落盘时替换</td></tr>
+      <tr><td>用量点</td><td>UsagePoint</td><td>一条聚合后的 Token 用量记录（日期 × 机器 × 工具 × 模型）</td></tr>
+      <tr><td>采集器</td><td>Collector</td><td>订阅余额抓取单元，分 fetch（hub 拉）/ local（agent 抓）/ push（外部推）三型</td></tr>
+      <tr><td>订阅卡片</td><td>SubscriptionCard</td><td>一个订阅实例的余额/配额展示单元（沿用 ai-plan-insight 概念）</td></tr>
+      <tr><td>收件箱</td><td>Inbox</td><td>漂移与告警的统一待处理队列</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============ 3 ARCH ============ -->
+<section id="arch">
+  <div class="sec-eyebrow">§03</div>
+  <h2>系统形态与架构</h2>
+
+  <h3>3.1 组件</h3>
+  <div class="tblwrap"><table>
+    <thead><tr><th style="width:120px;">组件</th><th>形态</th><th>职责</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Hub</strong><br><code>orciny</code></td>
+        <td>Go 单二进制，PocketBase 内核（内嵌 SQLite、认证、realtime、admin、备份），Web UI（React）编译内嵌。<code>docker run</code> 一行或直跑；数据 = 一个目录。</td>
+        <td>配置集存储与版本管理、下发调度、漂移收件箱、凭据库、用量与订阅聚合、fetch 型采集器、Web UI、（v1）告警</td>
+      </tr>
+      <tr>
+        <td><strong>Agent</strong><br><code>orciny-agent</code></td>
+        <td>Go 单二进制，无界面，systemd（Linux）/ launchd（macOS）常驻；最小 CLI。</td>
+        <td>注册与心跳、配置落盘与 apply 回执、漂移侦测与上报、会话 JSONL 解析上报、local 型订阅采集、自更新</td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <h3>3.2 连接模型（F1）</h3>
+  <ul>
+    <li>agent <strong>主动外拨</strong> hub 的 WebSocket 端点，长连接保持；断线指数退避重连。</li>
+    <li>首次接入：Web UI 生成<strong>一次性注册 token</strong>（限时、单次）→ <code>orciny-agent enroll</code>；agent 生成密钥对，<strong>指纹绑定</strong>机器身份，token 即焚。</li>
+    <li>在线状态：长连接存续即在线；心跳 30s（可配）。下发：hub 经长连接即时推送信号，机器秒级对齐。</li>
+    <li>TLS：hub 假定部署在反向代理后（Caddy/Nginx/Traefik），文档给标准配置。</li>
+    <li>预留：HTTP 长轮询降级通道（协议形状与 leycode 对齐）不进 MVP，接口层留位。</li>
+  </ul>
+
+  <h3>3.3 数据流（四条）</h3>
+  <ol class="flow">
+    <li><b>配置下行</b><span>Web 编辑 → 发布 Revision → hub 推送信号 → agent 拉取快照 → 落盘（凭据/变量注入）→ apply 回执上行。</span></li>
+    <li><b>漂移上行</b><span>agent 监视受管路径（fs 事件 + 定时哈希对账）→ 差异摘要上报 → 收件箱 → 收编 / 恢复 / 忽略；收编则物化为新 Revision 并向其余机器下发。</span></li>
+    <li><b>用量上行</b><span>agent 增量解析本地会话 JSONL → 聚合为 UsagePoint 批量上报（含首次历史回灌）。</span></li>
+    <li><b>订阅采集</b><span>fetch 型 hub 定时拉取；local 型 agent 本机执行（本地凭据不出机器，只上报结果）；push 型外部进程向 hub HTTP 端点推送。</span></li>
+  </ol>
+
+  <h3>3.4 部署形态</h3>
+  <div class="tblwrap"><table>
+    <thead><tr><th>场景</th><th>形态</th></tr></thead>
+    <tbody>
+      <tr><td>推荐</td><td>内网或 VPS 上 <code>docker compose up -d</code>（hub）+ 各机器一行安装脚本（agent）</td></tr>
+      <tr><td>最小</td><td>hub 单二进制直跑（个人内网，SQLite 文件即全部状态）</td></tr>
+      <tr><td>备份</td><td>PocketBase 自带备份（本地目录 / S3 兼容存储），一键恢复</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============ 4 FEATURES ============ -->
+<section id="features">
+  <div class="sec-eyebrow">§04</div>
+  <h2>功能规格</h2>
+
+  <h3>4.1 机器管理</h3>
+  <h4>接入流程</h4>
+  <ol class="flow">
+    <li><b>生成注册 token</b><span>Web UI「添加机器」→ 一次性 token（默认 15 分钟有效）+ 拷贝式安装命令 <code>curl -fsSL https://&lt;hub&gt;/install.sh | sh -s -- --token &lt;t&gt;</code>。</span></li>
+    <li><b>安装与注册</b><span>脚本探测 OS/arch → 下载 agent → 写 systemd/launchd 单元 → enroll → 上线。</span></li>
+    <li><b>首报</b><span>hostname、OS/arch、agent 版本、探测到的 Coding Agent 工具及版本（MVP：Claude Code）。</span></li>
+  </ol>
+  <h4>机器列表与详情</h4>
+  <ul>
+    <li>列表列：备注名、在线状态、配置集与对齐状态（已对齐 / 待应用 / 漂移 n 项 / 应用失败）、agent 版本、Claude Code 版本、最后心跳。</li>
+    <li>行内操作：立即同步、查看漂移、暂停管理（保持连接但不应用下发）、移除（吊销指纹，agent 侧保留本地配置不清理）。</li>
+    <li>详情页：apply 回执历史、本机漂移记录、机器变量编辑、本机用量速览。</li>
+    <li>agent 自更新：hub 持有目标版本，agent 收通知后自替换重启（beszel 同款）；可全局关闭。</li>
+  </ul>
+
+  <h3>4.2 配置集与版本</h3>
+  <ul>
+    <li><strong>结构</strong>：受管清单（manifest）+ 文件树 + 凭据/变量引用。MVP 为<strong>单层</strong>（无继承/叠加）；多机差异走「机器变量 + 凭据引用」；配置集可<strong>克隆</strong>；继承/叠加层留 v2。</li>
+    <li><strong>指派</strong>：一台机器同一时间指派一个配置集；一个配置集可覆盖多台机器。配置集级「暂停下发」开关（对齐 leycode <code>distribution_enabled</code> 语义）。</li>
+    <li><strong>版本</strong>：发布 = 不可变快照 + checksum；可浏览、diff（文件级 + 行级）、一键回滚（回滚即发布内容等于旧版的新版本，历史不可变）。编辑在草稿态进行，发布前预览 diff。</li>
+  </ul>
+  <div class="callout">
+    <span class="ct">个人版关键路径 · 导入向导</span>
+    首台机器接入后引导「把这台机器现有的 <code>~/.claude</code> 采集为初始配置集」：agent 按默认 manifest 采集 → Web 呈现清单勾选纳管范围 → <strong>敏感项检测</strong>（识别 settings env 中的 API key，引导抽取为凭据占位符）→ 生成 v1 并标记该机已对齐。后续机器可选「应用现有配置集」或「保持现状（仅观测）」——后者允许纯用量/订阅场景的机器接入。
+  </div>
+  <ul>
+    <li><strong>编辑器</strong>：文件树 + 等宽文本编辑；JSON 语法校验；<code>settings.json</code> 的表单辅助（MVP 可先纯文本）；<code>{{cred.*}}</code> / <code>{{var.*}}</code> 自动补全与未定义引用告警。</li>
+    <li><strong>发布校验</strong>：JSON 合法性、凭据引用可解析、路径安全（禁 <code>..</code> / 绝对路径 / 符号链接逃逸）。</li>
+  </ul>
+
+  <h3>4.3 受管范围与 Manifest</h3>
+  <div class="tblwrap"><table>
+    <thead><tr><th>类别</th><th>路径</th><th>策略</th></tr></thead>
+    <tbody>
+      <tr><td>纳管（默认）</td><td><code>settings.json</code></td><td>整文件受管，env 中敏感值以凭据占位符表达</td></tr>
+      <tr><td>纳管（默认）</td><td><code>CLAUDE.md</code> · <code>agents/**</code> · <code>commands/**</code> · <code>skills/**</code> · <code>keybindings.json</code></td><td>整文件受管</td></tr>
+      <tr><td>纳管（键级）</td><td><code>~/.claude.json</code> 的 <code>mcpServers</code></td><td><strong>键级受管</strong>：该文件混有运行时状态，agent 只重写受管键，其余原样保留</td></tr>
+      <tr><td>恒排除</td><td><code>projects/</code> · <code>todos/</code> · <code>shell-snapshots/</code> · <code>statsig/</code> · 缓存</td><td>永不采集、永不下发、永不上传</td></tr>
+      <tr><td>恒排除</td><td><code>.credentials.json</code>（OAuth 登录态）</td><td>机器私有；local 采集器仅本机读取，内容不上传</td></tr>
+    </tbody>
+  </table></div>
+  <p class="small">设计原则：<strong>宁可少管，不可误管</strong>。未在 manifest 中的路径 agent 一概不触碰；排除规则恒定不可去除。</p>
+
+  <h3>4.4 漂移与收编（C1 · 本产品的灵魂交互）</h3>
+  <ul>
+    <li><strong>检测</strong>：文件系统监视 + 周期性哈希对账（默认 5 分钟兜底），与「已应用版本」比对；上报路径、变更类型、脱敏后的内容 diff。</li>
+    <li><strong>收件箱</strong>：全局待处理队列，每条漂移显示来源机器、文件、diff 预览。三个动作：
+      <ul>
+        <li><strong>收编 Adopt</strong>——以该机现状生成新 Revision，自动下发其余机器；支持多条漂移合并、跨文件打包收编。</li>
+        <li><strong>恢复 Restore</strong>——指令该机丢弃本地改动回到基线。</li>
+        <li><strong>忽略 Ignore</strong>——路径加入该机忽略清单（局部放行）。</li>
+      </ul>
+    </li>
+    <li><strong>冲突提示</strong>：两台机器对同一文件各有漂移时，收编任一台会覆盖另一台——UI 显式警告并展示三方对比（基线 / 机器 1 / 机器 2）。</li>
+    <li><strong>自动收编规则</strong>（路径级）：如 <code>skills/**</code> 设自动收编（本机新写的 skill 直接同步全机队），<code>settings.json</code> 必须手动。默认全部手动，用户逐步放开。</li>
+  </ul>
+
+  <h3>4.5 凭据与机器变量</h3>
+  <ul>
+    <li><strong>凭据库</strong>：秘密<strong>永不进入配置版本</strong>；配置内写 <code>{{cred.&lt;name&gt;}}</code>，agent 落盘时换取真实值注入，文件 0600。hub 侧 AES-GCM 加密落库（主密钥来自 env/密钥文件）；Web 只显示名称与末四位；轮换不产生配置新版本，hub 通知受影响机器重注入；凭据页显示引用计数防误删。</li>
+    <li><strong>机器变量</strong>：机器级 KV（如 <code>workspace_root</code>），配置中 <code>{{var.&lt;name&gt;}}</code> 引用；内置 <code>{{machine.name}}</code> / <code>{{machine.os}}</code>。用途：同一配置集覆盖多机时表达小差异，避免为 10% 的差异克隆整个配置集。</li>
+  </ul>
+
+  <h3>4.6 用量观测（D1）</h3>
+  <ul>
+    <li><strong>采集</strong>：agent 解析 <code>~/.claude/projects/**</code> 会话 JSONL——增量读取（文件位点）、消息级去重（uuid）、compact/重排容错（管道移植自 leycode-client sessionlog）；首次接入<strong>历史回灌</strong>。MVP 只上报<strong>聚合数据</strong>，不上传会话内容本体。</li>
+    <li><strong>模型</strong>：UsagePoint = <code>date × machine × tool × model</code> → input / output / cache_read / cache_write（+ 可选 reasoning）。成本估算基于内置可编辑定价表，标注「等效估算」。</li>
+    <li><strong>面板</strong>：趋势（7/30/90 天）、按机器堆叠、按模型分布、成本开关；口径与本机 ccusage 对齐（同源解析，数字应一致）。</li>
+    <li><strong>v1 预留 · OTel</strong>：agent 内置轻量 OTLP 接收端，Claude Code 原生遥测经 localhost 汇入；所需 env 恰好由配置集下发注入——自闭环。</li>
+  </ul>
+
+  <h3>4.7 订阅余额（E1 · 全量 Go 化）</h3>
+  <div class="tblwrap"><table>
+    <thead><tr><th>执行位置</th><th>覆盖服务</th><th>机制</th></tr></thead>
+    <tbody>
+      <tr><td><strong>fetch 型</strong>（hub）</td><td>GLM/bigmodel（含国际版）、Kimi、火山方舟、Sub2API/Codex 中转、ZenMux、华为云、AIPing、Antigravity（API 模式）</td><td>hub 每 30s 并发刷新；单实例失败不影响其他；连续失败前两次沿用旧值（沿用 ai-plan-insight 容错语义）</td></tr>
+      <tr><td><strong>local 型</strong>（agent）</td><td>Claude 订阅（本机 OAuth 凭据调官方 usage 接口）、Cursor、Grok、MiMo、Antigravity（本地模式）</td><td><strong>本地凭据不上传</strong>，agent 本机调用后仅上报结果；执行机器可指定或自动（有凭据者执行）</td></tr>
+      <tr><td><strong>push 型</strong>（外部）</td><td>任意来源</td><td>HTTP 端点，<strong>wire 兼容 ai-plan-insight 现有 payload</strong>——移植期的桥 + 长期生态接口</td></tr>
+    </tbody>
+  </table></div>
+  <ul>
+    <li>模型别名归并（<code>model_aliases</code>）与来源存活告警（24h 沉默）照搬原语义。</li>
+    <li><strong>移植策略（E1 风险控制）</strong>：按你 config.json 实际启用的实例排序，先自用后长尾；每家以 ai-plan-insight 现网数据对照验收；<strong>自用实例 100% 移植且对照一致后 Python 才下线</strong>，push 兼容端点长期保留。</li>
+    <li>面板：卡片墙（「服务名 · 标签」心智）+ 30 天趋势 + 阈值标色 + 来源健康。</li>
+  </ul>
+
+  <h3>4.8 Web UI 信息架构</h3>
+  <div class="tblwrap"><table>
+    <thead><tr><th>页面</th><th>内容要点</th><th class="c">里程碑</th></tr></thead>
+    <tbody>
+      <tr><td>总览 Dashboard</td><td>机器状态条、今日/7 日 token、订阅卡片精简版、最近事件流</td><td class="c">M2</td></tr>
+      <tr><td>机器 Machines</td><td>列表 + 详情（§4.1）</td><td class="c">M0/M1</td></tr>
+      <tr><td>配置集 ConfigSets</td><td>列表、编辑器、版本历史与 diff、指派管理</td><td class="c">M1</td></tr>
+      <tr><td>收件箱 Inbox</td><td>漂移待处理队列（v1 起并入告警）</td><td class="c">M1</td></tr>
+      <tr><td>用量 Usage</td><td>趋势 / 按机器 / 按模型 / 成本估算</td><td class="c">M2</td></tr>
+      <tr><td>订阅 Subscriptions</td><td>卡片墙、阈值、来源健康</td><td class="c">M2</td></tr>
+      <tr><td>凭据 Credentials</td><td>列表、引用计数、轮换</td><td class="c">M1</td></tr>
+      <tr><td>设置 Settings</td><td>站点、备份、agent 更新策略、定价表、（v1）通知渠道</td><td class="c">M0 起</td></tr>
+    </tbody>
+  </table></div>
+  <p class="small">UI 语言：中/英双语内置（面向国际 self-hosted 社区发布），其余语言社区众包。</p>
+</section>
+
+<!-- ============ 5 AGENT ============ -->
+<section id="agent">
+  <div class="sec-eyebrow">§05</div>
+  <h2>Agent 设计（无界面）</h2>
+
+  <p><strong>职责边界——只做五件事：</strong>连接与心跳、配置落盘与回执、漂移侦测、本地数据采集（JSONL + local 采集器）、自更新。不开端口对外服务（除 v1 可选的 localhost OTLP 接收端）。</p>
+
+  <h3>本地布局</h3>
+  <pre><code>~/.orciny/
+├── agent.yml        # hub 地址、机器标识（安装时生成，一般不手改）
+├── identity/        # 密钥对与指纹（0600）
+├── state.json       # 已应用版本、文件位点、忽略清单（0600）
+└── logs/            # JSON lines，保留 14 天，token 一律脱敏</code></pre>
+
+  <h3>CLI 子命令</h3>
+  <div class="tblwrap"><table>
+    <thead><tr><th>命令</th><th>作用</th></tr></thead>
+    <tbody>
+      <tr><td><code>orciny-agent enroll --hub &lt;url&gt; --token &lt;t&gt;</code></td><td>注册接入</td></tr>
+      <tr><td><code>orciny-agent status</code></td><td>连接状态、已应用版本、待处理漂移</td></tr>
+      <tr><td><code>orciny-agent sync</code></td><td>立即拉取并应用</td></tr>
+      <tr><td><code>orciny-agent drift</code></td><td>本机漂移清单（含 diff）</td></tr>
+      <tr><td><code>orciny-agent pause / resume</code></td><td>暂停/恢复配置管理（数据采集不停）</td></tr>
+      <tr><td><code>orciny-agent version / update</code></td><td>版本与手动更新</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>行为准则</h3>
+  <ul>
+    <li><strong>宁可不动，不可写坏</strong>：apply 前快照备份（本地保留最近 N 版），失败自动回滚并上报。</li>
+    <li>所有落盘操作幂等；agent 崩溃/断网不影响本机 Coding Agent 正常使用——Orciny 不在关键路径上。</li>
+    <li>资源目标：常驻内存 &lt; 30MB，空闲 CPU ≈ 0，二进制 &lt; 30MB。</li>
+  </ul>
+</section>
+
+<!-- ============ 6 DATA ============ -->
+<section id="data">
+  <div class="sec-eyebrow">§06</div>
+  <h2>数据模型（业务级实体）</h2>
+  <div class="tblwrap"><table>
+    <thead><tr><th>实体</th><th>关键字段</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>machines</td><td>name, fingerprint, os/arch, agent_version, tool_versions, last_seen, status</td><td>机器注册表</td></tr>
+      <tr><td>config_sets</td><td>name, manifest, paused</td><td>配置集</td></tr>
+      <tr><td>revisions</td><td>config_set_id, seq, files[], checksum, note, created_at</td><td>不可变版本</td></tr>
+      <tr><td>assignments</td><td>machine_id, config_set_id, applied_revision, applied_at, state</td><td>一机一配置集（MVP）</td></tr>
+      <tr><td>drift_events</td><td>machine_id, path, kind, diff, state(open/adopted/restored/ignored)</td><td>漂移收件箱</td></tr>
+      <tr><td>credentials</td><td>name, cipher_value, last4, updated_at</td><td>加密凭据</td></tr>
+      <tr><td>variables</td><td>machine_id, key, value</td><td>机器变量</td></tr>
+      <tr><td>usage_points</td><td>date, machine_id, tool, model, tokens{4类}, source</td><td>用量聚合点</td></tr>
+      <tr><td>collector_instances</td><td>type, mode(fetch/local/push), label, config, machine_id?</td><td>订阅采集实例</td></tr>
+      <tr><td>sub_snapshots</td><td>instance_id, payload, fetched_at</td><td>卡片快照（含历史，供趋势）</td></tr>
+      <tr><td>events</td><td>actor, kind, target, detail, at</td><td>操作与系统事件流（轻量，非合规审计）</td></tr>
+      <tr><td>alerts <span class="chip dim">v1</span></td><td>rule, target, state, notified_at</td><td>告警</td></tr>
+    </tbody>
+  </table></div>
+  <p class="small">存储：PocketBase collections，单库 SQLite；设计容量上限 50 台机器 / 千万级 usage_points（超出即非目标场景）。</p>
+</section>
+
+<!-- ============ 7 PROTOCOL ============ -->
+<section id="protocol">
+  <div class="sec-eyebrow">§07</div>
+  <h2>协议与 leycode 对齐（A1）</h2>
+
+  <p><strong>对齐原则：概念与语义对齐，wire 不强求一致。</strong>状态机（draft → publish → apply → ack → drift）、幂等语义、checksum 口径与 leycode 相同；传输载体与字段细节允许不同，命名统一 camelCase。目的：保留远期 A3（Orciny 内核 + leycode 企业外壳）与数据互通的可能性。</p>
+
+  <h3>概念映射表</h3>
+  <div class="tblwrap"><table>
+    <thead><tr><th>leycode</th><th>Orciny</th><th>备注</th></tr></thead>
+    <tbody>
+      <tr><td>Profile（base/group 两层）</td><td>ConfigSet（单层）</td><td>Orciny 用变量+凭据表达差异，暂无层级</td></tr>
+      <tr><td>Revision + checksum + 发布物化</td><td>Revision + checksum</td><td>语义一致</td></tr>
+      <tr><td>agent_device_bindings（多绑定）</td><td>Assignment（一机一集）</td><td>有意简化</td></tr>
+      <tr><td>distribution_enabled 下发开关</td><td>「暂停下发」</td><td>语义一致</td></tr>
+      <tr><td>注册码 + 设备指纹</td><td>一次性 token + 密钥指纹</td><td>语义一致</td></tr>
+      <tr><td>apply 回执 / 审计留痕</td><td>apply 回执 / events 事件流</td><td>弱化为事件流</td></tr>
+      <tr><td>凭据下发注入（newapiToken）</td><td><code>{{cred.*}}</code> 注入</td><td>泛化为通用占位符</td></tr>
+      <tr><td>AgentAdapter（Claude/OpenCode）</td><td>Tool adapter（MVP 仅 Claude）</td><td>接口形状对齐，v2 多工具</td></tr>
+      <tr><td>会话日志（块八）</td><td>v2 会话检索（可选上传）</td><td>届时对齐 append/replace 语义</td></tr>
+      <tr><td>漂移告警（纠正视角）</td><td>漂移收件箱 + 收编（创作视角）</td><td><strong>有意不同</strong>：个人版新增「收编」</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>主要交互（业务级消息）</h3>
+  <div class="tblwrap"><table>
+    <thead><tr><th>方向</th><th>消息</th><th>语义</th></tr></thead>
+    <tbody>
+      <tr><td>agent → hub</td><td>hello / heartbeat</td><td>上线、心跳与基本信息</td></tr>
+      <tr><td>hub → agent</td><td>config.notify</td><td>有新版本（推送信号）</td></tr>
+      <tr><td>agent → hub</td><td>config.pull</td><td>拉取指派快照（含凭据换取）</td></tr>
+      <tr><td>agent → hub</td><td>apply.ack</td><td>应用结果（成功/失败/部分，幂等可重放）</td></tr>
+      <tr><td>agent → hub</td><td>drift.report</td><td>漂移摘要（批量）</td></tr>
+      <tr><td>hub → agent</td><td>drift.restore</td><td>指令恢复基线</td></tr>
+      <tr><td>agent → hub</td><td>usage.batch</td><td>UsagePoint 批量上报（位点游标，断点续传）</td></tr>
+      <tr><td>agent → hub</td><td>collector.report</td><td>local 采集结果</td></tr>
+      <tr><td>hub → agent</td><td>agent.update</td><td>版本更新通知</td></tr>
+      <tr><td>外部 → hub</td><td>push API（HTTP）</td><td>兼容 ai-plan-insight payload 的订阅/用量推送</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============ 8 SECURITY ============ -->
+<section id="security">
+  <div class="sec-eyebrow">§08</div>
+  <h2>安全与隐私</h2>
+
+  <h3>威胁模型（简表）</h3>
+  <div class="tblwrap"><table>
+    <thead><tr><th>威胁</th><th>对策</th></tr></thead>
+    <tbody>
+      <tr><td>注册 token 泄露</td><td>一次性 + 15 分钟 TTL + 使用即焚；Web 可撤销未用 token</td></tr>
+      <tr><td>agent 身份冒充</td><td>密钥对指纹绑定；吊销即断</td></tr>
+      <tr><td>hub 数据库泄露</td><td>凭据 AES-GCM 加密，主密钥不在库中；会话内容根本不采集（MVP）</td></tr>
+      <tr><td>传输窃听</td><td>反向代理 TLS；文档默认 HTTPS，HTTP 仅限内网明示</td></tr>
+      <tr><td>agent 写坏本机配置</td><td>manifest 白名单 + 路径安全校验 + apply 前快照 + 失败回滚</td></tr>
+      <tr><td>凭据在下游泄露</td><td>落盘 0600；日志全链路脱敏；Web 只显末四位</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>隐私立场（写进 README 的承诺）</h3>
+  <ul>
+    <li><strong>数据不出你的 hub</strong>：无厂商遥测、无 phone-home；版本检查可关。</li>
+    <li><strong>最小采集</strong>：会话内容 MVP 不上传（仅聚合数字）；v2 会话检索为显式 opt-in 且支持路径级排除。</li>
+    <li><strong>本地凭据不动</strong>：<code>.credentials.json</code> 等 OAuth 登录态永不上传，local 采集器只在本机使用。</li>
+    <li>开源发布随附《安全模型》文档（本节展开）。</li>
+  </ul>
+</section>
+
+<!-- ============ 9 NFR ============ -->
+<section id="nfr">
+  <div class="sec-eyebrow">§09</div>
+  <h2>非功能要求</h2>
+  <div class="tblwrap"><table>
+    <thead><tr><th>维度</th><th>目标</th></tr></thead>
+    <tbody>
+      <tr><td>资源</td><td>hub 常驻 &lt; 64MB RAM；agent &lt; 30MB RAM、空闲 CPU ≈ 0</td></tr>
+      <tr><td>体积</td><td>hub / agent 单二进制各 &lt; 30MB；docker 镜像 &lt; 40MB</td></tr>
+      <tr><td>规模</td><td>1–50 台机器为设计区间；SQLite 单库</td></tr>
+      <tr><td>可靠性</td><td>agent 离线不影响本机工具使用；hub 宕机仅失去面板与下发，机器照常工作</td></tr>
+      <tr><td>升级</td><td>hub 原地升级（迁移自动跑）；agent 由 hub 驱动自更新；升级零数据丢失</td></tr>
+      <tr><td>备份</td><td>PocketBase 备份（本地/S3），恢复演练写进文档</td></tr>
+      <tr><td>平台</td><td>hub：linux/amd64+arm64（docker 优先）；agent：linux + darwin 各 amd64/arm64</td></tr>
+      <tr><td>i18n / 主题</td><td>Web UI 中/英内置；深浅主题；键盘可达</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============ 10 MVP ============ -->
+<section id="mvp">
+  <div class="sec-eyebrow">§10</div>
+  <h2>MVP 范围与里程碑</h2>
+  <p>MVP = 四件事：<strong>机器清单与在线状态 · 配置闭环（导入/下发/漂移收编）· Token 用量聚合 · 订阅余额面板</strong>。里程碑按序不按期，每个以真实机队验收。</p>
+  <div class="tblwrap"><table>
+    <thead><tr><th>里程碑</th><th>内容</th><th>验收标准（对作者本人）</th></tr></thead>
+    <tbody>
+      <tr><td><strong>M0 · 骨架</strong></td><td>hub 可跑（docker+二进制）、enroll、WS 心跳、机器列表与在线状态、设置页雏形</td><td>≥3 台真机接入；杀 agent/断网后状态与重连表现正确</td></tr>
+      <tr><td><strong>M1 · 配置闭环</strong></td><td>导入向导（含敏感项抽取）、编辑器、发布/diff/回滚、下发落盘回执、漂移收件箱（收编/恢复/忽略）、凭据库与变量、快照回滚</td><td>主力机导入成配置集；全机队对齐；任一机器改 CLAUDE.md / 新增 skill 能被收编并同步；apply 失败自动回滚</td></tr>
+      <tr><td><strong>M2 · 数据面</strong></td><td>JSONL 解析上报+历史回灌、用量页；采集器框架 + 自用 provider 全部移植 + push 兼容端点；订阅卡片页</td><td>用量数字与本机 ccusage 一致；ai-plan-insight 可下线（自用实例 100% 移植并对照验收）</td></tr>
+      <tr><td><strong>M3 · 毕业与发布</strong></td><td>全机队迁移、旧方案下线；安装体验打磨；双语 README、安全模型文档、截图与 demo</td><td>连续 30 天全机队由 Orciny 管理且无手工 ssh 改配置 → 公开发布</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============ 11 ROADMAP ============ -->
+<section id="roadmap">
+  <div class="sec-eyebrow">§11</div>
+  <h2>版本路线图</h2>
+  <div class="tblwrap"><table>
+    <thead><tr><th>版本</th><th>主题</th><th>内容</th></tr></thead>
+    <tbody>
+      <tr><td><strong>v0（MVP）</strong></td><td>自用毕业</td><td>§10 的 M0–M3</td></tr>
+      <tr><td><strong>v1</strong></td><td>告警与遥测</td><td>通知渠道（ntfy / Telegram / Bark / SMTP / Webhook）+ 规则（机器离线、apply 失败、订阅阈值、来源沉默、agent 版本过旧）；OTel 接收端；收件箱并入告警</td></tr>
+      <tr><td><strong>v2</strong></td><td>检索与多工具</td><td>会话日志可选上传 + 跨机器全文检索（对齐 leycode 块八协议）；Tool adapter 引入 OpenCode / Codex；配置集叠加层（base + overlay）；微团队（成员、只读/可编辑、共享 skills 库）</td></tr>
+      <tr><td><strong>v3</strong></td><td>生态与互通</td><td>leycode 互通/迁移通道（评估 A3 启动）；Windows 原生 agent 评估；插件市场对接</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============ 12 OSS ============ -->
+<section id="oss">
+  <div class="sec-eyebrow">§12</div>
+  <h2>开源与社区计划（G2）</h2>
+  <ul>
+    <li><strong>许可与仓库</strong>：MIT；monorepo（hub + agent + install 脚本 + docs）。</li>
+    <li><strong>发布渠道</strong>：GitHub Releases（二进制）、Docker Hub / GHCR（镜像）、Homebrew tap（agent，后续）。</li>
+    <li><strong>README</strong>：英文主文 + 中文对照；核心截图/动图；「beszel for coding agents」一句话讲清形态。</li>
+    <li><strong>宣发点</strong>（M3 后）：r/selfhosted、Hacker News（Show HN）、V2EX / 少数派 / 阮一峰周刊自荐；中文独占卖点（GLM/Kimi/火山订阅聚合）单独成文。</li>
+    <li><strong>社区边界</strong>：不承诺 SLA；Collector 适配、i18n、平台移植标记 good-first-issue 引导共建。</li>
+    <li><strong>商业让渡</strong>：页脚一行「Need teams &amp; governance? → leycode」，是 Orciny 全部的商业动作。</li>
+  </ul>
+</section>
+
+<!-- ============ 13 METRICS ============ -->
+<section id="metrics">
+  <div class="sec-eyebrow">§13</div>
+  <h2>成功指标</h2>
+  <div class="tblwrap"><table>
+    <thead><tr><th>类别</th><th>指标</th></tr></thead>
+    <tbody>
+      <tr><td>自用（北极星前置）</td><td>连续 30 天：全部机器由 Orciny 管理、零手工 ssh 改配置；ai-plan-insight 与所有同步脚本下线</td></tr>
+      <tr><td>产品健康</td><td>新机接入 ≤ 2 分钟；收编从发现到全机队同步 ≤ 1 分钟；升级零数据丢失</td></tr>
+      <tr><td>社区（发布后 12 个月）</td><td>≥ 2,000 star；≥ 10 名外部贡献者；≥ 5 个社区贡献的 Collector；安装类 issue 占比持续下降（参照 beszel 曲线保守取值）</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============ 14 RISKS ============ -->
+<section id="risks">
+  <div class="sec-eyebrow">§14</div>
+  <h2>风险登记册</h2>
+  <div class="tblwrap"><table>
+    <thead><tr><th>#</th><th>风险</th><th class="c">等级</th><th>对策</th></tr></thead>
+    <tbody>
+      <tr><td>R1</td><td>Anthropic 上线官方配置同步</td><td class="c"><span class="chip warn">中</span></td><td>重心可滑向观测+订阅+多工具；自托管隐私立场恒在；官方只会同步自家</td></tr>
+      <tr><td>R2</td><td>E1 一次性重写量大、战线拉长</td><td class="c"><span class="chip warn">中高</span></td><td>按自用实例排序移植；push 兼容端点让旧 agent 过渡期继续供数；M2 验收未过则 ai-plan-insight 不下线</td></tr>
+      <tr><td>R3</td><td>JSONL / settings schema 随版本漂移</td><td class="c"><span class="chip warn">中</span></td><td>解析层独立成包 + 契约测试 + 版本探测；社区共摊（ccusage 生态先例）</td></tr>
+      <tr><td>R4</td><td>PocketBase v0.x API 变动</td><td class="c"><span class="chip dim">低中</span></td><td>锁版本、薄封装；业务逻辑不渗入框架层</td></tr>
+      <tr><td>R5</td><td>三线作战精力不足</td><td class="c"><span class="chip bad">高</span></td><td>MVP 卡死四件事；M2 完成即净减一个在维护项目；与 leycode 客户端收尾错峰排期</td></tr>
+      <tr><td>R6</td><td>凭据集中保管的安全事故</td><td class="c"><span class="chip bad">影响高/概率低</span></td><td>§08 全套；开源前外部 review；安全文档随首发</td></tr>
+      <tr><td>R7</td><td>做着做着长出编排功能</td><td class="c"><span class="chip warn">中</span></td><td>§1.5 非目标清单为红线；「远程开会话」类需求一律指向相邻项目</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============ 15 APPENDIX ============ -->
+<section id="appendix">
+  <div class="sec-eyebrow">§15</div>
+  <h2>附录</h2>
+
+  <h3>附录 A · 命名与品牌</h3>
+  <ul>
+    <li><strong>Orciny</strong>（/ˈɔːr.sɪ.ni/）：China Miéville《The City &amp; The City》中传说存在于双城缝隙间的隐形第三城，暗中治理两座可见之城——「一个不可见的层，治理你所有可见的机器」。与 beszel（同书城市 Besźel）同宇宙致敬；六字母、无 GitHub/npm 重名（2026-07 查证）。</li>
+    <li>命名体系：hub 二进制 <code>orciny</code>，agent 二进制 <code>orciny-agent</code>，本地目录 <code>~/.orciny/</code>。</li>
+    <li>彩蛋保留字：<code>unsee</code>（书中「视而不见」术语）——留给数据脱敏/隐私开关类特性。</li>
+    <li>备选弃用记录：Uqbar（区块链重名）、Armada（常用词）、Erewhon（发音不直观）、Breach（安全语境负联想，一票否决）。</li>
+  </ul>
+
+  <h3>附录 B · 与构思报告的差异记录</h3>
+  <div class="tblwrap"><table>
+    <thead><tr><th>项</th><th>报告推荐</th><th>拍板</th><th>影响与处理</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>决策 E</td><td>E3 协议先行、分阶段吸收</td><td><strong>E1 一次性 Go 重写</strong></td>
+        <td>移植总量前移。处理：① Collector 按自用实例优先排序；② push 兼容端点仍然实现（它同时是产品功能与生态接口，不因 E1 取消），客观上保留过渡期桥梁；③ M2 验收门槛「自用实例 100% 移植 + 现网对照一致」不过则 Python 不下线——把 E1 的风险封在 M2 内部</td>
+      </tr>
+      <tr>
+        <td>决策 D</td><td>D1+D3 进 MVP</td><td><strong>仅勾选 D1</strong></td>
+        <td>D3（订阅采集）实质随 E1 并入 MVP（§4.7），与拍板不冲突；OTel（D2）维持 v1</td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <h3>附录 C · 参考资料</h3>
+  <ul>
+    <li>《Orciny 项目构思报告》（2026-07-21）：需求验证、竞品格局、选型论证与来源链接。</li>
+    <li>leycode-hub <code>docs/IMPLEMENTATION-STATUS.md</code>：可复用协议与实现台账。</li>
+    <li>leycode-client <code>README.md</code>：daemon 管道（applier / sessionlog / poller）。</li>
+    <li>ai-plan-insight <code>README.md</code>：Collector 类型、payload 协议与容错语义。</li>
+    <li>beszel（henrygd/beszel）：连接模型、agent 自更新、部署形态参照。</li>
+  </ul>
+</section>
+
+<footer>
+  <p>Orciny 产品设计文档 v0.1 · 2026-07-21 · Markdown 正本：<code>orciny/PRODUCT-DESIGN.md</code>（两版内容一致，以 Markdown 为准）。</p>
+</footer>
+
+</div>
