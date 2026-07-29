@@ -2,6 +2,8 @@ package agent
 
 import (
 	"fmt"
+	"path/filepath"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -17,8 +19,43 @@ func newRootCmd() *cobra.Command {
 	}
 	root.PersistentFlags().String("dir", "", "agent 数据目录（默认 $ORCINY_HOME 或 ~/.orciny）")
 	root.AddCommand(newVersionCmd())
-	// enroll / run / status 由计划 4 与计划 7 补上。
+	root.AddCommand(newEnrollCmd())
+	// run / status 由计划 7 补上。
 	return root
+}
+
+func newEnrollCmd() *cobra.Command {
+	var hubURL, token, hubKey string
+
+	cmd := &cobra.Command{
+		Use:   "enroll",
+		Short: "用一次性注册 token 接入 hub",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			dir := dirFromFlags(cmd)
+			res, err := Enroll(cmd.Context(), EnrollOptions{
+				HubURL:       hubURL,
+				Token:        token,
+				ExpectHubKey: hubKey,
+				Dir:          dir,
+				RetryDelay:   2 * time.Second,
+			})
+			if err != nil {
+				return err
+			}
+			out := cmd.OutOrStdout()
+			fmt.Fprintf(out, "已接入 %s\n", hubURL)
+			fmt.Fprintf(out, "机器指纹    %s\n", res.Fingerprint)
+			fmt.Fprintf(out, "hub 公钥指纹 %s\n", res.HubKeyFingerprint)
+			fmt.Fprintf(out, "配置已写入   %s\n", filepath.Join(dir, ConfigFileName))
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&hubURL, "hub", "", "hub 地址，例如 https://orciny.example.com")
+	cmd.Flags().StringVar(&token, "token", "", "一次性注册 token")
+	cmd.Flags().StringVar(&hubKey, "hub-key", "", "hub 公钥指纹，用于带外校验（可选）")
+	_ = cmd.MarkFlagRequired("hub")
+	_ = cmd.MarkFlagRequired("token")
+	return cmd
 }
 
 func newVersionCmd() *cobra.Command {
