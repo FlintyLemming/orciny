@@ -278,6 +278,11 @@ func (a *TestAgent) Connect(t *testing.T, th *TestHub) *agent.Session // 计划 
 | C | 01 Task 1 `.gitignore` | 「Create `.gitignore`」 | 合并进已有文件，保留原有的 OS/编辑器条目 | 仓库里已存在 `.gitignore`；覆盖会丢掉 `*.swp` / `Thumbs.db` 等条目 |
 | D | 04 Task 1 `writer_test.go`、04 Task 2 `issue_test.go` | `rec.GetString("detail.prefix")` / `rec.GetString("detail.token_prefix")` | `rec.UnmarshalJSONField("detail", &m)` 后取 map 的键 | PocketBase 的 `JSONField` 没有实现 `GetterFinder`，`Record.Get` 拿点号 key 一律落到 `GetRaw` 返回空串——原式不报错但恒过不了断言。后续计划凡是断言 JSON 字段的子键都要走 `UnmarshalJSONField` |
 | E | 04 Task 3 `consume.go` | `handleNotConsumed(tx, hash, pubKey string, now types.DateTime, out *Result)` | 去掉 `now` 参数 | 该参数在函数体里从未使用；核销时刻已由前面那条 UPDATE 写进库了 |
+| F | 05 Task 4 Step 3 `dial.go` | `go socket.ReadLoop()` 紧跟在 `gws.NewClient` 之后，`h.session = session` 在其后 | 先挂 `h.session`，再起 `ReadLoop` | `OnClose` 在读循环那个 goroutine 上读 `h.session`，原顺序是真数据竞争，`-race` 必报 |
+| G | 05 Task 3 Step 5 `handler.go` | `NewHandler` 只对 `Clock` / `Registry` 兜底 | 三个 `time.Duration` 字段 `<= 0` 时也兜底 | `HeartbeatInterval` 为 0 会让 `time.NewTicker` panic，而它跑在 goroutine 里，会连带整个 hub 进程一起死。生产走 `hub.Config.WithDefaults` 碰不到，但 `ws.Deps` 是导出类型，挡一手成本极低 |
+| H | 05 Task 3 Step 7 `routes.go` | 无条件 `g.GET("/ws", ...)` | `if d.WS != nil` 才注册 | `routes.Deps` 被 `routes_test.go` 直接构造（不带 WS），留一条一被访问就 nil deref 的路由不如不注册 |
+| I | 05 Task 3 Step 2 `ws_test.go` | httptest handler 里 `require.NoError(t, h.UpgradeHTTP(w, r))` | 改为 `_ = h.UpgradeHTTP(w, r)` | `require` 失败会调 `t.FailNow`，而它只允许在测试 goroutine 上调用；在 HTTP handler 里调用属于未定义行为，且会盖掉真正的失败信息 |
+| J | 05 Task 4 Step 1 `dial_test.go` | `fakeHandler` 带 `clientNonce []byte` 字段 | 删掉该字段 | 只写不读；且 handler 实例被所有连接共享，留着会在多连接场景下变成数据竞争 |
 
 另记两处计划正文的笔误，不影响产物：01 Task 5 Step 3 的验证命令写成 `go test ./agent/...`，但该步创建的是 atomicfile 的测试，实际应为 `go test ./internal/atomicfile/...`；`go mod init` 生成的 go 指令是当前工具链版本（`go 1.26.5`），需按 Global Constraints 手工改回 `go 1.26.0`。
 
