@@ -276,6 +276,8 @@ func (a *TestAgent) Connect(t *testing.T, th *TestHub) *agent.Session // 计划 
 | A | 01 Task 2 `internal/clock/fake.go` | `func (f *Fake) NewTicker(d time.Duration) Ticker { return f.add(d, d) }` | 返回 `fakeTicker{f.add(d, d)}`，新增内嵌 `*fakeTimer` 的 5 行适配器只覆写 `Stop` | `fakeTimer.Stop() bool` 不满足 `Ticker.Stop()`（无返回值），原式编译不过。`Clock` / `Timer` / `Ticker` 三个接口本身不变 |
 | B | 01 Task 4 `hub/config.go` | `if (c.MinAgentVersion == semver.Version{})` | `if c.MinAgentVersion.EQ(semver.Version{})` | `semver.Version` 含 `Pre []PRVersion` 与 `Build []string` 两个切片字段，类型不可比较，`==` 编译不过 |
 | C | 01 Task 1 `.gitignore` | 「Create `.gitignore`」 | 合并进已有文件，保留原有的 OS/编辑器条目 | 仓库里已存在 `.gitignore`；覆盖会丢掉 `*.swp` / `Thumbs.db` 等条目 |
+| D | 04 Task 1 `writer_test.go`、04 Task 2 `issue_test.go` | `rec.GetString("detail.prefix")` / `rec.GetString("detail.token_prefix")` | `rec.UnmarshalJSONField("detail", &m)` 后取 map 的键 | PocketBase 的 `JSONField` 没有实现 `GetterFinder`，`Record.Get` 拿点号 key 一律落到 `GetRaw` 返回空串——原式不报错但恒过不了断言。后续计划凡是断言 JSON 字段的子键都要走 `UnmarshalJSONField` |
+| E | 04 Task 3 `consume.go` | `handleNotConsumed(tx, hash, pubKey string, now types.DateTime, out *Result)` | 去掉 `now` 参数 | 该参数在函数体里从未使用；核销时刻已由前面那条 UPDATE 写进库了 |
 
 另记两处计划正文的笔误，不影响产物：01 Task 5 Step 3 的验证命令写成 `go test ./agent/...`，但该步创建的是 atomicfile 的测试，实际应为 `go test ./internal/atomicfile/...`；`go mod init` 生成的 go 指令是当前工具链版本（`go 1.26.5`），需按 Global Constraints 手工改回 `go 1.26.0`。
 
