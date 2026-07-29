@@ -13,9 +13,25 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+#: src/components/Sidebar.tsx
+msgid "凭据"
+msgstr "Credentials"
+
 #: src/pages/Login.tsx
 msgid "密码"
 msgstr "Password"
+
+#: src/components/Sidebar.tsx
+msgid "总览"
+msgstr "Overview"
+
+#: src/components/Sidebar.tsx
+msgid "收件箱"
+msgstr "Inbox"
+
+#: src/components/Sidebar.tsx
+msgid "机器"
+msgstr "Machines"
 
 #: src/components/ThemeToggle.tsx
 msgid "浅色"
@@ -29,6 +45,10 @@ msgstr "Dark"
 msgid "用管理员账号登录"
 msgstr "Sign in with your admin account"
 
+#: src/components/Sidebar.tsx
+msgid "用量"
+msgstr "Usage"
+
 #: src/pages/Login.tsx
 msgid "登录"
 msgstr "Sign in"
@@ -37,9 +57,25 @@ msgstr "Sign in"
 msgid "登录中…"
 msgstr "Signing in…"
 
+#: src/components/Sidebar.tsx
+msgid "订阅"
+msgstr "Subscriptions"
+
+#: src/components/Sidebar.tsx
+msgid "设置"
+msgstr "Settings"
+
+#: src/components/Placeholder.tsx
+msgid "该功能将在 {milestone} 提供"
+msgstr "Coming in {milestone}"
+
 #: src/components/ThemeToggle.tsx
 msgid "跟随系统"
 msgstr "System"
+
+#: src/components/Shell.tsx
+msgid "退出"
+msgstr "Sign out"
 
 #: src/pages/Login.tsx
 msgid "邮箱"
@@ -48,3 +84,7 @@ msgstr "Email"
 #: src/pages/Login.tsx
 msgid "邮箱或密码不正确"
 msgstr "Incorrect email or password"
+
+#: src/components/Sidebar.tsx
+msgid "配置集"
+msgstr "Config sets"
