@@ -5,6 +5,7 @@ package testsupport_test
 import (
 	"io"
 	"net/http"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -53,6 +54,14 @@ func TestNewTestHubURLsAndClock(t *testing.T) {
 	before := th.Clock.Now()
 	th.Clock.Advance(time.Minute)
 	require.Equal(t, before.Add(time.Minute), th.Clock.Now())
+}
+
+func TestTestHubHasIdentityAfterServe(t *testing.T) {
+	th := testsupport.NewTestHub(t)
+	require.NotNil(t, th.Hub.PublicKey(), "OnServe 之后 hub 密钥必须已加载")
+
+	// 密钥落在数据目录里，会被 PocketBase 的备份一起带走（spec §4.5）
+	require.FileExists(t, filepath.Join(th.App.DataDir(), "orciny_hub_key.pem"))
 }
 
 func TestNewTestHubAcceptsConfigOverride(t *testing.T) {

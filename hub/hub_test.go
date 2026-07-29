@@ -40,6 +40,18 @@ func TestAttachSucceedsOnTestApp(t *testing.T) {
 	require.NotNil(t, h)
 }
 
+func TestPublicKeyBeforeServeIsNil(t *testing.T) {
+	app, err := tests.NewTestApp(t.TempDir())
+	require.NoError(t, err)
+	t.Cleanup(app.Cleanup)
+
+	h, err := hub.Attach(app, hub.Config{})
+	require.NoError(t, err)
+
+	// 密钥路径依赖 DataDir，只有 OnServe 之后才有值——此前访问必须是 nil 而不是 panic。
+	require.Nil(t, h.PublicKey())
+}
+
 func TestStartOnAttachedHubIsRejected(t *testing.T) {
 	app, err := tests.NewTestApp(t.TempDir())
 	require.NoError(t, err)

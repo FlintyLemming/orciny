@@ -3,12 +3,16 @@
 package hub
 
 import (
+	"crypto/ed25519"
 	"errors"
+	"fmt"
+	"path/filepath"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 
+	"github.com/FlintyLemming/orciny/hub/internal/identity"
 	"github.com/FlintyLemming/orciny/hub/internal/site"
 
 	// 空 import 触发 init()，把初始迁移注册进 core.AppMigrations。
@@ -21,6 +25,8 @@ type Hub struct {
 	core.App
 
 	cfg Config
+
+	identity *identity.Store
 
 	// pb 仅在 New 创建时非 nil。Attach 出来的实例由调用方驱动 serve。
 	pb *pocketbase.PocketBase
@@ -46,8 +52,17 @@ func Attach(app core.App, cfg Config) (*Hub, error) {
 	h := &Hub{App: app, cfg: cfg.WithDefaults()}
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
-		// 后续计划在此依次插入：hub 密钥加载、幽灵清理、自定义路由注册、
-		// 连接管理器启动。顺序即依赖顺序，不要打乱。
+		// 后续计划在此依次插入：幽灵清理、自定义路由注册、连接管理器启动。
+		// 顺序即依赖顺序，不要打乱。
+
+		// DataDir 只有在 Bootstrap 之后才有值，所以密钥路径必须在这里算，
+		// 不能在 Attach 时算。
+		h.identity = identity.NewStore(filepath.Join(e.App.DataDir(), identity.KeyFileName))
+		if err := h.identity.Load(); err != nil {
+			return fmt.Errorf("加载 hub 密钥: %w", err)
+		}
+		e.App.Logger().Info("hub 身份就绪", "fingerprint", h.identity.Fingerprint())
+
 		if err := h.registerUI(e); err != nil {
 			return err
 		}
@@ -62,6 +77,14 @@ func Attach(app core.App, cfg Config) (*Hub, error) {
 func (h *Hub) registerUI(e *core.ServeEvent) error {
 	e.Router.GET("/{path...}", apis.Static(site.DistFS(), true))
 	return nil
+}
+
+// PublicKey 返回 hub 的公钥。OnServe 之前返回 nil。
+func (h *Hub) PublicKey() ed25519.PublicKey {
+	if h.identity == nil {
+		return nil
+	}
+	return h.identity.PublicKey()
 }
 
 // Start 运行生产 hub（cobra 根命令，含 serve 子命令）。
