@@ -5,6 +5,7 @@ go 1.26.0
 require (
 	github.com/blang/semver/v4 v4.0.0
 	github.com/fxamacker/cbor/v2 v2.9.2
+	github.com/pocketbase/dbx v1.12.0
 	github.com/pocketbase/pocketbase v0.39.9
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
@@ -28,7 +29,6 @@ require (
 	github.com/mattn/go-isatty v0.0.23 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/pocketbase/dbx v1.12.0 // indirect
 	github.com/pocketbase/ozzo-validation/v4 v4.3.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/spf13/cast v1.10.0 // indirect
