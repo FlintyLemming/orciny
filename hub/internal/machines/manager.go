@@ -27,6 +27,11 @@ type Manager struct {
 	conns   map[string]Conn        // fingerprint → 当前连接
 	pending map[string]clock.Timer // fingerprint → 待定的离线定时器
 	stopped bool
+
+	// done 唤醒还卡在 timer.C() 上的等待协程，wg 让 Stop 能等它们真的收工。
+	done     chan struct{}
+	stopOnce sync.Once
+	wg       sync.WaitGroup
 }
 
 func NewManager(app core.App, ev *events.Writer, clk clock.Clock, grace time.Duration) *Manager {
@@ -37,6 +42,7 @@ func NewManager(app core.App, ev *events.Writer, clk clock.Clock, grace time.Dur
 		grace:   grace,
 		conns:   make(map[string]Conn),
 		pending: make(map[string]clock.Timer),
+		done:    make(chan struct{}),
 	}
 }
 
@@ -109,13 +115,23 @@ func (m *Manager) Unregister(c Conn) {
 	machineID := c.MachineID()
 	timer := m.clk.NewTimer(m.grace)
 	m.pending[fp] = timer
+	// Add 必须和 stopped 的检查在同一个临界区里：Stop 是先在锁内置位再在锁外
+	// Wait，这样就不会出现「Wait 已经开始了还有人 Add」。
+	m.wg.Add(1)
 	m.mu.Unlock()
 
 	go m.waitAndMarkOffline(fp, machineID, timer)
 }
 
 func (m *Manager) waitAndMarkOffline(fp, machineID string, timer clock.Timer) {
-	<-timer.C()
+	defer m.wg.Done()
+
+	select {
+	case <-timer.C():
+	case <-m.done:
+		// 关停了。定时器已被 Stop 摘掉，再等下去就是永远。
+		return
+	}
 
 	m.mu.Lock()
 	// 定时器到期时若该指纹已有新连接，什么都不做。
@@ -178,15 +194,21 @@ func (m *Manager) Count() int {
 	return len(m.conns)
 }
 
-// Stop 取消全部待定定时器，用于关停与测试清理。
+// Stop 取消全部待定定时器并等待在途的置离线协程收工。多次调用是安全的。
+//
+// 「等」这一步不能省：定时器可能刚好已经触发，等待协程正走在写库路上。
+// 只摘定时器就返回，会让那次写库落到已经关掉的数据库上。
 func (m *Manager) Stop() {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	m.stopped = true
 	for fp, t := range m.pending {
 		t.Stop()
 		delete(m.pending, fp)
 	}
+	m.mu.Unlock()
+
+	m.stopOnce.Do(func() { close(m.done) })
+	m.wg.Wait()
 }
 
 // setStatus 写状态，返回状态是否真的变了。

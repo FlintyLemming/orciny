@@ -38,6 +38,7 @@ type Hub struct {
 	identity *identity.Store
 	events   *events.Writer
 	enroll   *enroll.Service
+	machines *machines.Manager
 	ws       *ws.Handler
 
 	// pb 仅在 New 创建时非 nil。Attach 出来的实例由调用方驱动 serve。
@@ -66,9 +67,20 @@ func Attach(app core.App, cfg Config) (*Hub, error) {
 	// 这两个子系统只需要 core.App，不需要数据目录，因此可以在这里就构造。
 	h.events = events.NewWriter(app)
 	h.enroll = enroll.NewService(app, h.events, h.cfg.Clock, h.cfg.EnrollTokenTTL, rand.Reader)
+	h.machines = machines.NewManager(app, h.events, h.cfg.Clock, h.cfg.OfflineGrace)
+
+	// record hook 绑在 Attach 而不是 OnServe 里：OnServe 每次 serve 都会触发，
+	// 绑在里面会重复注册同一个 handler。
+	app.OnRecordAfterDeleteSuccess("machines").BindFunc(h.machines.OnRecordDeleted)
+
+	// OnTerminate 跑在数据库真正关闭之前，正好是排空读循环的时机。
+	app.OnTerminate().BindFunc(func(e *core.TerminateEvent) error {
+		h.Shutdown()
+		return e.Next()
+	})
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
-		// 后续计划在此依次插入：幽灵清理、自定义路由注册、连接管理器启动。
+		// 后续计划在此依次插入：自定义路由注册、连接管理器启动。
 		// 顺序即依赖顺序，不要打乱。
 
 		// DataDir 只有在 Bootstrap 之后才有值，所以密钥路径必须在这里算，
@@ -79,11 +91,17 @@ func Attach(app core.App, cfg Config) (*Hub, error) {
 		}
 		e.App.Logger().Info("hub 身份就绪", "fingerprint", h.identity.Fingerprint())
 
+		// 内存里的注册表此刻是空的，库里可能还留着上次进程退出时的 online。
+		// 必须赶在 WS 端点接客之前翻掉，否则会和真实重连交叉写状态。
+		if err := h.machines.ResetGhosts(); err != nil {
+			return fmt.Errorf("清理幽灵 online: %w", err)
+		}
+
 		// ws 依赖已加载的密钥（要用它签挑战），因此必须排在 identity.Load 之后。
 		h.ws = ws.NewHandler(ws.Deps{
 			App:               e.App,
 			Handshake:         handshake.NewServer(handshake.NewAppStore(e.App), h.identity, h.cfg.MinAgentVersion, rand.Reader),
-			Registry:          machines.NopRegistry{}, // 计划 6 换成真的 Manager
+			Registry:          h.machines,
 			Events:            h.events,
 			Clock:             h.cfg.Clock,
 			HandshakeTimeout:  h.cfg.HandshakeTimeout,
@@ -141,6 +159,22 @@ func (h *Hub) PublicKey() ed25519.PublicKey {
 // 这是 hub 包对外暴露的唯一「管理动作」，供测试脚手架绕开 HTTP 认证使用。
 func (h *Hub) IssueEnrollToken() (string, time.Time, error) {
 	return h.enroll.IssueToken()
+}
+
+// Shutdown 有序停掉 hub 的运行时部件：先踢连接，再等读循环退出，最后停
+// 宽限定时器。多次调用是安全的。
+//
+// 顺序不能反。读循环会经由 machines.Manager 写库，若它跑在数据库关闭之后，
+// PocketBase 内部会对着 nil 的 DB 解引用而 panic —— 生产上是关停时崩一下，
+// 测试里则是 t.Cleanup 拆掉 TestApp 后必现的段错误。
+func (h *Hub) Shutdown() {
+	if h.ws != nil {
+		h.ws.CloseAll()
+		h.ws.Wait()
+	}
+	if h.machines != nil {
+		h.machines.Stop()
+	}
 }
 
 // Start 运行生产 hub（cobra 根命令，含 serve 子命令）。

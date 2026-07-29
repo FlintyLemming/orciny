@@ -52,6 +52,20 @@ func TestPublicKeyBeforeServeIsNil(t *testing.T) {
 	require.Nil(t, h.PublicKey())
 }
 
+func TestShutdownBeforeServeIsSafe(t *testing.T) {
+	app, err := tests.NewTestApp(t.TempDir())
+	require.NoError(t, err)
+	t.Cleanup(app.Cleanup)
+
+	h, err := hub.Attach(app, hub.Config{})
+	require.NoError(t, err)
+
+	// ws.Handler 要到 OnServe 才构造。关停必须能在此之前调用——
+	// app.Cleanup() 触发的 OnTerminate 就会走到这里。
+	require.NotPanics(t, h.Shutdown)
+	require.NotPanics(t, h.Shutdown, "重复关停必须是安全的")
+}
+
 func TestStartOnAttachedHubIsRejected(t *testing.T) {
 	app, err := tests.NewTestApp(t.TempDir())
 	require.NoError(t, err)

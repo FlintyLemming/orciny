@@ -119,6 +119,17 @@ func (f *fixture) eventCount(t *testing.T, kind string) int {
 	return len(recs)
 }
 
+// countEvents 是 eventCount 的无断言版本，专供 require.Eventually 的条件函数。
+// 条件函数跑在 Eventually 自己的 goroutine 上，那里不允许调 require。
+func (f *fixture) countEvents(kind string) int {
+	recs, err := f.app.FindRecordsByFilter("events", "kind = {:k}", "", 0, 0,
+		map[string]any{"k": kind})
+	if err != nil {
+		return -1
+	}
+	return len(recs)
+}
+
 // —— 用例 ——
 
 func TestRegisterMarksOnline(t *testing.T) {
@@ -145,9 +156,10 @@ func TestUnregisterWaitsForGraceBeforeOffline(t *testing.T) {
 		2*time.Second, 5*time.Millisecond)
 
 	f.clk.Advance(5 * time.Second)
-	require.Eventually(t, func() bool { return f.status(t, c.id) == "offline" },
+	// 状态与事件是两次独立的写库，先状态后事件，所以要等的是后者。
+	require.Eventually(t, func() bool { return f.countEvents(events.KindMachineDisconnected) == 1 },
 		2*time.Second, 5*time.Millisecond)
-	require.Equal(t, 1, f.eventCount(t, events.KindMachineDisconnected))
+	require.Equal(t, "offline", f.status(t, c.id))
 }
 
 // 断开后 3 秒内重连：状态始终 online，且不产生 disconnected 事件。

@@ -3,6 +3,7 @@ package ws
 import (
 	"log/slog"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/lxzan/gws"
@@ -28,11 +29,18 @@ type Deps struct {
 	HeartbeatInterval time.Duration
 }
 
-// Handler 是 WS 端点。一个 hub 一个实例，内部无每连接状态。
+// Handler 是 WS 端点。一个 hub 一个实例。
+//
+// 它只为「关停」保留每连接状态：live 是当前活着的读循环，wg 用来等它们退出。
+// 业务意义上的连接注册表在 machines 包，与这里无关。
 type Handler struct {
 	d        Deps
 	upgrader *gws.Upgrader
 	log      *slog.Logger
+
+	mu   sync.Mutex
+	live map[*gws.Conn]struct{}
+	wg   sync.WaitGroup
 }
 
 const sessionKey = "orciny.conn"
@@ -62,7 +70,7 @@ func NewHandler(d Deps) *Handler {
 	if d.HeartbeatInterval <= 0 {
 		d.HeartbeatInterval = defaultHeartbeatInterval
 	}
-	h := &Handler{d: d}
+	h := &Handler{d: d, live: make(map[*gws.Conn]struct{})}
 	h.log = slog.Default()
 	if d.App != nil {
 		h.log = d.App.Logger()
@@ -85,9 +93,34 @@ func (h *Handler) UpgradeHTTP(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	go socket.ReadLoop() // 阻塞直到连接结束
+	// wg 必须在起 goroutine 之前 Add，否则 Wait 可能在读循环登记之前就返回。
+	h.wg.Add(1)
+	go func() {
+		defer h.wg.Done()
+		socket.ReadLoop() // 阻塞直到连接结束
+	}()
 	return nil
 }
+
+// CloseAll 关闭全部活跃连接。读循环随后自行退出，由 Wait 收尾。
+func (h *Handler) CloseAll() {
+	h.mu.Lock()
+	sockets := make([]*gws.Conn, 0, len(h.live))
+	for s := range h.live {
+		sockets = append(sockets, s)
+	}
+	h.mu.Unlock()
+
+	for _, s := range sockets {
+		_ = s.WriteClose(1001, []byte("hub shutting down"))
+	}
+}
+
+// Wait 阻塞到所有读循环退出。
+//
+// 这是关停时的必要一步：读循环会写库（machines.Manager），若在数据库拆掉
+// 之后才跑完，PocketBase 内部会对着 nil 的 DB 解引用。
+func (h *Handler) Wait() { h.wg.Wait() }
 
 // —— gws.Event 实现 ——
 
@@ -99,11 +132,19 @@ func (h *Handler) OnOpen(socket *gws.Conn) {
 	}
 	socket.Session().Store(sessionKey, c)
 
+	h.mu.Lock()
+	h.live[socket] = struct{}{}
+	h.mu.Unlock()
+
 	// 握手期用短 deadline：升级成功却迟迟不认证的连接必须被清掉。
 	_ = socket.SetDeadline(time.Now().Add(h.d.HandshakeTimeout))
 }
 
 func (h *Handler) OnClose(socket *gws.Conn, err error) {
+	h.mu.Lock()
+	delete(h.live, socket)
+	h.mu.Unlock()
+
 	c, ok := h.connOf(socket)
 	if !ok {
 		return
