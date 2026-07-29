@@ -9,7 +9,6 @@ import (
 	"github.com/FlintyLemming/orciny/agent/internal/conn"
 	"github.com/FlintyLemming/orciny/agent/internal/identity"
 	"github.com/FlintyLemming/orciny/agent/internal/probe"
-	"github.com/FlintyLemming/orciny/protocol"
 )
 
 // ConnectOptions 是 agent.Connect 的入参。
@@ -36,18 +35,12 @@ func Connect(ctx context.Context, o ConnectOptions) (*Session, error) {
 		return nil, err
 	}
 
-	hostname, goos, goarch := probe.Host()
 	return conn.Dial(ctx, conn.Config{
-		HubURL:       o.HubURL,
-		Identity:     id,
-		HubPub:       hubPub,
-		AgentVersion: orciny.Version,
-		Info: protocol.MachineInfo{
-			Hostname:     hostname,
-			OS:           goos,
-			Arch:         goarch,
-			AgentVersion: orciny.Version,
-		},
+		HubURL:           o.HubURL,
+		Identity:         id,
+		HubPub:           hubPub,
+		AgentVersion:     orciny.Version,
+		Info:             probe.Collect(ctx, orciny.Version),
 		HandshakeTimeout: o.HandshakeTimeout,
 		ReadTimeout:      o.ReadTimeout,
 	})
