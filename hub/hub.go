@@ -17,9 +17,12 @@ import (
 	"github.com/FlintyLemming/orciny"
 	"github.com/FlintyLemming/orciny/hub/internal/enroll"
 	"github.com/FlintyLemming/orciny/hub/internal/events"
+	"github.com/FlintyLemming/orciny/hub/internal/handshake"
 	"github.com/FlintyLemming/orciny/hub/internal/identity"
+	"github.com/FlintyLemming/orciny/hub/internal/machines"
 	"github.com/FlintyLemming/orciny/hub/internal/routes"
 	"github.com/FlintyLemming/orciny/hub/internal/site"
+	"github.com/FlintyLemming/orciny/hub/internal/ws"
 
 	// 空 import 触发 init()，把初始迁移注册进 core.AppMigrations。
 	// 这也让 internal/testsupport（只能看到公开包）间接获得迁移。
@@ -35,6 +38,7 @@ type Hub struct {
 	identity *identity.Store
 	events   *events.Writer
 	enroll   *enroll.Service
+	ws       *ws.Handler
 
 	// pb 仅在 New 创建时非 nil。Attach 出来的实例由调用方驱动 serve。
 	pb *pocketbase.PocketBase
@@ -75,9 +79,22 @@ func Attach(app core.App, cfg Config) (*Hub, error) {
 		}
 		e.App.Logger().Info("hub 身份就绪", "fingerprint", h.identity.Fingerprint())
 
+		// ws 依赖已加载的密钥（要用它签挑战），因此必须排在 identity.Load 之后。
+		h.ws = ws.NewHandler(ws.Deps{
+			App:               e.App,
+			Handshake:         handshake.NewServer(handshake.NewAppStore(e.App), h.identity, h.cfg.MinAgentVersion, rand.Reader),
+			Registry:          machines.NopRegistry{}, // 计划 6 换成真的 Manager
+			Events:            h.events,
+			Clock:             h.cfg.Clock,
+			HandshakeTimeout:  h.cfg.HandshakeTimeout,
+			ReadTimeout:       h.cfg.ReadTimeout,
+			HeartbeatInterval: h.cfg.HeartbeatInterval,
+		})
+
 		if err := routes.Register(e, routes.Deps{
 			Enroll:   h.enroll,
 			Identity: h.identity,
+			WS:       h.ws,
 			Version:  orciny.Version,
 		}); err != nil {
 			return fmt.Errorf("注册路由: %w", err)

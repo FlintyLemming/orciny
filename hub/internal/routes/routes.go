@@ -12,12 +12,14 @@ import (
 
 	"github.com/FlintyLemming/orciny/hub/internal/enroll"
 	"github.com/FlintyLemming/orciny/hub/internal/identity"
+	"github.com/FlintyLemming/orciny/hub/internal/ws"
 )
 
 // Deps 是路由层需要的全部依赖。路由不持有状态，只做编解码与状态码映射。
 type Deps struct {
 	Enroll   *enroll.Service
 	Identity *identity.Store
+	WS       *ws.Handler
 	Version  string
 }
 
@@ -32,7 +34,16 @@ func Register(e *core.ServeEvent, d Deps) error {
 	// token 本身就是凭证（spec §9.1）。
 	g.POST("/enroll", d.enroll)
 
-	// WS 端点与 /install.sh 分别由计划 5 与计划 9 在此追加。
+	// agent 的长连接入口。认证在 wire 上做（Ed25519 双向挑战-应答），
+	// 因此这里不挂任何 HTTP 层的鉴权中间件。
+	//
+	// WS 为 nil 时干脆不注册：只关心 HTTP 路由的测试不必去装配一个 ws.Handler，
+	// 也好过留一条一被访问就 panic 的路由。
+	if d.WS != nil {
+		g.GET("/ws", func(e *core.RequestEvent) error { return d.WS.Upgrade(e) })
+	}
+
+	// /install.sh 由计划 9 在此追加。
 	return nil
 }
 
