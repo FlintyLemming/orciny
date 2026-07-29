@@ -56,8 +56,9 @@ type Session struct {
 	socket *gws.Conn
 	done   chan struct{}
 
-	mu  sync.Mutex
-	err error
+	once sync.Once
+	mu   sync.Mutex
+	err  error
 }
 
 func (s *Session) Done() <-chan struct{} { return s.done }
@@ -69,7 +70,25 @@ func (s *Session) Err() error {
 	return s.err
 }
 
-func (s *Session) Close() error { return s.socket.WriteClose(1000, nil) }
+// finish 记录连接结束的原因并唤醒 Done()。只有第一次调用生效——
+// 重连循环靠 Done() 判断「这条连接完了」，原因以最先到达的那个为准。
+func (s *Session) finish(err error) {
+	s.once.Do(func() {
+		s.mu.Lock()
+		s.err = err
+		s.mu.Unlock()
+		close(s.done)
+	})
+}
+
+// Close 主动关闭连接。没有 socket 的会话（测试脚手架造的）直接结束。
+func (s *Session) Close() error {
+	if s.socket == nil {
+		s.finish(nil)
+		return nil
+	}
+	return s.socket.WriteClose(1000, nil)
+}
 
 // Send 在已建立的会话上发一条信封（计划 7 的心跳外消息用）。
 func (s *Session) Send(kind protocol.Kind, payload any) error {
@@ -123,14 +142,13 @@ func (h *handler) OnPong(socket *gws.Conn, _ []byte) {
 }
 
 func (h *handler) OnClose(_ *gws.Conn, err error) {
-	h.closeOnce.Do(func() {
-		if h.session != nil {
-			h.session.mu.Lock()
-			h.session.err = err
-			h.session.mu.Unlock()
-		}
-		close(h.done)
-	})
+	if h.session != nil {
+		h.session.finish(err)
+		return
+	}
+	// 理论上到不了这里（session 在 ReadLoop 之前就挂好了），
+	// 但 await 靠这个通道解除阻塞，宁可多一条兜底。
+	h.closeOnce.Do(func() { close(h.done) })
 }
 
 // Dial 连接 hub 并完成握手，成功后立即上报 MachineInfo。
