@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/pocketbase/pocketbase"
-	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 
 	"github.com/FlintyLemming/orciny"
@@ -21,7 +20,6 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/identity"
 	"github.com/FlintyLemming/orciny/hub/internal/machines"
 	"github.com/FlintyLemming/orciny/hub/internal/routes"
-	"github.com/FlintyLemming/orciny/hub/internal/site"
 	"github.com/FlintyLemming/orciny/hub/internal/ws"
 
 	// 空 import 触发 init()，把初始迁移注册进 core.AppMigrations。
@@ -140,12 +138,8 @@ func Attach(app core.App, cfg Config) (*Hub, error) {
 	return h, nil
 }
 
-// registerUI 挂内嵌前端。catch-all 模式在 net/http 的 ServeMux 里优先级最低，
-// 因此不会盖住 /api/* 与 PocketBase 自带的 /_/*。
-func (h *Hub) registerUI(e *core.ServeEvent) error {
-	e.Router.GET("/{path...}", apis.Static(site.DistFS(), true))
-	return nil
-}
+// registerUI 由 ui_prod.go / ui_dev.go 按 build tag 分别实现：
+// 生产挂内嵌 dist，dev 反代给 Vite。
 
 // PublicKey 返回 hub 的公钥。OnServe 之前返回 nil。
 func (h *Hub) PublicKey() ed25519.PublicKey {

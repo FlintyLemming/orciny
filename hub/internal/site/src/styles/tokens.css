@@ -1,0 +1,77 @@
+@import 'tailwindcss';
+
+:root {
+  --page: #faf9f6; --surface: #fffefb; --wash: #f0eee8; --wash2: #e9e6df;
+  --ink: #1c1b18; --ink2: #57544c; --ink3: #8c887e;
+  --line: #e6e3dc; --hair: rgba(28, 27, 24, .10);
+  --accent: #b45309; --accent-bright: #c2540f; --accent-soft: rgba(194, 84, 15, .09);
+  --pri-bg: #c2540f; --pri-ink: #fff8f2;
+  --good: #0ca30c; --good-text: #21691f; --good-bg: rgba(12, 163, 12, .10);
+  --warn: #d9a94a; --warn-text: #8a6414; --warn-bg: rgba(217, 169, 74, .16);
+  --crit: #d03b3b; --crit-text: #b3372e; --crit-bg: rgba(208, 59, 59, .10);
+  --info-text: #1c5cab; --info-bg: rgba(42, 120, 214, .10);
+  --brand-fill: #b45309;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "PingFang SC", "Hiragino Sans GB",
+          "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+  color-scheme: light;
+}
+
+/* 跟随系统 */
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    --page: #131210; --surface: #1c1a17; --wash: #262320; --wash2: #2e2b26;
+    --ink: #f2efe9; --ink2: #b6b2aa; --ink3: #8c887e;
+    --line: #2e2b26; --hair: rgba(242, 239, 233, .10);
+    --accent: #f08c4a; --accent-bright: #e8721e; --accent-soft: rgba(232, 114, 30, .13);
+    --good-text: #4fbf5e; --good-bg: rgba(12, 163, 12, .16);
+    --warn-text: #d9a94a; --warn-bg: rgba(217, 169, 74, .13);
+    --crit: #d03b3b; --crit-text: #e66767; --crit-bg: rgba(208, 59, 59, .16);
+    --info-text: #86b6ef; --info-bg: rgba(57, 135, 229, .14);
+    --brand-fill: #e8721e;
+    color-scheme: dark;
+  }
+}
+
+/* 显式切换（用户点了主题开关） */
+:root[data-theme="dark"] {
+  --page: #131210; --surface: #1c1a17; --wash: #262320; --wash2: #2e2b26;
+  --ink: #f2efe9; --ink2: #b6b2aa; --ink3: #8c887e;
+  --line: #2e2b26; --hair: rgba(242, 239, 233, .10);
+  --accent: #f08c4a; --accent-bright: #e8721e; --accent-soft: rgba(232, 114, 30, .13);
+  --good-text: #4fbf5e; --good-bg: rgba(12, 163, 12, .16);
+  --warn-text: #d9a94a; --warn-bg: rgba(217, 169, 74, .13);
+  --crit: #d03b3b; --crit-text: #e66767; --crit-bg: rgba(208, 59, 59, .16);
+  --info-text: #86b6ef; --info-bg: rgba(57, 135, 229, .14);
+  --brand-fill: #e8721e;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-wash: var(--wash);
+  --color-wash2: var(--wash2);
+  --color-ink: var(--ink);
+  --color-ink2: var(--ink2);
+  --color-ink3: var(--ink3);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-good: var(--good-text);
+  --color-warn: var(--warn-text);
+  --color-crit: var(--crit-text);
+  --font-sans: var(--sans);
+  --font-mono: var(--mono);
+}
+
+html, body, #root { height: 100%; }
+body {
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 键盘可达：焦点环统一走 accent-bright，与 mock 一致。 */
+:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 2px; }

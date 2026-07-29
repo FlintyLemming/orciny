@@ -4,7 +4,10 @@
 Thumbs.db
 
 # 构建与运行产物
-dist/
+# 只钉仓库根的 dist/（make build 的输出）。不能写成裸 `dist/`：那会在任意层级
+# 匹配，连 hub/internal/site/dist/ 一并排除，而被排除目录里的文件无法再用 `!`
+# 捞回来——占位 index.html 就进不了库，新克隆出来的仓库 //go:embed all:dist 直接编译失败。
+/dist/
 pb_data/
 node_modules/
 *.pem

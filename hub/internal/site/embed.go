@@ -1,3 +1,5 @@
+//go:build !dev
+
 // Package site 承载编译后的 Web UI。
 // 生产用 //go:embed 内嵌 dist/；dist/index.html 是仓库里的占位文件，
 // 前端构建会覆盖它（spec §5.4）。

@@ -1,0 +1,12 @@
+<!doctype html>
+<!-- 占位文件：只为让 //go:embed all:dist 找得到目录，使未构建前端时 Go 也编得过。
+     `make build-web` 会用真实产物覆盖它，覆盖后的内容不入库（见 .gitignore）。 -->
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Orciny</title>
+  </head>
+  <body>
+    <p>前端尚未构建，请执行 <code>make build-web</code>。</p>
+  </body>
+</html>
