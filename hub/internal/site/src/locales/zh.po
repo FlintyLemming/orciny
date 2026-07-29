@@ -13,6 +13,10 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+#: src/pages/Settings.tsx
+msgid "agent 更新策略"
+msgstr "agent 更新策略"
+
 #: src/pages/MachineDetail.tsx
 #: src/pages/Machines.tsx
 msgid "agent 版本"
@@ -23,6 +27,10 @@ msgstr "agent 版本"
 msgid "Claude Code"
 msgstr "Claude Code"
 
+#: src/pages/Settings.tsx
+msgid "hub 版本"
+msgstr "hub 版本"
+
 #: src/pages/MachineDetail.tsx
 msgid "主机名"
 msgstr "主机名"
@@ -30,6 +38,10 @@ msgstr "主机名"
 #: src/pages/MachineDetail.tsx
 msgid "事件流"
 msgstr "事件流"
+
+#: src/pages/Settings.tsx
+msgid "公钥指纹"
+msgstr "公钥指纹"
 
 #: src/components/AddMachineDialog.tsx
 msgid "关闭"
@@ -68,9 +80,21 @@ msgstr "在目标机器上执行这行命令即可接入："
 msgid "在线"
 msgstr "在线"
 
+#: src/pages/Settings.tsx
+msgid "备份"
+msgstr "备份"
+
+#: src/pages/Settings.tsx
+msgid "备份与恢复在 PocketBase 管理后台操作。注意：hub 的私钥也在数据目录里， 恢复时若丢了它，所有 agent 都需要重新 enroll。"
+msgstr "备份与恢复在 PocketBase 管理后台操作。注意：hub 的私钥也在数据目录里， 恢复时若丢了它，所有 agent 都需要重新 enroll。"
+
 #: src/components/AddMachineDialog.tsx
 msgid "复制安装命令"
 msgstr "复制安装命令"
+
+#: src/pages/Settings.tsx
+msgid "安装 agent 时可用 --hub-key 带上这个指纹做带外校验，防止在首次接入的那一刻被中间人冒充。"
+msgstr "安装 agent 时可用 --hub-key 带上这个指纹做带外校验，防止在首次接入的那一刻被中间人冒充。"
 
 #: src/pages/Login.tsx
 msgid "密码"
@@ -99,6 +123,10 @@ msgstr "已连接"
 #: src/components/Sidebar.tsx
 msgid "总览"
 msgstr "总览"
+
+#: src/pages/Settings.tsx
+msgid "打开备份设置"
+msgstr "打开备份设置"
 
 #: src/pages/MachineDetail.tsx
 msgid "找不到这台机器。"
@@ -182,6 +210,10 @@ msgstr "登录中…"
 msgid "离线"
 msgstr "离线"
 
+#: src/pages/Settings.tsx
+msgid "站点信息"
+msgstr "站点信息"
+
 #: src/pages/MachineDetail.tsx
 msgid "签发注册 token"
 msgstr "签发注册 token"
@@ -200,6 +232,7 @@ msgid "认证失败"
 msgstr "认证失败"
 
 #: src/components/Sidebar.tsx
+#: src/pages/Settings.tsx
 msgid "设置"
 msgstr "设置"
 

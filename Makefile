@@ -6,7 +6,7 @@ LDFLAGS := -s -w -X $(MODULE).Version=$(VERSION)
 
 all: build
 
-## build-web: 编译前端（计划 8 接入 site/ 之后才可用）
+## build-web: 编译前端，产物落进 hub/internal/site/dist/ 供 //go:embed 内嵌
 build-web:
 	cd hub/internal/site && npm ci && npm run build
 
@@ -16,7 +16,7 @@ build-hub:
 build-agent:
 	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o dist/orciny-agent ./cmd/orciny-agent
 
-build: build-hub build-agent
+build: build-web build-hub build-agent
 
 ## dev: 同时起 Vite 与 hub（dev tag，前端请求反代给 Vite）
 dev:

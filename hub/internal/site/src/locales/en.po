@@ -13,6 +13,10 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+#: src/pages/Settings.tsx
+msgid "agent 更新策略"
+msgstr "Agent update policy"
+
 #: src/pages/MachineDetail.tsx
 #: src/pages/Machines.tsx
 msgid "agent 版本"
@@ -23,6 +27,10 @@ msgstr "Agent version"
 msgid "Claude Code"
 msgstr "Claude Code"
 
+#: src/pages/Settings.tsx
+msgid "hub 版本"
+msgstr "Hub version"
+
 #: src/pages/MachineDetail.tsx
 msgid "主机名"
 msgstr "Hostname"
@@ -30,6 +38,10 @@ msgstr "Hostname"
 #: src/pages/MachineDetail.tsx
 msgid "事件流"
 msgstr "Event stream"
+
+#: src/pages/Settings.tsx
+msgid "公钥指纹"
+msgstr "Public key fingerprint"
 
 #: src/components/AddMachineDialog.tsx
 msgid "关闭"
@@ -68,9 +80,21 @@ msgstr "Run this command on the target machine to connect it:"
 msgid "在线"
 msgstr "Online"
 
+#: src/pages/Settings.tsx
+msgid "备份"
+msgstr "Backups"
+
+#: src/pages/Settings.tsx
+msgid "备份与恢复在 PocketBase 管理后台操作。注意：hub 的私钥也在数据目录里， 恢复时若丢了它，所有 agent 都需要重新 enroll。"
+msgstr "Backup and restore are handled in the PocketBase admin UI. Note: the hub's private key also lives in the data directory — if a restore loses it, every agent must enroll again."
+
 #: src/components/AddMachineDialog.tsx
 msgid "复制安装命令"
 msgstr "Copy install command"
+
+#: src/pages/Settings.tsx
+msgid "安装 agent 时可用 --hub-key 带上这个指纹做带外校验，防止在首次接入的那一刻被中间人冒充。"
+msgstr "Pass this fingerprint to the agent via --hub-key for out-of-band verification, so nobody can impersonate the hub at the moment of first contact."
 
 #: src/pages/Login.tsx
 msgid "密码"
@@ -99,6 +123,10 @@ msgstr "Connected"
 #: src/components/Sidebar.tsx
 msgid "总览"
 msgstr "Overview"
+
+#: src/pages/Settings.tsx
+msgid "打开备份设置"
+msgstr "Open backup settings"
 
 #: src/pages/MachineDetail.tsx
 msgid "找不到这台机器。"
@@ -182,6 +210,10 @@ msgstr "Signing in…"
 msgid "离线"
 msgstr "Offline"
 
+#: src/pages/Settings.tsx
+msgid "站点信息"
+msgstr "Site info"
+
 #: src/pages/MachineDetail.tsx
 msgid "签发注册 token"
 msgstr "Enroll token issued"
@@ -200,6 +232,7 @@ msgid "认证失败"
 msgstr "Authentication failed"
 
 #: src/components/Sidebar.tsx
+#: src/pages/Settings.tsx
 msgid "设置"
 msgstr "Settings"
 
