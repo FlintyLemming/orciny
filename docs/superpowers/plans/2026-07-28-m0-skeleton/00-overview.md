@@ -187,6 +187,7 @@ func Attach(app core.App, cfg Config) (*Hub, error)   // 把子系统绑到任�
 func (h *Hub) Start() error
 func (h *Hub) PublicKey() ed25519.PublicKey
 func (h *Hub) IssueEnrollToken() (token string, expiresAt time.Time, err error)
+func (h *Hub) Shutdown()                              // 计划 6 加：踢连接 → 等读循环 → 停定时器；已绑 OnTerminate
 ```
 
 ### `agent`（计划 1、4、7）
@@ -266,10 +267,11 @@ func (a *TestAgent) Connect(t *testing.T, th *TestHub) *agent.Session // 计划 
 | 3 | §5.1 `h.App.(*pocketbase.PocketBase).Start()` | `Hub` 多存一个 `pb *pocketbase.PocketBase` 字段 | 去掉运行时类型断言；`Attach` 到 `tests.TestApp` 时该字段为 nil，`Start()` 显式报错 |
 | 4 | §3.1 protocol「只有数据结构和编解码」 | 指纹派生 `protocol.Fingerprint` 也放 protocol | 指纹是 wire 上的身份格式，两侧必须逐位一致；放任一侧都会导致另一侧复制实现 |
 | 5 | §12.1 `NewTestHub` 包 `tests.TestApp` | 同时提供 `hub.Attach`，由 testsupport 用 `apis.NewRouter` + `OnServe().Trigger` + `httptest.Server` 组装 | `tests.TestApp` 不自带 HTTP 服务；这是 PocketBase 自身 `apis.Serve` 的同款装配路径，能跑真实路由与 WS 升级 |
+| 6 | spec 未定义 hub 的关停路径 | 新增 `Hub.Shutdown()`（踢连接 → 等 WS 读循环退出 → `machines.Manager.Stop()`），绑到 `OnTerminate`；配套 `ws.Handler.CloseAll/Wait`，`Manager.Stop` 由「摘定时器」升级为「摘定时器并等在途协程收工」 | 计划 6 把真的 `Manager` 接进 `ws` 之后，读循环与置离线协程都会写库。没有关停入口就没有「先停写、再拆库」的次序：`httptest.Server.Close` 不等被劫持的连接（Go 在 `StateHijacked` 直接 `wg.Done`），`t.Cleanup` 拆掉 `TestApp` 后在途的写库会让 PocketBase 对着 nil 的 DB 解引用而段错误。生产上同属真实缺口，计划 9 的服务单元也需要它 |
 
 ### 实现期对计划代码的修正
 
-下面三条不是对 spec 的设计偏离，而是执行子计划时发现计划正文里给的代码在 Go 下编译不过，被迫改的写法。对外接口契约一律未变，登记在此以免后续计划照抄同样的错误。
+下面这些不是对 spec 的设计偏离，而是执行子计划时发现计划正文里给的代码编译不过、或者断言恒真/恒假，被迫改的写法。对外接口契约一律未变，登记在此以免后续计划照抄同样的错误。
 
 | # | 出处 | 计划原文 | 实现的做法 | 理由 |
 |---|---|---|---|---|
@@ -283,6 +285,9 @@ func (a *TestAgent) Connect(t *testing.T, th *TestHub) *agent.Session // 计划 
 | H | 05 Task 3 Step 7 `routes.go` | 无条件 `g.GET("/ws", ...)` | `if d.WS != nil` 才注册 | `routes.Deps` 被 `routes_test.go` 直接构造（不带 WS），留一条一被访问就 nil deref 的路由不如不注册 |
 | I | 05 Task 3 Step 2 `ws_test.go` | httptest handler 里 `require.NoError(t, h.UpgradeHTTP(w, r))` | 改为 `_ = h.UpgradeHTTP(w, r)` | `require` 失败会调 `t.FailNow`，而它只允许在测试 goroutine 上调用；在 HTTP handler 里调用属于未定义行为，且会盖掉真正的失败信息 |
 | J | 05 Task 4 Step 1 `dial_test.go` | `fakeHandler` 带 `clientNonce []byte` 字段 | 删掉该字段 | 只写不读；且 handler 实例被所有连接共享，留着会在多连接场景下变成数据竞争 |
+| K | 06 Task 1 `manager_test.go` | `require.Equal(t, "2.1.3", r.GetString("tool_versions.claude-code"))` | `r.UnmarshalJSONField("tool_versions", &tools)` 后取键 | 与 D 同一个坑：`JSONField` 读不了点号 key，原式恒过不了断言 |
+| L | 06 Task 3 `lifecycle_test.go` | `require.Eventually(TimerCount >= 1)` 之后 `Clock.Advance(6s)` | 新增 `(*TestHub).AdvanceUntilStatus`，在轮询里每轮推进一点 | WS 的心跳 ticker 与宽限定时器共用同一只假时钟，连接一上线 `TimerCount` 就不为零，这个守卫恒真、证明不了宽限定时器已挂上。定时器挂在 WS 读循环那个 goroutine 上，一次性推进会赶在它前面，实测每 10 次必挂 1–2 次 |
+| M | 06 Task 1 Step 1、Task 3 Step 3 | 等到 status 变化后直接 `require.Equal(1, eventCount(...))` / `require.Contains(EventKinds(...))` | 改等事件本身：新增 `(*TestHub).RequireEvent` 与包内 `fixture.countEvents`，用 `Eventually` 轮询 | `Manager` 是先写状态再写事件的两次独立写库，「状态已经翻了」的那一刻事件可能还没落地。另注意 `Eventually` 的条件函数跑在它自己的 goroutine 上，里面不能调 `require`（同 I） |
 
 另记两处计划正文的笔误，不影响产物：01 Task 5 Step 3 的验证命令写成 `go test ./agent/...`，但该步创建的是 atomicfile 的测试，实际应为 `go test ./internal/atomicfile/...`；`go mod init` 生成的 go 指令是当前工具链版本（`go 1.26.5`），需按 Global Constraints 手工改回 `go 1.26.0`。
 
