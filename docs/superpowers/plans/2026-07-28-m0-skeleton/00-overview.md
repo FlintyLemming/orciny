@@ -294,7 +294,20 @@ func (a *TestAgent) Connect(t *testing.T, th *TestHub) *agent.Session // 计划 
 | Q | 07 Task 3 Step 1 `claude_test.go` | 伪造脚本内容 `sleep 30` | 脚本改成 `exec sleep 30`，并在 `claude.go` 里设 `cmd.WaitDelay = time.Second` | macOS 的 `/bin/sh`（bash 3.2）不会 exec 脚本的最后一条命令，被 `CommandContext` 杀掉的是 shell，`sleep` 成孤儿并继续攥着 stdout 管道，`Output()` 要等满 30 秒才返回——用例会「通过」但跑 30 秒，且掩盖了真实的挂起风险。`WaitDelay` 是同一问题在生产侧的兜底 |
 | R | 07 Task 4 Step 6 `cli.go` | `run` / `status` 直接 `LoadConfig(dir)` | 经 `loadConfigForCmd(dir)` 包一层，`os.ErrNotExist` 翻成「尚未 enroll：… 请先执行 orciny-agent enroll」 | Task 4 Step 10 的手工验收要求「明确报尚未 enroll」，裸 ENOENT 达不到；`TestStatusCommandFailsWithoutEnroll` 相应加断错误文案 |
 
-另记两处计划正文的笔误，不影响产物：01 Task 5 Step 3 的验证命令写成 `go test ./agent/...`，但该步创建的是 atomicfile 的测试，实际应为 `go test ./internal/atomicfile/...`；`go mod init` 生成的 go 指令是当前工具链版本（`go 1.26.5`），需按 Global Constraints 手工改回 `go 1.26.0`。
+| S | 08 Task 1 Step 1 | `npm create vite@latest . -- --template react-ts` | 手写 `package.json` / `index.html` / `tsconfig.json` / `src/main.tsx`，再 `npm install` 各依赖 | `hub/internal/site/` 里已有 `embed.go` 与 `dist/`，脚手架拒绝在非空目录里跑，且它是交互式的 |
+| T | 08 Task 1 Step 2 `vite.config.ts` | `server: { port: 5173, strictPort: true, proxy: {...} }` | 补 `host: '127.0.0.1'` | Vite 默认的 `localhost` 在 macOS 上只落到 `::1`，而 `site.DevTarget` 走 `127.0.0.1`，dev 反代必然 502。实测复现 |
+| U | 08 Task 2 Step 1 `lingui.config.ts` | `format: 'po'`，且文件在 Task 2 才创建 | `format: formatter({ lineNumbers: false })`（引入 `@lingui/format-po`），且文件提前到 Task 1 | Lingui v6 的 `format` 收 `CatalogFormatter` 对象，字符串写法类型不过。另外 Task 1 Step 2 就把 `lingui()` 插件挂进了 vite.config，缺这个文件 Task 1 Step 7 的 `npm run build` 直接起不来 |
+| V | 08 Task 7 Step 2 `.gitignore` | 「确认保留 `hub/internal/site/dist/*` 与 `!.../dist/index.html`」 | 把根部的 `dist/` 改成 `/dist/` | 两行本身在，但恒久失效：裸 `dist/` 在任意层级匹配，把 `hub/internal/site/dist/` 整个排除，而被排除目录里的文件无法再用 `!` 捞回来。占位 `index.html` 从来没进过库，新克隆的仓库 `//go:embed all:dist` 直接编译失败——已实测复现。改钉根目录后恢复正常 |
+| W | 08 Task 4 Step 1 `stores/machines.ts` | 模块级 `let unsub` 在 `.then` 里赋值，退订时判 `if (refCount === 0 && unsub)` | 改存 `Promise<() => void>`，退订走 `pending.then((fn) => fn())` | `subscribe()` 是异步的，而 StrictMode 下 React 会「挂载→卸载→再挂载」。卸载那一刻 `unsub` 还是 null，退订被跳过；再挂载 `refCount` 又回到 1 于是再订一次——第一条订阅永久泄漏，每个 realtime 事件被处理两遍。同步顺手让首屏 `getFullList` 的结果也过一遍 `byName`：服务端按 `name` 排、realtime 更新按 `name \|\| hostname` 排，两者不一致时任一更新到达都会让整张表重排 |
+| X | 08 Task 5 Step 1 `stores/events.ts` | 同 W 的 `let unsub`；且切换机器时无防护 | 同 W 改存 Promise；另加自增票号 `ticket`，`getList` 与订阅回调都核对票号 | 除 W 的泄漏外，快速切换机器时先发出的 `getList` 可能后返回，把后一台机器的事件流覆盖掉 |
+| Y | 08 Task 6 Step 1 `AddMachineDialog.tsx` | 签发 token 的 effect 无守卫；`knownIds` 在首次渲染即从 `$machines` 取基线 | 签发加 `issued` ref 守卫；基线改为等 `$machinesLoading` 落下再取；`navigator.clipboard` 加 try/catch | StrictMode 会把签发跑两遍，每开一次弹窗白签一枚 token 并多写一条 `token.issued`。基线更严重：弹窗可能在首屏 `getFullList` 还没回来时打开，那一刻列表是空的，基线取空集会让随后加载进来的每一台都算「新机器」，弹窗立刻自己关掉。clipboard API 在非安全上下文不可用，不兜底会抛未捕获异常 |
+| Z | 08 Task 1 Step 3 `tokens.css` | `@theme inline` 块里没有 `--color-accent-soft` | 补一条 `--color-accent-soft: var(--accent-soft)` | Task 3 的 `Sidebar` 用了 `bg-accent-soft` 标高亮项，token 不在 `@theme` 里 Tailwind 就不生成这个 utility，当前项没有背景色 |
+
+另记若干计划正文的笔误与执行期约定，不影响产物：
+
+- 01 Task 5 Step 3 的验证命令写成 `go test ./agent/...`，但该步创建的是 atomicfile 的测试，实际应为 `go test ./internal/atomicfile/...`；`go mod init` 生成的 go 指令是当前工具链版本（`go 1.26.5`），需按 Global Constraints 手工改回 `go 1.26.0`。
+- 08 的 Tech Stack 写明 Vite 7 + TS 5，但 `npm install` 默认装到 Vite 8 + TS 7。按计划钉回 7 / 5 时须同时钉 `@vitejs/plugin-react@^5`——v6 的 peer 要求 `vite@^8`，不钉会解析失败。
+- `hub/internal/site/dist/index.html` 是**入库的占位文件**，而 `vite build` 每次都会覆盖它（`emptyOutDir` 连 `.gitkeep` 之类的点文件也一并删，换不成别的锚点）。因此 `make build` / `npm run build` 之后工作区必然「脏」一个 `dist/index.html`，提交前需 `git checkout -- hub/internal/site/dist/index.html` 还原，切勿把构建产物提交进去。
 
 ---
 
