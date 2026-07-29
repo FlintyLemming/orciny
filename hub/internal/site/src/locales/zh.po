@@ -13,25 +13,70 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+#: src/pages/Machines.tsx
+msgid "agent 版本"
+msgstr "agent 版本"
+
+#: src/pages/Machines.tsx
+msgid "Claude Code"
+msgstr "Claude Code"
+
+#: src/pages/Machines.tsx
+msgid "最后心跳"
+msgstr "最后心跳"
+
 #: src/components/Sidebar.tsx
 msgid "凭据"
 msgstr "凭据"
+
+#: src/pages/Machines.tsx
+msgid "删除后该机器的 agent 会停止重试，需要重新 enroll。确定删除？"
+msgstr "删除后该机器的 agent 会停止重试，需要重新 enroll。确定删除？"
+
+#: src/pages/Machines.tsx
+msgid "删除机器"
+msgstr "删除机器"
+
+#: src/pages/Machines.tsx
+msgid "加载中…"
+msgstr "加载中…"
+
+#: src/pages/Machines.tsx
+msgid "名称"
+msgstr "名称"
+
+#: src/components/StatusDot.tsx
+msgid "在线"
+msgstr "在线"
 
 #: src/pages/Login.tsx
 msgid "密码"
 msgstr "密码"
 
+#: src/components/StatusDot.tsx
+msgid "已暂停"
+msgstr "已暂停"
+
 #: src/components/Sidebar.tsx
 msgid "总览"
 msgstr "总览"
+
+#: src/pages/Machines.tsx
+msgid "持续在线"
+msgstr "持续在线"
 
 #: src/components/Sidebar.tsx
 msgid "收件箱"
 msgstr "收件箱"
 
 #: src/components/Sidebar.tsx
+#: src/pages/Machines.tsx
 msgid "机器"
 msgstr "机器"
+
+#: src/pages/Machines.tsx
+msgid "机器名称"
+msgstr "机器名称"
 
 #: src/components/ThemeToggle.tsx
 msgid "浅色"
@@ -40,6 +85,14 @@ msgstr "浅色"
 #: src/components/ThemeToggle.tsx
 msgid "深色"
 msgstr "深色"
+
+#: src/pages/Machines.tsx
+msgid "添加机器"
+msgstr "添加机器"
+
+#: src/pages/Machines.tsx
+msgid "状态"
+msgstr "状态"
 
 #: src/pages/Login.tsx
 msgid "用管理员账号登录"
@@ -57,6 +110,14 @@ msgstr "登录"
 msgid "登录中…"
 msgstr "登录中…"
 
+#: src/components/StatusDot.tsx
+msgid "离线"
+msgstr "离线"
+
+#: src/pages/Machines.tsx
+msgid "系统"
+msgstr "系统"
+
 #: src/components/Sidebar.tsx
 msgid "订阅"
 msgstr "订阅"
@@ -69,9 +130,17 @@ msgstr "设置"
 msgid "该功能将在 {milestone} 提供"
 msgstr "该功能将在 {milestone} 提供"
 
+#: src/pages/Machines.tsx
+msgid "详情"
+msgstr "详情"
+
 #: src/components/ThemeToggle.tsx
 msgid "跟随系统"
 msgstr "跟随系统"
+
+#: src/pages/Machines.tsx
+msgid "还没有机器。点「添加机器」拿到一行安装命令。"
+msgstr "还没有机器。点「添加机器」拿到一行安装命令。"
 
 #: src/components/Shell.tsx
 msgid "退出"

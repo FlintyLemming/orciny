@@ -13,25 +13,70 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+#: src/pages/Machines.tsx
+msgid "agent 版本"
+msgstr "Agent version"
+
+#: src/pages/Machines.tsx
+msgid "Claude Code"
+msgstr "Claude Code"
+
+#: src/pages/Machines.tsx
+msgid "最后心跳"
+msgstr "Last seen"
+
 #: src/components/Sidebar.tsx
 msgid "凭据"
 msgstr "Credentials"
+
+#: src/pages/Machines.tsx
+msgid "删除后该机器的 agent 会停止重试，需要重新 enroll。确定删除？"
+msgstr "Once deleted, this machine's agent stops retrying and must enroll again. Delete it?"
+
+#: src/pages/Machines.tsx
+msgid "删除机器"
+msgstr "Delete machine"
+
+#: src/pages/Machines.tsx
+msgid "加载中…"
+msgstr "Loading…"
+
+#: src/pages/Machines.tsx
+msgid "名称"
+msgstr "Name"
+
+#: src/components/StatusDot.tsx
+msgid "在线"
+msgstr "Online"
 
 #: src/pages/Login.tsx
 msgid "密码"
 msgstr "Password"
 
+#: src/components/StatusDot.tsx
+msgid "已暂停"
+msgstr "Paused"
+
 #: src/components/Sidebar.tsx
 msgid "总览"
 msgstr "Overview"
+
+#: src/pages/Machines.tsx
+msgid "持续在线"
+msgstr "Currently online"
 
 #: src/components/Sidebar.tsx
 msgid "收件箱"
 msgstr "Inbox"
 
 #: src/components/Sidebar.tsx
+#: src/pages/Machines.tsx
 msgid "机器"
 msgstr "Machines"
+
+#: src/pages/Machines.tsx
+msgid "机器名称"
+msgstr "Machine name"
 
 #: src/components/ThemeToggle.tsx
 msgid "浅色"
@@ -40,6 +85,14 @@ msgstr "Light"
 #: src/components/ThemeToggle.tsx
 msgid "深色"
 msgstr "Dark"
+
+#: src/pages/Machines.tsx
+msgid "添加机器"
+msgstr "Add machine"
+
+#: src/pages/Machines.tsx
+msgid "状态"
+msgstr "Status"
 
 #: src/pages/Login.tsx
 msgid "用管理员账号登录"
@@ -57,6 +110,14 @@ msgstr "Sign in"
 msgid "登录中…"
 msgstr "Signing in…"
 
+#: src/components/StatusDot.tsx
+msgid "离线"
+msgstr "Offline"
+
+#: src/pages/Machines.tsx
+msgid "系统"
+msgstr "OS"
+
 #: src/components/Sidebar.tsx
 msgid "订阅"
 msgstr "Subscriptions"
@@ -69,9 +130,17 @@ msgstr "Settings"
 msgid "该功能将在 {milestone} 提供"
 msgstr "Coming in {milestone}"
 
+#: src/pages/Machines.tsx
+msgid "详情"
+msgstr "Details"
+
 #: src/components/ThemeToggle.tsx
 msgid "跟随系统"
 msgstr "System"
+
+#: src/pages/Machines.tsx
+msgid "还没有机器。点「添加机器」拿到一行安装命令。"
+msgstr "No machines yet. Click \"Add machine\" to get a one-line install command."
 
 #: src/components/Shell.tsx
 msgid "退出"
