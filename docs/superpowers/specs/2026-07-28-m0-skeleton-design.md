@@ -107,7 +107,7 @@ Orciny 改用 Go 的 internal 规则做**编译期强制**：`hub/internal/X` �
 
 **一个直接后果**：`internal/testsupport` 也在 `hub/` 树之外，因此它只能通过 `hub` 和 `agent` 的公开入口包做集成测试，够不到 `hub/internal/*`。这些包的单元测试必须写在包内部（`hub/internal/ws/ws_test.go` 这种）。这是正确的分工——跨组件的时序行为走集成测试，包内逻辑走同包单元测试——但要在写第一个测试之前知道，否则会先写出一个够不到目标的脚手架。
 
-**模块路径**用 `github.com/FlintyLemming/orciny`，即项目公开后的地址，尽管当前仓库托管在自建 Gitea 上。Go 的模块路径一旦有人引用就极难更改，而产品文档 §12 已确定 MIT 开源并通过 GitHub Releases 分发，现在就按终态写。
+**模块路径**为 `github.com/FlintyLemming/orciny`，与仓库地址逐字符一致。Go 的模块路径**大小写敏感**（模块代理把大写字母编码成 `!x` 形式），路径与仓库名不符会导致 `go get` 失败，而路径一旦被引用就极难更改。仓库名同步取小写，与二进制名 `orciny`、agent 目录 `~/.orciny/`、Docker 镜像名保持一致。
 
 ### 2.3 依赖选型
 
