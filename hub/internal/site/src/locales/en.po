@@ -13,14 +13,25 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+#: src/pages/MachineDetail.tsx
 #: src/pages/Machines.tsx
 msgid "agent 版本"
 msgstr "Agent version"
 
+#: src/pages/MachineDetail.tsx
 #: src/pages/Machines.tsx
 msgid "Claude Code"
 msgstr "Claude Code"
 
+#: src/pages/MachineDetail.tsx
+msgid "主机名"
+msgstr "Hostname"
+
+#: src/pages/MachineDetail.tsx
+msgid "事件流"
+msgstr "Event stream"
+
+#: src/pages/MachineDetail.tsx
 #: src/pages/Machines.tsx
 msgid "最后心跳"
 msgstr "Last seen"
@@ -53,26 +64,58 @@ msgstr "Online"
 msgid "密码"
 msgstr "Password"
 
+#: src/pages/MachineDetail.tsx
+msgid "已删除"
+msgstr "Removed"
+
+#: src/pages/MachineDetail.tsx
+msgid "已断开"
+msgstr "Disconnected"
+
 #: src/components/StatusDot.tsx
 msgid "已暂停"
 msgstr "Paused"
+
+#: src/pages/MachineDetail.tsx
+msgid "已注册"
+msgstr "Enrolled"
+
+#: src/pages/MachineDetail.tsx
+msgid "已连接"
+msgstr "Connected"
 
 #: src/components/Sidebar.tsx
 msgid "总览"
 msgstr "Overview"
 
+#: src/pages/MachineDetail.tsx
+msgid "找不到这台机器。"
+msgstr "Machine not found."
+
 #: src/pages/Machines.tsx
 msgid "持续在线"
 msgstr "Currently online"
+
+#: src/pages/MachineDetail.tsx
+msgid "指纹"
+msgstr "Fingerprint"
 
 #: src/components/Sidebar.tsx
 msgid "收件箱"
 msgstr "Inbox"
 
+#: src/pages/MachineDetail.tsx
+msgid "暂无事件。"
+msgstr "No events yet."
+
 #: src/components/Sidebar.tsx
 #: src/pages/Machines.tsx
 msgid "机器"
 msgstr "Machines"
+
+#: src/pages/MachineDetail.tsx
+msgid "机器变量"
+msgstr "Machine variables"
 
 #: src/pages/Machines.tsx
 msgid "机器名称"
@@ -89,6 +132,10 @@ msgstr "Dark"
 #: src/pages/Machines.tsx
 msgid "添加机器"
 msgstr "Add machine"
+
+#: src/pages/MachineDetail.tsx
+msgid "漂移"
+msgstr "Drift"
 
 #: src/pages/Machines.tsx
 msgid "状态"
@@ -114,6 +161,11 @@ msgstr "Signing in…"
 msgid "离线"
 msgstr "Offline"
 
+#: src/pages/MachineDetail.tsx
+msgid "签发注册 token"
+msgstr "Enroll token issued"
+
+#: src/pages/MachineDetail.tsx
 #: src/pages/Machines.tsx
 msgid "系统"
 msgstr "OS"
@@ -121,6 +173,10 @@ msgstr "OS"
 #: src/components/Sidebar.tsx
 msgid "订阅"
 msgstr "Subscriptions"
+
+#: src/pages/MachineDetail.tsx
+msgid "认证失败"
+msgstr "Authentication failed"
 
 #: src/components/Sidebar.tsx
 msgid "设置"
@@ -138,6 +194,10 @@ msgstr "Details"
 msgid "跟随系统"
 msgstr "System"
 
+#: src/pages/MachineDetail.tsx
+msgid "返回列表"
+msgstr "Back to list"
+
 #: src/pages/Machines.tsx
 msgid "还没有机器。点「添加机器」拿到一行安装命令。"
 msgstr "No machines yet. Click \"Add machine\" to get a one-line install command."
@@ -154,6 +214,14 @@ msgstr "Email"
 msgid "邮箱或密码不正确"
 msgstr "Incorrect email or password"
 
+#: src/pages/MachineDetail.tsx
+msgid "配置对齐状态"
+msgstr "Config alignment"
+
 #: src/components/Sidebar.tsx
 msgid "配置集"
 msgstr "Config sets"
+
+#: src/pages/MachineDetail.tsx
+msgid "重新注册"
+msgstr "Re-enrolled"

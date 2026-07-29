@@ -13,14 +13,25 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+#: src/pages/MachineDetail.tsx
 #: src/pages/Machines.tsx
 msgid "agent 版本"
 msgstr "agent 版本"
 
+#: src/pages/MachineDetail.tsx
 #: src/pages/Machines.tsx
 msgid "Claude Code"
 msgstr "Claude Code"
 
+#: src/pages/MachineDetail.tsx
+msgid "主机名"
+msgstr "主机名"
+
+#: src/pages/MachineDetail.tsx
+msgid "事件流"
+msgstr "事件流"
+
+#: src/pages/MachineDetail.tsx
 #: src/pages/Machines.tsx
 msgid "最后心跳"
 msgstr "最后心跳"
@@ -53,26 +64,58 @@ msgstr "在线"
 msgid "密码"
 msgstr "密码"
 
+#: src/pages/MachineDetail.tsx
+msgid "已删除"
+msgstr "已删除"
+
+#: src/pages/MachineDetail.tsx
+msgid "已断开"
+msgstr "已断开"
+
 #: src/components/StatusDot.tsx
 msgid "已暂停"
 msgstr "已暂停"
+
+#: src/pages/MachineDetail.tsx
+msgid "已注册"
+msgstr "已注册"
+
+#: src/pages/MachineDetail.tsx
+msgid "已连接"
+msgstr "已连接"
 
 #: src/components/Sidebar.tsx
 msgid "总览"
 msgstr "总览"
 
+#: src/pages/MachineDetail.tsx
+msgid "找不到这台机器。"
+msgstr "找不到这台机器。"
+
 #: src/pages/Machines.tsx
 msgid "持续在线"
 msgstr "持续在线"
+
+#: src/pages/MachineDetail.tsx
+msgid "指纹"
+msgstr "指纹"
 
 #: src/components/Sidebar.tsx
 msgid "收件箱"
 msgstr "收件箱"
 
+#: src/pages/MachineDetail.tsx
+msgid "暂无事件。"
+msgstr "暂无事件。"
+
 #: src/components/Sidebar.tsx
 #: src/pages/Machines.tsx
 msgid "机器"
 msgstr "机器"
+
+#: src/pages/MachineDetail.tsx
+msgid "机器变量"
+msgstr "机器变量"
 
 #: src/pages/Machines.tsx
 msgid "机器名称"
@@ -89,6 +132,10 @@ msgstr "深色"
 #: src/pages/Machines.tsx
 msgid "添加机器"
 msgstr "添加机器"
+
+#: src/pages/MachineDetail.tsx
+msgid "漂移"
+msgstr "漂移"
 
 #: src/pages/Machines.tsx
 msgid "状态"
@@ -114,6 +161,11 @@ msgstr "登录中…"
 msgid "离线"
 msgstr "离线"
 
+#: src/pages/MachineDetail.tsx
+msgid "签发注册 token"
+msgstr "签发注册 token"
+
+#: src/pages/MachineDetail.tsx
 #: src/pages/Machines.tsx
 msgid "系统"
 msgstr "系统"
@@ -121,6 +173,10 @@ msgstr "系统"
 #: src/components/Sidebar.tsx
 msgid "订阅"
 msgstr "订阅"
+
+#: src/pages/MachineDetail.tsx
+msgid "认证失败"
+msgstr "认证失败"
 
 #: src/components/Sidebar.tsx
 msgid "设置"
@@ -138,6 +194,10 @@ msgstr "详情"
 msgid "跟随系统"
 msgstr "跟随系统"
 
+#: src/pages/MachineDetail.tsx
+msgid "返回列表"
+msgstr "返回列表"
+
 #: src/pages/Machines.tsx
 msgid "还没有机器。点「添加机器」拿到一行安装命令。"
 msgstr "还没有机器。点「添加机器」拿到一行安装命令。"
@@ -154,6 +214,14 @@ msgstr "邮箱"
 msgid "邮箱或密码不正确"
 msgstr "邮箱或密码不正确"
 
+#: src/pages/MachineDetail.tsx
+msgid "配置对齐状态"
+msgstr "配置对齐状态"
+
 #: src/components/Sidebar.tsx
 msgid "配置集"
 msgstr "配置集"
+
+#: src/pages/MachineDetail.tsx
+msgid "重新注册"
+msgstr "重新注册"
