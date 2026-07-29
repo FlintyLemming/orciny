@@ -4,12 +4,18 @@ package testsupport_test
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/FlintyLemming/orciny/agent"
 	"github.com/FlintyLemming/orciny/internal/testsupport"
+	"github.com/FlintyLemming/orciny/protocol"
 )
 
 func TestEnrollEndToEnd(t *testing.T) {
@@ -61,4 +67,51 @@ func TestThreeAgentsEnrollIndependently(t *testing.T) {
 	machines, err := th.App.FindRecordsByFilter("machines", "1=1", "", 0, 0)
 	require.NoError(t, err)
 	require.Len(t, machines, 3)
+}
+
+func TestAgentHandshakeAgainstRealHub(t *testing.T) {
+	th := testsupport.NewTestHub(t)
+	ta := testsupport.NewTestAgent(t, th)
+
+	s := ta.Connect(t, th)
+	select {
+	case <-s.Done():
+		t.Fatalf("连接不该立刻结束: %v", s.Err())
+	case <-time.After(200 * time.Millisecond):
+	}
+}
+
+func TestAgentWithTamperedHubKeyRefusesToConnect(t *testing.T) {
+	th := testsupport.NewTestHub(t)
+	ta := testsupport.NewTestAgent(t, th)
+
+	// 篡改钉扎的 hub 公钥（对应 DoD #7）
+	other, _, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(
+		filepath.Join(ta.IdentityDir, "hub.pub"),
+		[]byte(protocol.EncodePublicKey(other)+"\n"), 0o600))
+
+	_, err = agent.Connect(context.Background(), agent.ConnectOptions{
+		Dir: ta.Dir, HubURL: th.HTTPURL,
+		HandshakeTimeout: 2 * time.Second, ReadTimeout: 2 * time.Second,
+	})
+	require.Error(t, err, "hub 签名验证失败必须阻止连接建立")
+}
+
+func TestUnenrolledAgentIsRejectedWithCode(t *testing.T) {
+	th := testsupport.NewTestHub(t)
+	ta := testsupport.NewTestAgent(t, th)
+
+	// 删掉 hub 侧的机器记录，模拟「指纹未登记」
+	m, err := th.App.FindRecordById("machines", ta.MachineID)
+	require.NoError(t, err)
+	require.NoError(t, th.App.Delete(m))
+
+	_, err = agent.Connect(context.Background(), agent.ConnectOptions{
+		Dir: ta.Dir, HubURL: th.HTTPURL,
+		HandshakeTimeout: 2 * time.Second, ReadTimeout: 2 * time.Second,
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "code=1", "应带 CodeUnknownFingerprint")
 }
