@@ -31,6 +31,10 @@ msgstr "Hostname"
 msgid "事件流"
 msgstr "Event stream"
 
+#: src/components/AddMachineDialog.tsx
+msgid "关闭"
+msgstr "Close"
+
 #: src/pages/MachineDetail.tsx
 #: src/pages/Machines.tsx
 msgid "最后心跳"
@@ -56,9 +60,17 @@ msgstr "Loading…"
 msgid "名称"
 msgstr "Name"
 
+#: src/components/AddMachineDialog.tsx
+msgid "在目标机器上执行这行命令即可接入："
+msgstr "Run this command on the target machine to connect it:"
+
 #: src/components/StatusDot.tsx
 msgid "在线"
 msgstr "Online"
+
+#: src/components/AddMachineDialog.tsx
+msgid "复制安装命令"
+msgstr "Copy install command"
 
 #: src/pages/Login.tsx
 msgid "密码"
@@ -104,6 +116,10 @@ msgstr "Fingerprint"
 msgid "收件箱"
 msgstr "Inbox"
 
+#: src/components/AddMachineDialog.tsx
+msgid "无法写入剪贴板，请手动复制上面的命令。"
+msgstr "Couldn't write to the clipboard — please copy the command above manually."
+
 #: src/pages/MachineDetail.tsx
 msgid "暂无事件。"
 msgstr "No events yet."
@@ -121,6 +137,10 @@ msgstr "Machine variables"
 msgid "机器名称"
 msgstr "Machine name"
 
+#: src/components/AddMachineDialog.tsx
+msgid "正在签发注册 token…"
+msgstr "Issuing enroll token…"
+
 #: src/components/ThemeToggle.tsx
 msgid "浅色"
 msgstr "Light"
@@ -129,6 +149,7 @@ msgstr "Light"
 msgid "深色"
 msgstr "Dark"
 
+#: src/components/AddMachineDialog.tsx
 #: src/pages/Machines.tsx
 msgid "添加机器"
 msgstr "Add machine"
@@ -181,6 +202,11 @@ msgstr "Authentication failed"
 #: src/components/Sidebar.tsx
 msgid "设置"
 msgstr "Settings"
+
+#. placeholder {0}: formatCountdown(remaining)
+#: src/components/AddMachineDialog.tsx
+msgid "该 token 一次性使用，{0} 后过期。新机器上线后本窗口会自动关闭。"
+msgstr "This token is single-use and expires in {0}. This dialog closes automatically once the new machine comes online."
 
 #: src/components/Placeholder.tsx
 msgid "该功能将在 {milestone} 提供"

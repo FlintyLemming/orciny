@@ -31,6 +31,10 @@ msgstr "主机名"
 msgid "事件流"
 msgstr "事件流"
 
+#: src/components/AddMachineDialog.tsx
+msgid "关闭"
+msgstr "关闭"
+
 #: src/pages/MachineDetail.tsx
 #: src/pages/Machines.tsx
 msgid "最后心跳"
@@ -56,9 +60,17 @@ msgstr "加载中…"
 msgid "名称"
 msgstr "名称"
 
+#: src/components/AddMachineDialog.tsx
+msgid "在目标机器上执行这行命令即可接入："
+msgstr "在目标机器上执行这行命令即可接入："
+
 #: src/components/StatusDot.tsx
 msgid "在线"
 msgstr "在线"
+
+#: src/components/AddMachineDialog.tsx
+msgid "复制安装命令"
+msgstr "复制安装命令"
 
 #: src/pages/Login.tsx
 msgid "密码"
@@ -104,6 +116,10 @@ msgstr "指纹"
 msgid "收件箱"
 msgstr "收件箱"
 
+#: src/components/AddMachineDialog.tsx
+msgid "无法写入剪贴板，请手动复制上面的命令。"
+msgstr "无法写入剪贴板，请手动复制上面的命令。"
+
 #: src/pages/MachineDetail.tsx
 msgid "暂无事件。"
 msgstr "暂无事件。"
@@ -121,6 +137,10 @@ msgstr "机器变量"
 msgid "机器名称"
 msgstr "机器名称"
 
+#: src/components/AddMachineDialog.tsx
+msgid "正在签发注册 token…"
+msgstr "正在签发注册 token…"
+
 #: src/components/ThemeToggle.tsx
 msgid "浅色"
 msgstr "浅色"
@@ -129,6 +149,7 @@ msgstr "浅色"
 msgid "深色"
 msgstr "深色"
 
+#: src/components/AddMachineDialog.tsx
 #: src/pages/Machines.tsx
 msgid "添加机器"
 msgstr "添加机器"
@@ -181,6 +202,11 @@ msgstr "认证失败"
 #: src/components/Sidebar.tsx
 msgid "设置"
 msgstr "设置"
+
+#. placeholder {0}: formatCountdown(remaining)
+#: src/components/AddMachineDialog.tsx
+msgid "该 token 一次性使用，{0} 后过期。新机器上线后本窗口会自动关闭。"
+msgstr "该 token 一次性使用，{0} 后过期。新机器上线后本窗口会自动关闭。"
 
 #: src/components/Placeholder.tsx
 msgid "该功能将在 {milestone} 提供"
