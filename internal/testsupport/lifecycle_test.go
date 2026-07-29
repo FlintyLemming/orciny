@@ -3,11 +3,13 @@
 package testsupport_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/FlintyLemming/orciny/agent"
 	"github.com/FlintyLemming/orciny/internal/testsupport"
 )
 
@@ -139,4 +141,35 @@ func TestHubRestartClearsGhosts(t *testing.T) {
 	restarted := th.Restart(t)
 	require.Equal(t, "offline", restarted.MachineStatus(t, ta.MachineID),
 		"重启后不该留下幽灵 online")
+}
+
+// agent.Run 的完整装配：从 agent.yml + identity 起步，连上 hub 让面板转
+// online，收到取消信号后干净退出。退避时长由计划 7 Task 2 的假时钟用例断言，
+// 这里只验证「线接对了」。
+func TestAgentRunConnectsAndStopsCleanly(t *testing.T) {
+	th := testsupport.NewTestHub(t)
+	ta := testsupport.NewTestAgent(t, th)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() {
+		done <- agent.Run(ctx, agent.RunOptions{
+			Dir:              ta.Dir,
+			HandshakeTimeout: 2 * time.Second,
+			ReadTimeout:      2 * time.Second,
+		})
+	}()
+
+	th.RequireStatus(t, ta.MachineID, "online")
+
+	// 运行状态已落盘，status 子命令据此报告
+	require.Eventually(t, func() bool {
+		s, err := agent.LoadStatus(ta.Dir)
+		return err == nil && s.State == "connected"
+	}, 3*time.Second, 10*time.Millisecond)
+
+	cancel()
+	require.ErrorIs(t, <-done, context.Canceled)
 }
