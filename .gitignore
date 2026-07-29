@@ -2,3 +2,13 @@
 .DS_Store
 *.swp
 Thumbs.db
+
+# 构建与运行产物
+dist/
+pb_data/
+node_modules/
+*.pem
+
+# 前端构建产物不入库，但保留占位 index.html，否则 //go:embed all:dist 找不到目录
+hub/internal/site/dist/*
+!hub/internal/site/dist/index.html
