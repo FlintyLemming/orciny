@@ -4,15 +4,21 @@ package hub
 
 import (
 	"crypto/ed25519"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"path/filepath"
+	"time"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 
+	"github.com/FlintyLemming/orciny"
+	"github.com/FlintyLemming/orciny/hub/internal/enroll"
+	"github.com/FlintyLemming/orciny/hub/internal/events"
 	"github.com/FlintyLemming/orciny/hub/internal/identity"
+	"github.com/FlintyLemming/orciny/hub/internal/routes"
 	"github.com/FlintyLemming/orciny/hub/internal/site"
 
 	// 空 import 触发 init()，把初始迁移注册进 core.AppMigrations。
@@ -27,6 +33,8 @@ type Hub struct {
 	cfg Config
 
 	identity *identity.Store
+	events   *events.Writer
+	enroll   *enroll.Service
 
 	// pb 仅在 New 创建时非 nil。Attach 出来的实例由调用方驱动 serve。
 	pb *pocketbase.PocketBase
@@ -51,6 +59,10 @@ func New(cfg Config) (*Hub, error) {
 func Attach(app core.App, cfg Config) (*Hub, error) {
 	h := &Hub{App: app, cfg: cfg.WithDefaults()}
 
+	// 这两个子系统只需要 core.App，不需要数据目录，因此可以在这里就构造。
+	h.events = events.NewWriter(app)
+	h.enroll = enroll.NewService(app, h.events, h.cfg.Clock, h.cfg.EnrollTokenTTL, rand.Reader)
+
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		// 后续计划在此依次插入：幽灵清理、自定义路由注册、连接管理器启动。
 		// 顺序即依赖顺序，不要打乱。
@@ -62,6 +74,27 @@ func Attach(app core.App, cfg Config) (*Hub, error) {
 			return fmt.Errorf("加载 hub 密钥: %w", err)
 		}
 		e.App.Logger().Info("hub 身份就绪", "fingerprint", h.identity.Fingerprint())
+
+		if err := routes.Register(e, routes.Deps{
+			Enroll:   h.enroll,
+			Identity: h.identity,
+			Version:  orciny.Version,
+		}); err != nil {
+			return fmt.Errorf("注册路由: %w", err)
+		}
+
+		// PocketBase 自带 cron 调度器，不必自己起 goroutine。
+		// 清理失败只记日志——它不该拖垮 serve。
+		e.App.Cron().MustAdd("purge_enroll_tokens", "0 * * * *", func() {
+			n, err := h.enroll.PurgeExpiredTokens(24 * time.Hour)
+			if err != nil {
+				e.App.Logger().Warn("清理过期注册 token 失败", "error", err)
+				return
+			}
+			if n > 0 {
+				e.App.Logger().Info("已清理过期注册 token", "count", n)
+			}
+		})
 
 		if err := h.registerUI(e); err != nil {
 			return err
@@ -85,6 +118,12 @@ func (h *Hub) PublicKey() ed25519.PublicKey {
 		return nil
 	}
 	return h.identity.PublicKey()
+}
+
+// IssueEnrollToken 签发一枚一次性注册 token。
+// 这是 hub 包对外暴露的唯一「管理动作」，供测试脚手架绕开 HTTP 认证使用。
+func (h *Hub) IssueEnrollToken() (string, time.Time, error) {
+	return h.enroll.IssueToken()
 }
 
 // Start 运行生产 hub（cobra 根命令，含 serve 子命令）。
