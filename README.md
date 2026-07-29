@@ -17,6 +17,7 @@
 | [docs/product-design.html](docs/product-design.html) | 产品设计文档的 HTML 排版版（同内容） |
 | [docs/concept-report.html](docs/concept-report.html) | 项目构思报告 — 需求验证、竞品格局、七组选型论证、命名提案 |
 | [mock/ui-mock.html](mock/ui-mock.html) | hub Web UI 的可交互静态原型（单文件，暖黑/暖纸双主题） |
+| [docs/superpowers/specs/](docs/superpowers/specs/) | 工程设计 spec（按里程碑分册，可直接转为实现计划） |
 
 ## 选型基线（v0.1）
 
@@ -26,4 +27,6 @@
 
 ## 状态
 
-设计阶段（v0.1 草案）。尚无实现代码。
+设计阶段。产品设计 v0.1 已定稿；M0（骨架）的工程设计已完成，见
+[docs/superpowers/specs/2026-07-28-m0-skeleton-design.md](docs/superpowers/specs/2026-07-28-m0-skeleton-design.md)。
+尚无实现代码。
