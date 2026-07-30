@@ -1,0 +1,7 @@
+.git
+dist
+pb_data
+**/node_modules
+docs
+mock
+*.md

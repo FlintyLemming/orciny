@@ -1,0 +1,33 @@
+# Orciny hub 的最小部署示例。
+#
+# TLS 不在这里做：hub 假定跑在反向代理之后（Caddy / Nginx / Traefik）。
+# 这一点不是省事，是必须——agent 的信任根建立在 enroll 那一刻的 HTTPS 上
+# （spec §4.4），明文 HTTP 暴露到公网等于把首次接入交给中间人。
+services:
+  orciny:
+    image: ghcr.io/flintylemming/orciny:latest
+    container_name: orciny
+    restart: unless-stopped
+    ports:
+      # 只监听回环，由宿主上的反向代理转发。
+      # 若在内网直连使用，改成 "8090:8090"。
+      - "127.0.0.1:8090:8090"
+    volumes:
+      # 整个应用的状态就是这一个目录：SQLite + 上传文件 + hub 私钥。
+      # 备份它就等于备份了 Orciny。
+      - ./pb_data:/pb_data
+    environment:
+      - TZ=Asia/Shanghai
+
+# Caddy 示例（另存为 Caddyfile 并按需启用）：
+#
+#   orciny.example.com {
+#     reverse_proxy 127.0.0.1:8090
+#   }
+#
+# WebSocket 无需额外配置——Caddy 默认透传 Upgrade。
+# 若用 Nginx，务必加：
+#   proxy_http_version 1.1;
+#   proxy_set_header Upgrade $http_upgrade;
+#   proxy_set_header Connection "upgrade";
+#   proxy_read_timeout 300s;   # 大于 hub 的 70s read deadline
