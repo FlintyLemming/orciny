@@ -38,6 +38,22 @@ func TestInstallScriptHasPlaceholdersFilled(t *testing.T) {
 	require.Contains(t, s, "0.1.0")
 }
 
+func TestInstallScriptPinsDownloadToOwnVersion(t *testing.T) {
+	f := newFixture(t)
+
+	resp, err := http.Get(f.srv.URL + "/install.sh")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	s := string(body)
+	// hub 注入的是它**自己**的版本号，所以下载源也必须钉在同一个版本上。
+	require.Contains(t, s, "releases/download/v0.1.0")
+	require.NotContains(t, s, "releases/latest/download",
+		"指向 latest 时，发了新版而 hub 未重新部署就会拿旧版本号去新 release 里找，必然 404")
+}
+
 func TestInstallScriptServedAsShellText(t *testing.T) {
 	f := newFixture(t)
 
