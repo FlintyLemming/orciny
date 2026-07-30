@@ -26,6 +26,14 @@ type Config struct {
 	EnrollTokenTTL    time.Duration // 注册 token 有效期，spec §4.4
 
 	MinAgentVersion semver.Version
+
+	// DownloadBase 是 install.sh 的下载源。空值走 routes.DefaultDownloadBase
+	// （GitHub releases）；开发期指向本地构建产物，免得每次都要发 release
+	// 才能测安装路径（spec §11.4）。
+	//
+	// 这里不在 WithDefaults 里补默认：默认值属于 routes 包，
+	// 让 hub 复制一份常量只会多一处需要同步的地方。
+	DownloadBase string
 }
 
 // WithDefaults 返回补齐默认值后的副本。零值即默认，调用方不必知道默认是多少。

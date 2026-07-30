@@ -108,10 +108,11 @@ func Attach(app core.App, cfg Config) (*Hub, error) {
 		})
 
 		if err := routes.Register(e, routes.Deps{
-			Enroll:   h.enroll,
-			Identity: h.identity,
-			WS:       h.ws,
-			Version:  orciny.Version,
+			Enroll:       h.enroll,
+			Identity:     h.identity,
+			WS:           h.ws,
+			Version:      orciny.Version,
+			DownloadBase: h.cfg.DownloadBase,
 		}); err != nil {
 			return fmt.Errorf("注册路由: %w", err)
 		}

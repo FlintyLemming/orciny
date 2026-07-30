@@ -1,0 +1,1 @@
+../../hub/internal/routes/install-agent.sh

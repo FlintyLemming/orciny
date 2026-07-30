@@ -21,6 +21,10 @@ type Deps struct {
 	Identity *identity.Store
 	WS       *ws.Handler
 	Version  string
+
+	// DownloadBase 是 install.sh 拉取 agent 归档的位置。
+	// 空值走 DefaultDownloadBase（GitHub releases）。
+	DownloadBase string
 }
 
 // Register 在 OnServe 阶段注册全部自定义路由。
@@ -43,7 +47,10 @@ func Register(e *core.ServeEvent, d Deps) error {
 		g.GET("/ws", func(e *core.RequestEvent) error { return d.WS.Upgrade(e) })
 	}
 
-	// /install.sh 由计划 9 在此追加。
+	// 安装脚本不在 /api 下：它要能被 `curl -fsSL https://<hub>/install.sh` 直接取到。
+	// 无需认证——脚本不含秘密，token 由用户拼在命令行上（spec §9.1）。
+	e.Router.GET("/install.sh", d.installSh)
+
 	return nil
 }
 
