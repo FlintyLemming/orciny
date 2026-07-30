@@ -304,6 +304,7 @@ func (a *TestAgent) Connect(t *testing.T, th *TestHub) *agent.Session // 计划 
 | Z | 08 Task 1 Step 3 `tokens.css` | `@theme inline` 块里没有 `--color-accent-soft` | 补一条 `--color-accent-soft: var(--accent-soft)` | Task 3 的 `Sidebar` 用了 `bg-accent-soft` 标高亮项，token 不在 `@theme` 里 Tailwind 就不生成这个 utility，当前项没有背景色 |
 | AA | 09 Task 4 Step 1 `install-agent.sh` | `$SUDO systemctl enable --now orciny-agent` | 拆成 `enable` + `restart` 两条 | `enable --now` 在服务已经 active 时**什么都不做**，于是重装／升级 agent 后跑的还是旧二进制。实测：重装后 `MainPID` 不变，`orciny-agent status` 挂着上个版本的陈旧错误。而重装正是运维手册给「升级 agent」「重新 enroll」开的方子，这条路径必须真的生效。`restart` 对「未启动」与「已在跑」两种情形都对。launchd 分支原本就是 `unload || true` + `load`，无此问题 |
 | AB | 09 Task 6 Step 2 第 7 条的篡改命令 | `printf 'AAAAC3NzaC1lZDI1NTE5AAAA…' > ~/.orciny/identity/hub.pub` | 换成格式合法但非 hub 的公钥：`python3 -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"` | 原文那串是 **SSH 格式**的 ed25519 公钥 blob，解出来 48 字节，而 `hub.pub` 存的是裸 32 字节公钥的 base64。agent 在**加载**阶段就报「公钥长度应为 32 字节，实际 48」，压根走不到签名验证，落进通用指数退避并无限重试——照原文跑会误判第 7 条不通过。换成长度合法的错误公钥后才真正测到 `Compromised` 终态 |
+| AC | 05 Task 4 / 07 Task 2 `agent/internal/conn` | `OnMessage` 一律把帧塞进 `h.inbox`；`Client.Run` 在 session 结束时一律走退避 | `handler` 加 `connected` 标志，握手后的帧交给新的 `onConnected`；`Run` 在结束原因是 `RejectedError` 时过一遍 `classify`。另补 `ConnectOptions.Logger` | `h.inbox` 的唯一消费者 `await` 只在**握手期**跑，握手完成后没人再读它。于是 spec §3.3 明确要求的「连接期收到 `AuthResult{OK:false}` 也按 `Code` 分流」整条路径落空：机器在面板上被删时，hub 发的 `CodeMachineRemoved` 撤销通知进了 channel 就再没人看，agent 只能从随后的 WS close 帧间接得知，重连时撞上 `code=1` 转为每 5 分钟无限重试——验收第 8 条就是这么挂的。`Logger` 那条是同一次修改暴露的：连接层拿不到 JSON logger，日志格式与 agent 其余部分不一致 |
 
 另记若干计划正文的笔误与执行期约定，不影响产物：
 
@@ -319,10 +320,10 @@ func (a *TestAgent) Connect(t *testing.T, th *TestHub) *agent.Session // 计划 
 
 ## 验收对照（spec §13）
 
-**实测结论见 [acceptance.md](acceptance.md)。** 八条已实测通过或部分通过，
-第 3 条与第 4 条后半待真机；第 8 条**未通过**（agent 连接期不消费 `inbox`，
-`CodeMachineRemoved` 撤销通知被丢弃），第 5 条的「60 秒」与 spec 的 70s 读
-超时不自洽。
+**实测结论见 [acceptance.md](acceptance.md)。** 第 3 条与第 4 条后半待真机验收；
+第 8 条首测**未通过**（agent 连接期不消费 `inbox`，`CodeMachineRemoved` 撤销
+通知被丢弃），已在提交 `1666650` 修好并复测通过；第 5 条的「60 秒」与 spec 的
+70s 读超时不自洽，属 DoD 数字需修正。其余各条实测通过。
 
 | DoD # | 标准 | 由哪个子计划保证 |
 |---|---|---|

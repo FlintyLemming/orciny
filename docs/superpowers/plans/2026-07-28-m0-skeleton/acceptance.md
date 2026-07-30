@@ -25,7 +25,7 @@ Linux 容器」的组合实测；需要多台异构真机才有意义的条目�
 | 5 | 断网 60 秒 → 转 offline；恢复 → 自动重连 | **部分通过** | 恢复重连 **0.31 s** ✅；但转 offline 用了 **66.3 s**（> 60 s），见下 |
 | 6 | 重启 hub → 机器自动重连，无残留幽灵 online | **通过** | 重启后库里立即是 offline（无幽灵），**1.46 s** 后重连回 online |
 | 7 | 篡改 `hub.pub` → 拒绝连接、日志明确报出、不再重试 | **通过** | 进入 `compromised` 终态，进程退出，20 s 内零重试 |
-| 8 | UI 删除机器 → 该 agent 收到明确原因并停止重试 | **未通过** | agent 拿到了原因，但**没有停止重试**（转 5 分钟固定间隔）。有确切定位，见下 |
+| 8 | UI 删除机器 → 该 agent 收到明确原因并停止重试 | **首测未通过 → 已修，复测通过** | 修前：转 5 分钟固定间隔无限重试。修后：报「停止重试」并退出，15 s 零重试 |
 | 9 | `go test -tags=testing ./...` 全绿 | **通过** | 203 个顶层用例（含子测试 213），全绿，`real 7.37s` |
 | 10 | hub < 64MB RAM，agent < 30MB RAM，agent 空闲 CPU ≈ 0 | **通过** | hub **34.84 MiB** / CPU 0.02%；agent **13.6 MB** RSS / CPU **0.0%** |
 
@@ -170,9 +170,9 @@ hub 重启完成那一刻库里的状态:      offline   ← ResetGhosts 已翻�
 > 无限重试**，而不是 `Compromised`。一个损坏/被替换成垃圾的钉扎公钥同样是
 > 「需要人来判断」的情形，按 spec §7.2 的精神也该进终态。记入 M1 待办。
 
-### 8. UI 删除机器 —— 未通过
+### 8. UI 删除机器 —— 首测未通过，已修，复测通过
 
-删除记录后 agent 的日志：
+**首测（未通过）。** 删除记录后 agent 的日志：
 
 ```json
 {"level":"WARN","msg":"与 hub 的连接已断开","error":"gws: connection closed, code=1000, reason=machine removed"}
@@ -202,11 +202,32 @@ close 帧间接得知，重连时才撞上 code=1。
 **影响：** 不是安全问题（hub 一直在拒），但被删机器的 agent 会永远每 5 分钟
 敲一次门，且违反 spec §7.2 与 §6.4c。
 
-**处置：** 代码在计划 5/7 的范围内（`agent/internal/conn`），不属于计划 9，
-且需要配一个测试，因此**本轮不顺手改**。建议作为 M0 收尾的一个小任务修掉：
-在连接期的会话循环里消费 `inbox`，收到 `KindAuthResult` 且 `OK == false` 时
-复用 `client.go:155` 已有的 `RejectedError` 分流。修完第 8 条应当变成
-「进入终态、进程退出」。
+**已修（提交 `1666650`）。** 两处改动：
+
+1. `handler` 加 `connected` 标志，握手完成后的帧交给新的 `onConnected`：
+   收到 `AuthResult{OK:false}` 即记为连接结束原因并关连接，`OK:true` 忽略。
+   标志在发 `MachineInfo` **之前**置位，并补一次 `inbox` 排空——hub 发出
+   `AuthResult{OK:true}` 之后就登记了连接，撤销通知随时可能到来，晚一步
+   置位就又漏了。
+2. `Client.Run` 在 session 结束时，若原因是 `RejectedError` 就过一遍
+   `classify`，与握手期的拒绝共用同一条分流。
+
+配了四个用例（两个 conn 层、两个 client 层），改动前全部失败、改动后全部
+通过，`-race` 干净。
+
+**复测（通过）：**
+
+```json
+{"level":"WARN","msg":"hub 撤销了本连接的授权","error":"conn: hub 拒绝连接（code=4）: 该机器已在面板中被删除，请重新 enroll"}
+{"level":"ERROR","msg":"hub 报告本机已被删除，停止重试；如需重新接入请执行 orciny-agent enroll","reason":"该机器已在面板中被删除，请重新 enroll"}
+```
+
+进程随即退出，此后 15 秒零重试。
+
+顺带修掉的一件事：`ConnectOptions` 原先没有 `Logger` 字段，连接层拿不到
+JSON logger，于是「撤销了本连接的授权」这条会以 slog 默认的**文本**格式打
+出来，跟 agent 其余的 JSON 日志混在一起（首测时肉眼可见）。补上字段后全部
+日志行都是 JSON。
 
 ### 9. 测试
 
@@ -233,7 +254,7 @@ agent 连续两次采样（间隔 10 秒）RSS 都是 13.6 MB、CPU 0.0%，没�
 
 | 事项 | 类型 | 归属 |
 |---|---|---|
-| 连接期不消费 `inbox`，`CodeMachineRemoved` 撤销通知被丢弃（第 8 条未通过）| **代码缺陷** | 建议 M0 收尾修 |
+| ~~连接期不消费 `inbox`，`CodeMachineRemoved` 撤销通知被丢弃（第 8 条）~~ | 代码缺陷 | **已修，提交 `1666650`** |
 | `hub.pub` 无法解析时无限重试，而非进入 `Compromised` | 代码缺陷（次要）| M1 |
 | DoD 第 5 条的「60 秒」与 spec 的 70s 读超时不自洽，应改为 75 秒 | 文档修正 | M1 |
 | 计划 9 Task 6 Step 2 的篡改命令是无效测试（SSH 格式公钥）| 文档修正 | 已在本文件更正 |
