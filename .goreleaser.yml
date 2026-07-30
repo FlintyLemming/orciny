@@ -1,0 +1,51 @@
+version: 2
+
+before:
+  hooks:
+    # 前端必须先构建：go build 会 embed dist/
+    - sh -c "cd hub/internal/site && npm ci && npm run build"
+
+builds:
+  - id: hub
+    main: ./cmd/orciny
+    binary: orciny
+    env: [CGO_ENABLED=0]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X github.com/FlintyLemming/orciny.Version={{.Version}}
+    goos: [linux]
+    goarch: [amd64, arm64]
+
+  - id: agent
+    main: ./cmd/orciny-agent
+    binary: orciny-agent
+    env: [CGO_ENABLED=0]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X github.com/FlintyLemming/orciny.Version={{.Version}}
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+
+archives:
+  # 归档名直接决定 install.sh 的下载 URL，改动这里必须同步改脚本。
+  - id: hub
+    ids: [hub]
+    name_template: "orciny_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+  - id: agent
+    ids: [agent]
+    name_template: "orciny-agent_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude: ["^docs:", "^test:", "^chore:"]
+
+release:
+  draft: true
+  prerelease: auto
