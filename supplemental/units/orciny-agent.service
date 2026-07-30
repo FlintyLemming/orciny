@@ -1,0 +1,39 @@
+# Orciny agent —— systemd system unit
+#
+# 关键差异（spec §11.3）：agent 不跑在专用系统用户下，而是以**目标用户**
+# 身份运行。从 M1 起 agent 要读写 ~/.claude，属主必须正确，否则用户自己
+# 反而动不了那些文件。
+#
+# 选 system unit 而非 user unit：user unit 需要 loginctl enable-linger
+# 才能在用户未登录时运行，多一个容易漏掉的步骤。
+#
+# 占位符由 install.sh 替换：__USER__ __HOME__ __BIN__
+[Unit]
+Description=Orciny agent
+Documentation=https://github.com/FlintyLemming/orciny
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+Group=__USER__
+Environment=HOME=__HOME__
+ExecStart=__BIN__ run
+Restart=always
+RestartSec=5s
+
+# agent 只需要读写自己的 ~/.orciny 与（M1 起）~/.claude。
+# 这里不加 ProtectHome —— 那恰好会挡住它要干的正事。
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+# 空闲时 CPU 应当接近 0；给一个宽松的内存上限兜底（目标 < 30MB）。
+MemoryMax=128M
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

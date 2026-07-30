@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Orciny agent —— macOS LaunchAgent
+
+  装在 ~/Library/LaunchAgents/，随用户登录启动，天然以该用户身份运行——
+  正是 M1 读写 ~/.claude 需要的属主（spec §11.3）。
+
+  已知限制：headless 的 Mac mini 在无人登录时 LaunchAgent 不运行。
+  这是 macOS 的固有特性，M0 不解决；两条出路见 docs/operations.md。
+
+  占位符由 install.sh 替换：__BIN__ __HOME__
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>moe.flinty.orciny-agent</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>__BIN__</string>
+    <string>run</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>__HOME__</string>
+    <!-- claude 通常装在这些位置；LaunchAgent 的 PATH 很窄，要显式给全 -->
+    <key>PATH</key>
+    <string>__HOME__/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>__HOME__/.orciny/logs/launchd.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>__HOME__/.orciny/logs/launchd.err.log</string>
+</dict>
+</plist>
