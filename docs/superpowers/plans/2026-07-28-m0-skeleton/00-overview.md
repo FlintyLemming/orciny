@@ -302,16 +302,27 @@ func (a *TestAgent) Connect(t *testing.T, th *TestHub) *agent.Session // 计划 
 | X | 08 Task 5 Step 1 `stores/events.ts` | 同 W 的 `let unsub`；且切换机器时无防护 | 同 W 改存 Promise；另加自增票号 `ticket`，`getList` 与订阅回调都核对票号 | 除 W 的泄漏外，快速切换机器时先发出的 `getList` 可能后返回，把后一台机器的事件流覆盖掉 |
 | Y | 08 Task 6 Step 1 `AddMachineDialog.tsx` | 签发 token 的 effect 无守卫；`knownIds` 在首次渲染即从 `$machines` 取基线 | 签发加 `issued` ref 守卫；基线改为等 `$machinesLoading` 落下再取；`navigator.clipboard` 加 try/catch | StrictMode 会把签发跑两遍，每开一次弹窗白签一枚 token 并多写一条 `token.issued`。基线更严重：弹窗可能在首屏 `getFullList` 还没回来时打开，那一刻列表是空的，基线取空集会让随后加载进来的每一台都算「新机器」，弹窗立刻自己关掉。clipboard API 在非安全上下文不可用，不兜底会抛未捕获异常 |
 | Z | 08 Task 1 Step 3 `tokens.css` | `@theme inline` 块里没有 `--color-accent-soft` | 补一条 `--color-accent-soft: var(--accent-soft)` | Task 3 的 `Sidebar` 用了 `bg-accent-soft` 标高亮项，token 不在 `@theme` 里 Tailwind 就不生成这个 utility，当前项没有背景色 |
+| AA | 09 Task 4 Step 1 `install-agent.sh` | `$SUDO systemctl enable --now orciny-agent` | 拆成 `enable` + `restart` 两条 | `enable --now` 在服务已经 active 时**什么都不做**，于是重装／升级 agent 后跑的还是旧二进制。实测：重装后 `MainPID` 不变，`orciny-agent status` 挂着上个版本的陈旧错误。而重装正是运维手册给「升级 agent」「重新 enroll」开的方子，这条路径必须真的生效。`restart` 对「未启动」与「已在跑」两种情形都对。launchd 分支原本就是 `unload || true` + `load`，无此问题 |
+| AB | 09 Task 6 Step 2 第 7 条的篡改命令 | `printf 'AAAAC3NzaC1lZDI1NTE5AAAA…' > ~/.orciny/identity/hub.pub` | 换成格式合法但非 hub 的公钥：`python3 -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"` | 原文那串是 **SSH 格式**的 ed25519 公钥 blob，解出来 48 字节，而 `hub.pub` 存的是裸 32 字节公钥的 base64。agent 在**加载**阶段就报「公钥长度应为 32 字节，实际 48」，压根走不到签名验证，落进通用指数退避并无限重试——照原文跑会误判第 7 条不通过。换成长度合法的错误公钥后才真正测到 `Compromised` 终态 |
 
 另记若干计划正文的笔误与执行期约定，不影响产物：
 
 - 01 Task 5 Step 3 的验证命令写成 `go test ./agent/...`，但该步创建的是 atomicfile 的测试，实际应为 `go test ./internal/atomicfile/...`；`go mod init` 生成的 go 指令是当前工具链版本（`go 1.26.5`），需按 Global Constraints 手工改回 `go 1.26.0`。
 - 08 的 Tech Stack 写明 Vite 7 + TS 5，但 `npm install` 默认装到 Vite 8 + TS 7。按计划钉回 7 / 5 时须同时钉 `@vitejs/plugin-react@^5`——v6 的 peer 要求 `vite@^8`，不钉会解析失败。
-- `hub/internal/site/dist/index.html` 是**入库的占位文件**，而 `vite build` 每次都会覆盖它（`emptyOutDir` 连 `.gitkeep` 之类的点文件也一并删，换不成别的锚点）。因此 `make build` / `npm run build` 之后工作区必然「脏」一个 `dist/index.html`，提交前需 `git checkout -- hub/internal/site/dist/index.html` 还原，切勿把构建产物提交进去。
+- `hub/internal/site/dist/index.html` 是**入库的占位文件**，而 `vite build` 每次都会覆盖它（`emptyOutDir` 连 `.gitkeep` 之类的点文件也一并删，换不成别的锚点）。因此 `make build` / `npm run build` 之后工作区必然「脏」一个 `dist/index.html`，提交前需 `git checkout -- hub/internal/site/dist/index.html` 还原，切勿把构建产物提交进去。goreleaser 的 `before` 钩子里也有 `npm run build`，同样会脏这个文件。
+- 09 Task 2 Step 2 与 Task 4 Step 7 假定快照版本形如 `0.1.0-SNAPSHOT`，但仓库里**还没有任何 tag**，`goreleaser --snapshot` 实际给出 `0.0.0-SNAPSHOT-<sha>`。要拿到 0.1.0 系的快照名而又不动仓库，用 `GORELEASER_CURRENT_TAG=v0.1.0 goreleaser …`。
+- 更要紧的是：**带预发布标识的版本按 semver 低于同号正式版**，`0.1.0-SNAPSHOT-abc1234 < 0.1.0`，因此任何快照产物都会被 `MinAgentVersion = 0.1.0` 的门槛以 `code=3` 拒掉，握手连不上。要在真机上验在线状态，agent 必须用 `-X …Version=0.1.0` 这样的正式版本号构建。
+- `hub.Config.DownloadBase` 在出厂的 `cmd/orciny` 里**没有入口**（`main` 传的是空 `hub.Config{}`），只有把 hub 当库嵌入时才能设。开发期改下载源走的是脚本自己的 `--download-base` 参数，不是 hub 配置——这与 spec §11.4 一致，不是缺口。
+- 核对 docker 镜像体积不要只看 `docker images`：Docker Desktop 的 containerd 镜像存储会把压缩 blob 与解包后的 snapshot 两份都算进去（本项目实测报 51.6MB，而 `docker save` 13.2MB、容器内 `du -sh /` 35.8MB）。以后两者为准。
 
 ---
 
 ## 验收对照（spec §13）
+
+**实测结论见 [acceptance.md](acceptance.md)。** 八条已实测通过或部分通过，
+第 3 条与第 4 条后半待真机；第 8 条**未通过**（agent 连接期不消费 `inbox`，
+`CodeMachineRemoved` 撤销通知被丢弃），第 5 条的「60 秒」与 spec 的 70s 读
+超时不自洽。
 
 | DoD # | 标准 | 由哪个子计划保证 |
 |---|---|---|
