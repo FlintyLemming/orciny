@@ -1,0 +1,47 @@
+name: ci
+
+on:
+  push:
+    branches: [genesis]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      # 不需要先构建前端：hub/internal/site/dist/index.html 的占位文件在库里，
+      # //go:embed all:dist 有目录就能编译。真正的前端构建由下面的 web job 管。
+      - run: make lint
+
+      - run: go test -tags=testing ./...
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hub/internal/site
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: hub/internal/site/package-lock.json
+
+      - run: npm ci
+
+      # npm run build = tsc --noEmit && vite build，类型错误在这里就拦住，
+      # 不用等到 release 时 goreleaser 的 before hook 挂掉。
+      - run: npm run build

@@ -47,5 +47,7 @@ changelog:
     exclude: ["^docs:", "^test:", "^chore:"]
 
 release:
-  draft: true
+  # 不能是草稿：草稿 release 的附件不公开下载，install.sh 一定 404。
+  # 要人工复核就先推 -rc tag，prerelease 不会被当成 latest。
+  draft: false
   prerelease: auto

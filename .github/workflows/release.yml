@@ -1,0 +1,95 @@
+# 推一个 v* tag 即出 release：goreleaser 打二进制归档 + checksums，
+# 同时把 hub 镜像推到 GHCR。
+#
+# 两件产物的版本号必须一致，都用「去掉 v 前缀的 tag」：
+#   - goreleaser 的 {{.Version}} 天然就是这个形式，归档名形如 orciny-agent_0.1.0_linux_amd64.tar.gz
+#   - 镜像的 --build-arg VERSION 要显式传，否则 Dockerfile 的默认值 dev 会被
+#     编进 hub 的 orciny.Version，于是 GET /install.sh 注入 dev，脚本去下载
+#     orciny-agent_dev_… 直接 404。这是 2026-07 踩过的坑。
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # 创建 release 并上传附件
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # goreleaser 的 changelog 与版本推导都要完整历史和 tag
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      # goreleaser 的 before hook 会跑 npm ci && npm run build，
+      # 前端产物必须在 go build 之前就位（//go:embed all:dist）
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: hub/internal/site/package-lock.json
+
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # 推 ghcr.io
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 推导版本号
+        id: version
+        # 与 goreleaser 的 {{.Version}} 保持一致：去掉 v 前缀
+        run: echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      # arm64 靠 qemu 交叉构建。前端与 go build 都不吃 CGO，慢但可靠。
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/orciny
+          # latest=auto：预发布 tag（v0.2.0-rc1 之类）不会抢走 latest，
+          # 与 GitHub 自己对 releases/latest 的判定一致。
+          flavor: latest=auto
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: supplemental/docker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ steps.version.outputs.value }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
