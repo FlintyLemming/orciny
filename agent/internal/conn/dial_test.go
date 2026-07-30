@@ -25,6 +25,10 @@ type fakeHub struct {
 	priv       ed25519.PrivateKey
 	signWith   ed25519.PrivateKey // 用它签名；与 priv 不同即「假 hub」
 	rejectCode uint8
+	// revokeCode 非零时，收到 MachineInfo 后补发一条 AuthResult{OK:false}
+	// 再关连接——即 spec §3.3 的「授权已撤销」通知（M0 唯一触发场景是
+	// 机器在面板上被删）。
+	revokeCode uint8
 	gotInfo    chan protocol.MachineInfo
 }
 
@@ -65,6 +69,13 @@ func (f *fakeHandler) OnMessage(socket *gws.Conn, msg *gws.Message) {
 			case f.h.gotInfo <- info:
 			default:
 			}
+		}
+		if f.h.revokeCode != 0 {
+			b, _ := protocol.Encode(protocol.KindAuthResult, nil, protocol.AuthResult{
+				OK: false, Code: f.h.revokeCode, Reason: "该机器已在面板中被删除，请重新 enroll",
+			})
+			_ = socket.WriteMessage(gws.OpcodeBinary, b)
+			_ = socket.WriteClose(1000, []byte("machine removed"))
 		}
 	}
 }
@@ -184,6 +195,52 @@ func TestSessionDoneFiresOnHubClose(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("Done 未在连接结束后关闭")
 	}
+}
+
+// 握手完成之后 hub 仍可发 AuthResult{OK:false} 作为「授权已撤销」通知
+// （spec §3.3），M0 的唯一触发场景是机器在面板上被删（§6.4c）。
+// agent 必须把它当成连接结束的原因，而不是一次普通断开——否则重连循环
+// 只会看到「连接断开了」，继续无限重连（验收第 8 条就是这么挂的）。
+func TestSessionSurfacesRevocationAfterHandshake(t *testing.T) {
+	h := newFakeHub(t)
+	h.revokeCode = protocol.CodeMachineRemoved
+
+	s, err := conn.Dial(context.Background(), cfgFor(t, h, newIdentity(t)))
+	require.NoError(t, err, "握手本身应当成功，撤销是握手之后的事")
+
+	select {
+	case <-s.Done():
+	case <-time.After(2 * time.Second):
+		t.Fatal("收到撤销通知后 Done 未关闭")
+	}
+
+	var rej *conn.RejectedError
+	require.ErrorAs(t, s.Err(), &rej, "连接结束原因必须是 RejectedError，才能走 §7.2 的分流")
+	require.Equal(t, protocol.CodeMachineRemoved, rej.Code)
+}
+
+// 连接期收到 OK:true 没有意义，但不能因此崩掉或结束连接。
+func TestSessionIgnoresPositiveAuthResultAfterHandshake(t *testing.T) {
+	h := newFakeHub(t)
+	h.revokeCode = 0
+
+	s, err := conn.Dial(context.Background(), cfgFor(t, h, newIdentity(t)))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = s.Close() })
+
+	// 等 hub 收到 MachineInfo，确认连接确实进入了「连接期」
+	select {
+	case <-h.gotInfo:
+	case <-time.After(2 * time.Second):
+		t.Fatal("未收到 MachineInfo")
+	}
+
+	select {
+	case <-s.Done():
+		t.Fatal("连接不该结束")
+	case <-time.After(200 * time.Millisecond):
+	}
+	require.NoError(t, s.Err())
 }
 
 func TestDialFailsOnUnreachableHub(t *testing.T) {

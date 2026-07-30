@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/lxzan/gws"
@@ -107,6 +108,11 @@ type handler struct {
 	readTimeout time.Duration
 	log         *slog.Logger
 	session     *Session
+
+	// connected 在握手完成后置真，用来分开两个阶段的收信规则：
+	// 握手期的帧要交给 await，连接期的帧由 onConnected 直接处理。
+	// 由读循环那个 goroutine 读、由 Dial 所在的 goroutine 写，故用 atomic。
+	connected atomic.Bool
 }
 
 func (h *handler) OnMessage(socket *gws.Conn, msg *gws.Message) {
@@ -123,11 +129,40 @@ func (h *handler) OnMessage(socket *gws.Conn, msg *gws.Message) {
 		h.log.Warn("忽略未知消息类型", "kind", uint8(env.Kind))
 		return
 	}
+	if h.connected.Load() {
+		h.onConnected(socket, env)
+		return
+	}
 	select {
 	case h.inbox <- env:
 	default:
 		h.log.Warn("入站队列已满，丢弃消息", "kind", env.Kind.String())
 	}
+}
+
+// onConnected 处理握手完成之后收到的帧。
+//
+// M0 里 hub 在连接期只会发一种业务帧：`AuthResult{OK:false}`，即 spec §3.3 的
+// 「授权已撤销」通知（唯一触发场景是机器在面板上被删，§6.4c）。把它记成连接
+// 结束的原因，重连循环就能像处理握手期的拒绝一样按 `Code` 分流——spec §3.3
+// 要的正是「agent 侧只有一条处理路径」。
+func (h *handler) onConnected(socket *gws.Conn, env protocol.Envelope) {
+	if env.Kind != protocol.KindAuthResult {
+		h.log.Warn("忽略连接期收到的意外消息", "kind", env.Kind.String())
+		return
+	}
+	err := rejectionFrom(env)
+	if err == nil {
+		// 连接期的 OK:true 没有语义，忽略即可——但不能因此断开。
+		return
+	}
+	h.log.Warn("hub 撤销了本连接的授权", "error", err)
+	// 先记原因再关连接：finish 只认第一次调用，随后 OnClose 带来的
+	// gws.CloseError 不会盖掉这个更具体的原因。
+	if h.session != nil {
+		h.session.finish(err)
+	}
+	_ = socket.WriteClose(1000, nil)
 }
 
 func (h *handler) OnPing(socket *gws.Conn, payload []byte) {
@@ -184,6 +219,21 @@ func Dial(ctx context.Context, cfg Config) (*Session, error) {
 	if err := handshakeWith(ctx, cfg, socket, h); err != nil {
 		_ = socket.WriteClose(1000, nil)
 		return nil, err
+	}
+
+	// 从这一刻起收到的帧按连接期规则走。必须排在 MachineInfo 之前置位：
+	// hub 在发出 AuthResult{OK:true} 之后就登记了连接，撤销通知随时可能到来，
+	// 晚一步置位就会让那条通知落进 inbox 再没人读。
+	h.connected.Store(true)
+	// 置位前若已有帧进了 inbox（窗口极窄但存在），补一次连接期处理。
+	for {
+		select {
+		case env := <-h.inbox:
+			h.onConnected(socket, env)
+			continue
+		default:
+		}
+		break
 	}
 
 	// 握手后的首条业务消息（spec §4.2 第 6 步）

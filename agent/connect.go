@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"log/slog"
 	"path/filepath"
 	"time"
 
@@ -17,6 +18,11 @@ type ConnectOptions struct {
 	HubURL           string
 	HandshakeTimeout time.Duration
 	ReadTimeout      time.Duration
+
+	// Logger 为 nil 时走 slog.Default()。不传的后果是连接层的日志
+	// （撤销通知、未知消息）用默认的文本格式打出来，与 agent 其余部分的
+	// JSON 日志不一致。
+	Logger *slog.Logger
 }
 
 // Session 是一条已建立的连接。这是 conn.Session 的别名，
@@ -43,5 +49,6 @@ func Connect(ctx context.Context, o ConnectOptions) (*Session, error) {
 		Info:             probe.Collect(ctx, orciny.Version),
 		HandshakeTimeout: o.HandshakeTimeout,
 		ReadTimeout:      o.ReadTimeout,
+		Logger:           o.Logger,
 	})
 }

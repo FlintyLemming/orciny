@@ -73,6 +73,7 @@ func Run(ctx context.Context, o RunOptions) error {
 				HubURL:           cfg.HubURL,
 				HandshakeTimeout: o.HandshakeTimeout,
 				ReadTimeout:      o.ReadTimeout,
+				Logger:           o.Logger,
 			})
 		},
 		Clock:   clock.System(),

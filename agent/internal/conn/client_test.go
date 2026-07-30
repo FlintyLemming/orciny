@@ -165,6 +165,57 @@ func TestMachineRemovedStopsRetrying(t *testing.T) {
 }
 
 // hub 签名验证失败 → Compromised 终态，永不重试
+// 连接**期**（握手已完成）收到的撤销通知必须与握手期的拒绝走同一条分流
+// （spec §3.3 明说「不区分是握手期还是连接期」）。这里的 session 是连上之后
+// 才以 RejectedError 结束的——重连循环若只按「普通断开」处理，就会无限重连。
+func TestConnectedRevocationStopsRetrying(t *testing.T) {
+	clk := clock.NewFake(epoch)
+	sess := conn.NewTestSession()
+	d := &dialRecorder{results: []func() (*conn.Session, error){
+		func() (*conn.Session, error) { return sess, nil },
+	}}
+
+	c := conn.NewClient(conn.ClientConfig{
+		Dial: d.dial, Clock: clk,
+		Backoff: conn.NewBackoff(time.Second, time.Minute, 0, nil),
+	})
+	_, wait := runClient(t, c)
+
+	require.Eventually(t, func() bool { return c.State() == conn.StateConnected },
+		2*time.Second, 5*time.Millisecond, "未进入 Connected")
+
+	// 机器在面板上被删：hub 先发撤销通知再关连接
+	sess.CloseForTest(&conn.RejectedError{Code: protocol.CodeMachineRemoved, Reason: "已删除"})
+
+	require.ErrorIs(t, wait(), conn.ErrMachineRemoved)
+	require.Equal(t, 1, d.count(), "不该再拨第二次")
+	require.Equal(t, 0, clk.TimerCount(), "不该挂任何重试定时器")
+}
+
+// 连接期收到可修复的拒绝码（指纹未登记等）时，用固定长间隔而不是退避的 1 秒。
+func TestConnectedRejectionUsesFixedInterval(t *testing.T) {
+	clk := clock.NewFake(epoch)
+	sess := conn.NewTestSession()
+	d := &dialRecorder{results: []func() (*conn.Session, error){
+		func() (*conn.Session, error) { return sess, nil },
+		failWith(errors.New("boom")),
+	}}
+
+	c := conn.NewClient(conn.ClientConfig{
+		Dial: d.dial, Clock: clk,
+		Backoff:             conn.NewBackoff(time.Second, time.Minute, 0, nil),
+		RejectRetryInterval: 5 * time.Minute,
+	})
+	_, _ = runClient(t, c)
+
+	require.Eventually(t, func() bool { return c.State() == conn.StateConnected },
+		2*time.Second, 5*time.Millisecond, "未进入 Connected")
+
+	sess.CloseForTest(&conn.RejectedError{Code: protocol.CodeUnknownFingerprint, Reason: "未登记"})
+
+	waitAndFire(t, clk, d, 5*time.Minute)
+}
+
 func TestHubSignatureFailureEntersCompromised(t *testing.T) {
 	clk := clock.NewFake(epoch)
 	d := &dialRecorder{results: []func() (*conn.Session, error){

@@ -120,8 +120,25 @@ func (c *Client) Run(ctx context.Context) error {
 
 		select {
 		case <-session.Done():
-			c.setState(StateDisconnected, session.Err())
-			c.cfg.Logger.Warn("与 hub 的连接已断开", "error", session.Err())
+			err := session.Err()
+
+			// 连接期的「授权已撤销」通知与握手期的拒绝必须走同一条分流
+			// （spec §3.3：不区分握手期还是连接期）。少了这一步，机器在面板上
+			// 被删之后 agent 只看到一次普通断开，会一直重连下去。
+			var rej *RejectedError
+			if errors.As(err, &rej) {
+				wait, fatal := c.classify(err)
+				if fatal != nil {
+					return fatal
+				}
+				if err := c.sleep(ctx, wait); err != nil {
+					return err
+				}
+				continue
+			}
+
+			c.setState(StateDisconnected, err)
+			c.cfg.Logger.Warn("与 hub 的连接已断开", "error", err)
 			if err := c.sleep(ctx, c.cfg.Backoff.Next()); err != nil {
 				return err
 			}
