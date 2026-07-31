@@ -12,7 +12,10 @@ HUB=""
 TOKEN=""
 HUB_KEY=""
 VERSION="__VERSION__"
-DOWNLOAD_BASE="__DOWNLOAD_BASE__"
+# DOWNLOAD_BASES 是空格分隔的主下载源列表，按顺序尝试，首个成功即用。
+# hub 注入 Worker 主源（github-dl.flinty.moe）；GitHub 直连兜底在下面下载前用
+# $VERSION 自动追加，确保主源/兜底同 tag。--download-base 可覆盖主源。
+DOWNLOAD_BASES="__DOWNLOAD_BASES__"
 BIN_PATH="/usr/local/bin/orciny-agent"
 
 die() { echo "错误: $*" >&2; exit 1; }
@@ -24,7 +27,10 @@ while [ $# -gt 0 ]; do
     --token) TOKEN="${2:-}"; shift 2 ;;
     --hub-key) HUB_KEY="${2:-}"; shift 2 ;;
     --version) VERSION="${2:-}"; shift 2 ;;
-    --download-base) DOWNLOAD_BASE="${2:-}"; shift 2 ;;
+    --download-base)
+      # 显式覆盖主源；GitHub 直连兜底在下载前仍会按 $VERSION 追加。
+      DOWNLOAD_BASES="${2:-}"
+      shift 2 ;;
     -h|--help)
       echo "用法: $0 --hub <url> --token <t> [--hub-key <fp>] [--version <v>] [--download-base <url>]"
       exit 0 ;;
@@ -72,15 +78,39 @@ info "运行身份: $RUN_USER ($RUN_HOME)"
 SUDO=""
 [ "$(id -u)" -eq 0 ] || SUDO="sudo"
 
+# 追加 GitHub 直连兜底：版本取当前 $VERSION，与主源同 tag。用 $VERSION 现拼
+# 而不是让 hub 注入，是为了 --download-base 覆盖主源、或 --version 改版本时
+# 兜底仍能对上号。已含则不重复。
+GITHUB_FALLBACK="https://github.com/FlintyLemming/orciny/releases/download/v${VERSION}"
+case " $DOWNLOAD_BASES " in
+  *" $GITHUB_FALLBACK "*) ;;
+  *) DOWNLOAD_BASES="$DOWNLOAD_BASES $GITHUB_FALLBACK" ;;
+esac
+
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
+# fetch_to <relative_path> <dest>: 遍历 DOWNLOAD_BASES 依次尝试，首个成功即用，
+# 回显命中的源便于排障。全部失败返回非零，由调用方决定是否致命。
+# curl 走 -f，404/5xx 直接算失败换下一源；-L 跟随 GitHub 的 302。
+fetch_to() {
+  _rel="$1"; _dest="$2"
+  for _base in $DOWNLOAD_BASES; do
+    [ -n "$_base" ] || continue
+    if curl -fsSL -o "$_dest" "$_base/$_rel" 2>/dev/null; then
+      info "  来自: $_base"
+      return 0
+    fi
+  done
+  return 1
+}
+
 ARCHIVE="orciny-agent_${VERSION}_${GOOS}_${GOARCH}.tar.gz"
 info "下载 $ARCHIVE"
-curl -fsSL -o "$TMP/$ARCHIVE" "$DOWNLOAD_BASE/$ARCHIVE" \
-  || die "下载失败: $DOWNLOAD_BASE/$ARCHIVE"
+fetch_to "$ARCHIVE" "$TMP/$ARCHIVE" \
+  || die "所有下载源均失败: $ARCHIVE"
 
-if curl -fsSL -o "$TMP/checksums.txt" "$DOWNLOAD_BASE/checksums.txt" 2>/dev/null; then
+if fetch_to "checksums.txt" "$TMP/checksums.txt"; then
   EXPECTED="$(grep " $ARCHIVE\$" "$TMP/checksums.txt" | awk '{print $1}')"
   [ -n "$EXPECTED" ] || die "checksums.txt 里没有 $ARCHIVE 的记录"
   if command -v sha256sum >/dev/null 2>&1; then

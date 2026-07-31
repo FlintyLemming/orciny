@@ -27,8 +27,8 @@ type Config struct {
 
 	MinAgentVersion semver.Version
 
-	// DownloadBase 是 install.sh 的下载源。空值走 routes.DefaultDownloadBase，
-	// 即本 hub 版本对应的那个 GitHub release；开发期指向本地构建产物，
+	// DownloadBase 是 install.sh 的主下载源。空值走 routes.DefaultDownloadBase，
+	// 即本 hub 版本对应的 github-dl.flinty.moe Worker；开发期指向本地构建产物，
 	// 免得每次都要发 release 才能测安装路径（spec §11.4）。
 	//
 	// 这里不在 WithDefaults 里补默认：默认值属于 routes 包，且要按版本推导，

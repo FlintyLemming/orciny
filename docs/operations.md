@@ -15,6 +15,33 @@ hub 假定跑在反向代理之后。**不要把明文 HTTP 暴露到公网**：
 Nginx 需要显式透传 WebSocket，且 `proxy_read_timeout` 要大于 hub 的 70 秒
 读超时；Caddy 默认即可。
 
+## 下载源（agent 二进制分发）
+
+`GET /install.sh` 注入的下载源默认是 `https://github-dl.flinty.moe/v<version>`：一个
+Cloudflare Worker 反代 GitHub Release 并做边缘缓存，客户端全程只连
+`github-dl.flinty.moe`，不再直连 GitHub，中国大陆下载不再卡。脚本同时把 GitHub 直连
+作为兜底，Worker 故障时自动回退。
+
+Worker 脚本在 `supplemental/cloudflare/dl-worker.js`，已部署为账号下的
+`dl-orciny` Worker，绑定到 `github-dl.flinty.moe`（Custom Domain，CF 自动管 DNS 与
+证书）。Worker 匿名即可，GitHub 公开 release 不需要凭据。
+
+改 Worker：
+
+```bash
+# 用 Cloudflare API 重新上传（需要 Workers 编辑权限的 API token + account id）
+curl -X PUT \
+  "https://api.cloudflare.com/client/v4/accounts/<account_id>/workers/scripts/dl-orciny" \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: multipart/form-data; boundary=BOUNDARY" \
+  --data-binary @body.txt   # body 见 supplemental/cloudflare/ 的部署说明
+```
+
+或在 dashboard: Workers & Pages -> `dl-orciny` -> 编辑 -> 部署。
+
+产物路径形如 `releases/download/v<version>/<archive>`，归档名由 `.goreleaser.yml`
+的 `name_template` 决定，改它必须同步改 `install-agent.sh` 的 `ARCHIVE=` 那行。
+
 ## 接入机器
 
 面板 →「机器」→「添加机器」，把弹出的一行命令贴到目标机器上执行。token

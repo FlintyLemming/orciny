@@ -22,8 +22,9 @@ type Deps struct {
 	WS       *ws.Handler
 	Version  string
 
-	// DownloadBase 是 install.sh 拉取 agent 归档的位置。
-	// 空值走 DefaultDownloadBase(Version)，即本 hub 版本对应的 GitHub release。
+	// DownloadBase 是 install.sh 拉取 agent 归档的主下载源。
+	// 空值走 DefaultDownloadBase(Version)，即本 hub 版本对应的 github-dl.flinty.moe Worker；
+	// GitHub 直连兜底由 install-agent.sh 自行追加。
 	DownloadBase string
 }
 
