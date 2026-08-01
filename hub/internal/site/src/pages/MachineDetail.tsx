@@ -1,13 +1,22 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useStore } from '@nanostores/react'
 import { Trans } from '@lingui/react/macro'
 import { ArrowLeft } from 'lucide-react'
 import { $machines, subscribeMachines } from '@/stores/machines'
 import { $events, subscribeEvents } from '@/stores/events'
+import { $configSets, subscribeConfigSets } from '@/stores/configsets'
 import { StatusDot } from '@/components/StatusDot'
 import { Placeholder } from '@/components/Placeholder'
+import { AssignDialog } from '@/components/AssignDialog'
+import { VariablesEditor } from '@/components/VariablesEditor'
 import { navigate } from '@/router'
-import type { EventKind } from '@/types/collections'
+import { assignConfigSet } from '@/lib/api'
+import { pb } from '@/lib/pb'
+import {
+  COLLECTION_ASSIGNMENTS,
+  type AssignmentRecord,
+  type EventKind,
+} from '@/types/collections'
 
 const eventLabel: Partial<Record<EventKind, React.ReactNode>> = {
   'machine.enrolled': <Trans>已注册</Trans>,
@@ -37,10 +46,35 @@ const eventLabel: Partial<Record<EventKind, React.ReactNode>> = {
 export function MachineDetail({ id }: { id: string }) {
   const machines = useStore($machines)
   const events = useStore($events)
+  const configSets = useStore($configSets)
   const machine = machines.find((m) => m.id === id)
+
+  const [assignment, setAssignment] = useState<AssignmentRecord | null>(null)
+  const [showAssign, setShowAssign] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => subscribeMachines(), [])
   useEffect(() => subscribeEvents(id), [id])
+  useEffect(() => subscribeConfigSets(), [])
+
+  useEffect(() => {
+    let cancelled = false
+    void pb
+      .collection(COLLECTION_ASSIGNMENTS)
+      .getFullList<AssignmentRecord>({
+        filter: pb.filter('machine = {:m}', { m: id }),
+        expand: 'config_set,applied_revision',
+      })
+      .then((list) => {
+        if (!cancelled) setAssignment(list[0] ?? null)
+      })
+      .catch(() => {
+        if (!cancelled) setAssignment(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [id, showAssign])
 
   if (!machine) {
     return (
@@ -82,10 +116,75 @@ export function MachineDetail({ id }: { id: string }) {
         </dl>
       </section>
 
+      {error && <p className="text-sm text-rose-600">{error}</p>}
+
       <div className="grid gap-4 md:grid-cols-3">
-        <PlaceholderCard title={<Trans>配置对齐状态</Trans>} />
-        <PlaceholderCard title={<Trans>漂移</Trans>} />
-        <PlaceholderCard title={<Trans>机器变量</Trans>} />
+        <section className="rounded-lg border border-line bg-surface p-4">
+          <h2 className="mb-2 text-sm font-semibold">
+            <Trans>配置对齐状态</Trans>
+          </h2>
+          {assignment ? (
+            <dl className="space-y-1 text-sm">
+              <div>
+                <dt className="text-xs text-ink3"><Trans>配置集</Trans></dt>
+                <dd>{assignment.expand?.config_set?.name ?? assignment.config_set}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-ink3"><Trans>模式</Trans></dt>
+                <dd>{assignment.mode}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-ink3"><Trans>状态</Trans></dt>
+                <dd>
+                  {assignment.state}
+                  {assignment.last_error && (
+                    <span className="mt-1 block text-xs text-rose-600">{assignment.last_error}</span>
+                  )}
+                </dd>
+              </div>
+              {assignment.expand?.applied_revision && (
+                <div>
+                  <dt className="text-xs text-ink3"><Trans>已应用版本</Trans></dt>
+                  <dd>v{assignment.expand.applied_revision.seq}</dd>
+                </div>
+              )}
+            </dl>
+          ) : (
+            <p className="mb-2 text-sm text-ink3">
+              <Trans>尚未指派配置集。</Trans>
+            </p>
+          )}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setShowAssign(true)}
+              className="rounded bg-accent px-2 py-1 text-xs text-white"
+            >
+              <Trans>指派</Trans>
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('import', id)}
+              className="rounded bg-wash px-2 py-1 text-xs"
+            >
+              <Trans>从本机导入</Trans>
+            </button>
+          </div>
+        </section>
+
+        <section className="rounded-lg border border-line bg-surface p-4">
+          <h2 className="mb-2 text-sm font-semibold">
+            <Trans>漂移</Trans>
+          </h2>
+          <Placeholder milestone="M1" />
+        </section>
+
+        <section className="rounded-lg border border-line bg-surface p-4">
+          <h2 className="mb-2 text-sm font-semibold">
+            <Trans>机器变量</Trans>
+          </h2>
+          <VariablesEditor machineId={id} />
+        </section>
       </div>
 
       <section className="rounded-lg border border-line bg-surface p-5">
@@ -108,6 +207,22 @@ export function MachineDetail({ id }: { id: string }) {
           ))}
         </ul>
       </section>
+
+      {showAssign && (
+        <AssignDialog
+          machineId={id}
+          configSets={configSets.map((s) => ({ id: s.id, name: s.name }))}
+          applyFileCount={
+            configSets.find((s) => s.id === (assignment?.config_set))?.draft?.length
+          }
+          onClose={() => setShowAssign(false)}
+          onSubmit={({ configSet, mode }) => {
+            void assignConfigSet(id, configSet, mode)
+              .then(() => setShowAssign(false))
+              .catch((e: Error) => setError(e.message))
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -118,14 +233,5 @@ function Field({ label, value, mono }: { label: React.ReactNode; value: string; 
       <dt className="text-xs text-ink3">{label}</dt>
       <dd className={mono ? 'font-mono text-xs break-all' : ''}>{value}</dd>
     </div>
-  )
-}
-
-function PlaceholderCard({ title }: { title: React.ReactNode }) {
-  return (
-    <section className="rounded-lg border border-line bg-surface p-4">
-      <h2 className="mb-2 text-sm font-semibold">{title}</h2>
-      <Placeholder milestone="M1" />
-    </section>
   )
 }
