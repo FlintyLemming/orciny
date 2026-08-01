@@ -41,6 +41,10 @@ type MachineInfo struct {
 	Arch         string            `cbor:"2,keyasint"` // amd64 / arm64
 	AgentVersion string            `cbor:"3,keyasint"`
 	ToolVersions map[string]string `cbor:"4,keyasint,omitempty"` // {"claude-code": "2.1.3"}
+
+	// M1 追加（spec §5.2）。keyasint 加字段向后兼容，老版本解码时忽略。
+	LocalPaused bool   `cbor:"5,keyasint,omitempty"` // orciny-agent pause
+	ManagedHome string `cbor:"6,keyasint,omitempty"` // 面板上显示「管的是哪个 home」
 }
 
 // 拒绝原因码（spec §4.6）。
