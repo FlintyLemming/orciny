@@ -1,4 +1,4 @@
-# Orciny 运维手册（M0）
+# Orciny 运维手册（M0 + M1）
 
 ## 部署 hub
 
@@ -63,28 +63,96 @@ curl -X PUT \
 备份走 PocketBase 自带机制（面板「设置」→「打开备份设置」，或 `/_/#/settings/backups`），
 支持本地目录与 S3 兼容存储。
 
-> **必须知道的一条：** hub 的私钥 `pb_data/orciny_hub_key.pem` 也在数据目录里，
-> 因此**会被备份一起带走**。反过来说——
+> **必须知道的两条密钥：**
 >
-> **恢复备份时若丢了这个文件，所有 agent 都会因 hub 签名验证失败而拒绝连接，
-> 需要在每台机器上重新 enroll。**
+> 1. hub 的私钥 `pb_data/orciny_hub_key.pem` 也在数据目录里，因此**会被备份一起带走**。
+>    恢复备份时若丢了这个文件，所有 agent 都会因 hub 签名验证失败而拒绝连接，
+>    需要在每台机器上重新 enroll。
+>
+> 2. **主密钥** `pb_data/secret.key`（M1）必须与数据库一起备份。它用来加解密
+>    凭据集合。恢复到新机器时忘了带它，hub 会**拒绝启动**并给出明确错误——
+>    这是有意的（spec §6.6）：解不开凭据比带着坏数据继续跑更安全。
+>    也可以用 `ORCINY_SECRET_KEY` 环境变量注入（优先于文件）。
 >
 > agent 侧的表现是日志里出现「hub 签名验证失败，停止一切重试」，且进程不再
 > 重连（这是有意的：签名不匹配意味着要么遭中间人，要么 hub 换了密钥，
 > 两种都需要人来判断）。
 >
-> 恢复演练时请务必确认这个文件在备份里，并在恢复后用 `orciny-agent status`
+> 恢复演练时请务必确认这两个文件在备份里，并在恢复后用 `orciny-agent status`
 > 抽查一台机器。
+
+## agent 的两个 HOME
+
+| 名字 | 默认 | 用途 |
+|---|---|---|
+| `$ORCINY_HOME`（agent 目录） | `~/.orciny` | agent 自己的数据：身份、状态、日志、blob 缓存、快照 |
+| `managed_home`（`agent.yml`） | `os.UserHomeDir()` | **被管理的**那个 home，即 `~/.claude` 所在处 |
+
+两者必须分开：测试与容器部署都靠它隔离。容器里跑 agent 时，`managed_home`
+要显式指定到挂载了用户配置的路径，否则 agent 会去管容器自己的空 home。
+
+```yaml
+# ~/.orciny/agent.yml
+hub_url: https://orciny.example.com
+machine_id: ...
+managed_home: /home/alice   # 容器里显式指定
+reconcile_interval: 5m      # 定时全量对账，默认 5 分钟
+```
+
+## 快照与磁盘占用
+
+| 路径 | 内容 | 可否删 |
+|---|---|---|
+| `~/.orciny/snapshots/` | 最近 **5** 次 apply 前的现场（目录 0700，文件 0600） | 可以。代价是丢掉回滚现场 |
+| `~/.orciny/blobs/` | 内容寻址缓存（渲染前的 blob） | 可以。下次 apply 会重新从 hub 拉 |
+| `~/.orciny/secrets.json` | 本机凭据/变量缓存（0600） | **不要删**——离线还原与对账依赖它 |
+| `~/.orciny/state.json` | 当前已应用的版本与基线（0600） | 删了会触发 survey 全量对账，**不会**覆盖用户文件 |
+
+## `degraded` 怎么办
+
+`degraded` 表示：**一次 apply 失败，且回滚也失败**。此后 agent 不再自动 apply
+任何后续版本——继续写只会把现场破坏得更彻底。
+
+排查步骤：
+
+1. 看 `~/.orciny/logs/`（或 `journalctl -u orciny-agent`）里 apply 失败的原因；
+2. 看 `~/.orciny/snapshots/` 里最近一次快照，对照用户目录确认哪些文件处于中间态；
+3. 手工把用户目录恢复到可接受的状态；
+4. 在面板机器详情点「解除 degraded」——agent 会转 survey 模式做全量对账，
+   差异进收件箱，由人决定收编还是恢复，**不会**静默覆盖用户文件。
 
 ## 机器状态怎么读
 
 | 状态 | 含义 |
 |---|---|
 | 在线 | WebSocket 长连接存续。面板不显示秒级心跳时间——`last_seen` 只在状态变化时写库 |
-| 离线 | 连接断开超过 5 秒宽限。`last_seen` 正是断开那一刻 |
-| 已暂停 | M1 起才有语义（保持连接但不应用下发）。M0 不提供切换入口 |
+| 离线 | 连接断开超过 5 秒宽限。`last_seen` 正是断开那一刻。静默断网最坏 **75 秒内**转 offline（70s 读超时 + 5s 宽限） |
+| 已暂停 | 本机执行了 `orciny-agent pause`：保持连接但不 apply、不上报漂移 |
 
 短暂的网络抖动（5 秒内恢复）不会让面板闪红，也不会产生断连事件。
+
+指派状态（配置闭环）：
+
+| 状态 | 含义 |
+|---|---|
+| `pending` | 已指派，等待 agent 拉取 |
+| `applying` | agent 正在 apply |
+| `aligned` | 与 head 一致 |
+| `failed` | apply 失败（已回滚） |
+| `degraded` | apply 失败且回滚也失败，需人工介入 |
+| `paused` | 配置集或本机暂停 |
+
+## CLI 速查
+
+| 命令 | 用途 | 副作用 |
+|---|---|---|
+| `orciny-agent status` | 连接状态、配置版本、健康、本机漂移数 | 无（只读；漂移数会做一次本地扫描） |
+| `orciny-agent sync` | 立即 pull + apply，打印计划与结果 | **会短暂顶掉常驻 agent 的连接**（几秒内自动重连） |
+| `orciny-agent drift` | 本机离线对账 + 简易 diff（已脱敏） | 无（只读、不联网）。收编/恢复请在 Web 上操作 |
+| `orciny-agent pause` | 暂停本机配置管理 | 写 `state.json`；下次握手经 `LocalPaused` 上报面板 |
+| `orciny-agent resume` | 恢复本机配置管理 | 同上 |
+| `orciny-agent enroll` | 用一次性 token 接入 hub | 写身份与 `agent.yml` |
+| `orciny-agent run` | 前台运行（服务单元调用的就是它） | 长连接 + 监视 + 对账 |
 
 ## 常见排查
 
@@ -93,7 +161,7 @@ curl -X PUT \
 在目标机器上：
 
 ```bash
-orciny-agent status            # 看 hub 地址、指纹、连接状态
+orciny-agent status            # 看 hub 地址、指纹、连接状态、配置版本
 journalctl -u orciny-agent -n 50          # Linux
 tail -50 ~/.orciny/logs/launchd.err.log   # macOS
 ```
@@ -106,6 +174,8 @@ tail -50 ~/.orciny/logs/launchd.err.log   # macOS
 | `hub 拒绝连接 code=3` | agent 版本低于 hub 门槛，升级 agent |
 | `hub 报告本机已被删除` | 面板上删掉了这台机器，需重新 enroll |
 | `hub 签名验证失败，停止一切重试` | hub 换了密钥（多半是恢复备份时丢了私钥），或遭中间人。**不要**盲目删掉 `~/.orciny/identity/hub.pub`，先确认 hub 侧发生了什么 |
+| `钉扎的 hub 公钥无法使用，停止一切重试` | `hub.pub` 文件损坏或被替换成垃圾。确认 hub 身份后重新 enroll |
+| `本机处于 degraded 状态` | 见上文「degraded 怎么办」 |
 
 `code=3` 有一个容易踩的变体：agent 版本形如 `0.1.0-SNAPSHOT-abc1234` 时，
 按 semver 它**低于** `0.1.0`（带预发布标识的版本排在同号正式版之前），
@@ -116,6 +186,11 @@ tail -50 ~/.orciny/logs/launchd.err.log   # macOS
 
 指纹由公钥派生，密钥没了就是一台新机器。重新执行一次安装命令即可，
 旧记录可以在面板上删掉。
+
+**删掉了 `~/.orciny/state.json`**
+
+agent 会向 hub 报告「我没有任何已应用的版本」。若这台机器曾经对齐过，
+hub 会自动打回 survey 模式：差异进收件箱，**不会**用中台内容覆盖用户文件。
 
 ## macOS 的已知限制
 
@@ -162,7 +237,15 @@ Claude Code 自己也在写 `~/.claude.json`（记录 project 状态等运行时
 重写该文件时，agent 的写入可能被覆盖。下一次对账（默认 ≤5 分钟）会发现
 并重新应用。
 
-**inotify watch 数**：`skills/**` 递归监视通常占用几十个 watch，
-远低于 Linux 默认的 8192 上限（`/proc/sys/fs/inotify/max_user_watches`）。
-若同一台机器上跑了多个大量占用 watch 的工具而报 `no space left on device`，
-调高该内核参数即可。
+## inotify watch 数
+
+`skills/**` 递归监视通常占用几十个 watch，远低于 Linux 默认的 8192 上限
+（`/proc/sys/fs/inotify/max_user_watches`）。若同一台机器上跑了多个大量占用
+watch 的工具而报 `no space left on device`，调高该内核参数即可：
+
+```bash
+# 临时
+sudo sysctl -w fs.inotify.max_user_watches=524288
+# 持久
+echo fs.inotify.max_user_watches=524288 | sudo tee /etc/sysctl.d/99-orciny.conf
+```
