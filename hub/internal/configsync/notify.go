@@ -134,6 +134,7 @@ func (s *Service) ApplyAck(machineID string, a protocol.ApplyAck) {
 		assign.Set("applied_at", types.NowDateTime())
 		assign.Set("last_error", "")
 		s.writeEvent(events.KindApplyOK, machineID, detail)
+		s.resolveDriftOnApply(machineID, a)
 	case a.RolledBack:
 		assign.Set("state", configsets.StateFailed)
 		assign.Set("last_error", a.Error)
@@ -154,5 +155,32 @@ func (s *Service) ApplyAck(machineID string, a protocol.ApplyAck) {
 func (s *Service) writeEvent(kind, machineID string, detail map[string]any) {
 	if err := s.d.Events.Write(kind, machineID, detail); err != nil {
 		s.log.Warn("写事件失败", "kind", kind, "error", err)
+	}
+}
+
+// resolveDriftOnApply 在成功 apply 后处置收件箱：
+// 1. 先 MarkRestored（只认刚下过 restore 指令的路径）
+// 2. 再 Supersede（剩下的 open 漂移是被覆盖的，spec §7.7）
+//
+// 顺序不能反：先 supersede 再 markRestored 会把被覆盖的也标成 restored。
+func (s *Service) resolveDriftOnApply(machineID string, a protocol.ApplyAck) {
+	if s.d.Drift == nil || len(a.Results) == 0 {
+		return
+	}
+	var all, overwritten []string
+	for _, res := range a.Results {
+		all = append(all, res.Path)
+		switch res.Action {
+		case protocol.ActionOverwrite, protocol.ActionDelete, protocol.ActionMerge:
+			overwritten = append(overwritten, res.Path)
+		}
+	}
+	if err := s.d.Drift.MarkRestored(machineID, all); err != nil {
+		s.log.Warn("标记已恢复漂移失败", "machine", machineID, "error", err)
+	}
+	if len(overwritten) > 0 {
+		if err := s.d.Drift.Supersede(machineID, overwritten, a.RevisionID); err != nil {
+			s.log.Warn("标记被覆盖的漂移失败", "machine", machineID, "error", err)
+		}
 	}
 }

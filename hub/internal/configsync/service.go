@@ -31,6 +31,8 @@ type Sender interface {
 type DriftHandler interface {
 	HandleReport(machineID string, rep protocol.DriftReport) error
 	IgnorePaths(machineID string) ([]string, error)
+	Supersede(machineID string, paths []string, revID string) error
+	MarkRestored(machineID string, paths []string) error
 }
 
 type Deps struct {
@@ -59,6 +61,15 @@ type Service struct {
 
 // SetDrift 在装配阶段把收件箱接上。必须在任何 agent 消息到达之前调用。
 func (s *Service) SetDrift(d DriftHandler) { s.d.Drift = d }
+
+// SendTo 把任意协议消息发给指定机器。drift 发 DriftCommand 走这里，
+// 避免 drift 直接依赖 machines 包。
+func (s *Service) SendTo(machineID string, kind protocol.Kind, payload any) error {
+	if s.d.Sender == nil {
+		return fmt.Errorf("configsync: sender 未配置")
+	}
+	return s.d.Sender.SendTo(machineID, kind, payload)
+}
 
 func NewService(d Deps) *Service {
 	log := d.Logger

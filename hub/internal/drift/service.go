@@ -32,8 +32,11 @@ type Service struct {
 	log *slog.Logger
 
 	// fullSeen 跨批累积本轮 Full 对账已见路径。Final 到达时取出并清空。
-	mu       sync.Mutex
-	fullSeen map[string][]string
+	// pendingRestore 记录刚下过 restore 指令的路径，ApplyAck 时
+	// MarkRestored 只认这些路径，避免普通 apply 误标 restored。
+	mu             sync.Mutex
+	fullSeen       map[string][]string
+	pendingRestore map[string]map[string]bool // machineID → paths
 }
 
 // NewService 构造 drift 服务。
@@ -47,9 +50,10 @@ func NewService(d Deps) *Service {
 		}
 	}
 	return &Service{
-		d:        d,
-		log:      log,
-		fullSeen: map[string][]string{},
+		d:              d,
+		log:            log,
+		fullSeen:       map[string][]string{},
+		pendingRestore: map[string]map[string]bool{},
 	}
 }
 
