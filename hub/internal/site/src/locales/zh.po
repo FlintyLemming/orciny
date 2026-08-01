@@ -13,6 +13,15 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+#. placeholder {0}: e.path
+#: src/lib/inbox.ts
+msgid "{0} 内容未能安全脱敏，无法自动收编"
+msgstr "{0} 内容未能安全脱敏，无法自动收编"
+
+#: src/components/ThreeWayCompare.tsx
+msgid "∅"
+msgstr "∅"
+
 #: src/pages/ImportWizard.tsx
 msgid "1. 采集"
 msgstr "1. 采集"
@@ -39,6 +48,10 @@ msgid "agent 版本"
 msgstr "agent 版本"
 
 #: src/pages/MachineDetail.tsx
+msgid "apply 回执历史"
+msgstr "apply 回执历史"
+
+#: src/pages/MachineDetail.tsx
 #: src/pages/Machines.tsx
 msgid "Claude Code"
 msgstr "Claude Code"
@@ -52,6 +65,10 @@ msgstr "hub 版本"
 #: src/pages/ConfigSets.tsx
 msgid "v{0} · {1}"
 msgstr "v{0} · {1}"
+
+#: src/pages/Inbox.tsx
+msgid "三方对比"
+msgstr "三方对比"
 
 #: src/pages/MachineDetail.tsx
 msgid "上报漂移"
@@ -68,6 +85,10 @@ msgstr "下一步：敏感项"
 #: src/components/AssignDialog.tsx
 msgid "不写盘，差异进收件箱"
 msgstr "不写盘，差异进收件箱"
+
+#: src/lib/inbox.ts
+msgid "不能跨配置集收编：所选条目属于不同配置集"
+msgstr "不能跨配置集收编：所选条目属于不同配置集"
 
 #: src/pages/MachineDetail.tsx
 msgid "主机名"
@@ -93,6 +114,10 @@ msgstr "从本机导入"
 msgid "从草稿中移除 {selected}？"
 msgstr "从草稿中移除 {selected}？"
 
+#: src/pages/Inbox.tsx
+msgid "以下条目变量还原不完整（restore_partial）。请逐条查看 diff 并勾选确认后再收编。"
+msgstr "以下条目变量还原不完整（restore_partial）。请逐条查看 diff 并勾选确认后再收编。"
+
 #: src/components/PublishDialog.tsx
 msgid "例如：同步 CLAUDE.md 更新"
 msgstr "例如：同步 CLAUDE.md 更新"
@@ -113,6 +138,10 @@ msgstr "保存变量"
 msgid "保留明文"
 msgstr "保留明文"
 
+#: src/components/DriftCard.tsx
+msgid "修改"
+msgstr "修改"
+
 #: src/components/VariablesEditor.tsx
 msgid "值"
 msgstr "值"
@@ -121,15 +150,28 @@ msgstr "值"
 msgid "值（至少 {MIN_LEN} 字符）"
 msgstr "值（至少 {MIN_LEN} 字符）"
 
+#: src/pages/MachineDetail.tsx
+msgid "先看看（survey）"
+msgstr "先看看（survey）"
+
 #: src/pages/ConfigSets.tsx
 msgid "克隆"
 msgstr "克隆"
+
+#: src/pages/Inbox.tsx
+msgid "全局忽略"
+msgstr "全局忽略"
+
+#: src/pages/Inbox.tsx
+msgid "全部"
+msgstr "全部"
 
 #: src/pages/Settings.tsx
 msgid "公钥指纹"
 msgstr "公钥指纹"
 
 #: src/components/AddMachineDialog.tsx
+#: src/pages/Inbox.tsx
 msgid "关闭"
 msgstr "关闭"
 
@@ -172,6 +214,7 @@ msgstr "列表只显示末四位。值不会出现在版本历史或日志里。
 msgid "创建"
 msgstr "创建"
 
+#: src/components/DriftCard.tsx
 #: src/pages/ConfigSets.tsx
 #: src/pages/Credentials.tsx
 msgid "删除"
@@ -188,6 +231,7 @@ msgstr "删除机器"
 #: src/pages/ConfigSetDetail.tsx
 #: src/pages/ConfigSets.tsx
 #: src/pages/Credentials.tsx
+#: src/pages/Inbox.tsx
 #: src/pages/Machines.tsx
 msgid "加载中…"
 msgstr "加载中…"
@@ -195,6 +239,10 @@ msgstr "加载中…"
 #: src/pages/ImportWizard.tsx
 msgid "勾选取消不想纳管的文件，然后继续。"
 msgstr "勾选取消不想纳管的文件，然后继续。"
+
+#: src/pages/MachineDetail.tsx
+msgid "去收件箱"
+msgstr "去收件箱"
 
 #: src/components/PublishDialog.tsx
 #: src/pages/ConfigSetDetail.tsx
@@ -218,13 +266,28 @@ msgstr "发布失败"
 msgid "发布配置集"
 msgstr "发布配置集"
 
+#: src/components/ThreeWayCompare.tsx
+msgid "发现 {conflictCount} 处两边改法不同的冲突行，请选定一侧后再收编。"
+msgstr "发现 {conflictCount} 处两边改法不同的冲突行，请选定一侧后再收编。"
+
 #: src/components/AssignDialog.tsx
+#: src/components/DegradedBanner.tsx
 #: src/components/FindingList.tsx
 #: src/components/PublishDialog.tsx
 #: src/pages/ConfigSets.tsx
 #: src/pages/Credentials.tsx
+#: src/pages/Inbox.tsx
 msgid "取消"
 msgstr "取消"
+
+#: src/pages/Inbox.tsx
+msgid "取消选择"
+msgstr "取消选择"
+
+#. placeholder {0}: openDrifts.length - 5
+#: src/pages/MachineDetail.tsx
+msgid "另有 {0} 条，请到收件箱处理"
+msgstr "另有 {0} 条，请到收件箱处理"
 
 #: src/pages/Machines.tsx
 msgid "名称"
@@ -238,6 +301,7 @@ msgstr "名称（字母数字_-）"
 msgid "回滚"
 msgstr "回滚"
 
+#: src/components/ApplyHistory.tsx
 #: src/pages/MachineDetail.tsx
 msgid "回滚失败"
 msgstr "回滚失败"
@@ -249,6 +313,10 @@ msgstr "在目标机器上执行这行命令即可接入："
 #: src/components/StatusDot.tsx
 msgid "在线"
 msgstr "在线"
+
+#: src/pages/Inbox.tsx
+msgid "基线"
+msgstr "基线"
 
 #: src/pages/ImportWizard.tsx
 msgid "处理敏感项：抽取为凭据（推荐）、保留明文（进版本历史）、或移出纳管。"
@@ -269,6 +337,10 @@ msgstr "备注（可选）"
 #: src/components/AddMachineDialog.tsx
 msgid "复制安装命令"
 msgstr "复制安装命令"
+
+#: src/pages/MachineDetail.tsx
+msgid "失败"
+msgstr "失败"
 
 #: src/pages/Settings.tsx
 msgid "安装 agent 时可用 --hub-key 带上这个指纹做带外校验，防止在首次接入的那一刻被中间人冒充。"
@@ -314,6 +386,10 @@ msgstr "尚未指派配置集。"
 msgid "已删除"
 msgstr "已删除"
 
+#: src/pages/MachineDetail.tsx
+msgid "已对齐"
+msgstr "已对齐"
+
 #: src/pages/ConfigSetDetail.tsx
 msgid "已对齐 head"
 msgstr "已对齐 head"
@@ -322,11 +398,24 @@ msgstr "已对齐 head"
 msgid "已应用版本"
 msgstr "已应用版本"
 
+#: src/pages/Inbox.tsx
+msgid "已忽略"
+msgstr "已忽略"
+
+#: src/pages/Inbox.tsx
+msgid "已恢复"
+msgstr "已恢复"
+
+#: src/pages/Inbox.tsx
+msgid "已收编"
+msgstr "已收编"
+
 #: src/pages/MachineDetail.tsx
 msgid "已断开"
 msgstr "已断开"
 
 #: src/components/StatusDot.tsx
+#: src/pages/MachineDetail.tsx
 msgid "已暂停"
 msgstr "已暂停"
 
@@ -334,14 +423,34 @@ msgstr "已暂停"
 msgid "已注册"
 msgstr "已注册"
 
+#: src/components/DriftCard.tsx
+#: src/pages/Inbox.tsx
+msgid "已被覆盖"
+msgstr "已被覆盖"
+
 #: src/pages/MachineDetail.tsx
 msgid "已连接"
 msgstr "已连接"
 
+#. placeholder {0}: selected.size
+#: src/pages/Inbox.tsx
+msgid "已选 {0} 条"
+msgstr "已选 {0} 条"
+
+#: src/pages/MachineDetail.tsx
+msgid "应用"
+msgstr "应用"
+
+#: src/pages/MachineDetail.tsx
+msgid "应用中"
+msgstr "应用中"
+
+#: src/components/ApplyHistory.tsx
 #: src/pages/MachineDetail.tsx
 msgid "应用失败"
 msgstr "应用失败"
 
+#: src/components/ApplyHistory.tsx
 #: src/pages/MachineDetail.tsx
 msgid "应用成功"
 msgstr "应用成功"
@@ -354,9 +463,21 @@ msgstr "应用配置集"
 msgid "开始采集"
 msgstr "开始采集"
 
+#: src/pages/MachineDetail.tsx
+msgid "待对齐"
+msgstr "待对齐"
+
+#: src/pages/Inbox.tsx
+msgid "忽略"
+msgstr "忽略"
+
 #: src/components/Sidebar.tsx
 msgid "总览"
 msgstr "总览"
+
+#: src/pages/Inbox.tsx
+msgid "恢复"
+msgstr "恢复"
 
 #: src/pages/Settings.tsx
 msgid "打开备份设置"
@@ -391,8 +512,17 @@ msgid "指纹"
 msgstr "指纹"
 
 #: src/components/Sidebar.tsx
+#: src/pages/Inbox.tsx
 msgid "收件箱"
 msgstr "收件箱"
+
+#: src/pages/Inbox.tsx
+msgid "收编"
+msgstr "收编"
+
+#: src/pages/Inbox.tsx
+msgid "收编前复核"
+msgstr "收编前复核"
 
 #: src/pages/ConfigSetDetail.tsx
 msgid "文件"
@@ -401,6 +531,10 @@ msgstr "文件"
 #: src/pages/Credentials.tsx
 msgid "新值（至少 {MIN_LEN} 字符）"
 msgstr "新值（至少 {MIN_LEN} 字符）"
+
+#: src/components/DriftCard.tsx
+msgid "新增"
+msgstr "新增"
 
 #: src/pages/ConfigSets.tsx
 #: src/pages/Credentials.tsx
@@ -411,13 +545,22 @@ msgstr "新建"
 msgid "新配置集名称"
 msgstr "新配置集名称"
 
+#: src/components/ThreeWayCompare.tsx
+msgid "无内容"
+msgstr "无内容"
+
 #: src/components/DiffView.tsx
+#: src/components/DriftCard.tsx
 msgid "无内容 diff"
 msgstr "无内容 diff"
 
 #: src/components/DiffView.tsx
 msgid "无差异"
 msgstr "无差异"
+
+#: src/pages/MachineDetail.tsx
+msgid "无未处理漂移。"
+msgstr "无未处理漂移。"
 
 #: src/components/AddMachineDialog.tsx
 msgid "无法写入剪贴板，请手动复制上面的命令。"
@@ -427,9 +570,17 @@ msgstr "无法写入剪贴板，请手动复制上面的命令。"
 msgid "暂停下发"
 msgstr "暂停下发"
 
+#: src/components/ApplyHistory.tsx
+msgid "暂无 apply 回执。"
+msgstr "暂无 apply 回执。"
+
 #: src/pages/MachineDetail.tsx
 msgid "暂无事件。"
 msgstr "暂无事件。"
+
+#: src/pages/Inbox.tsx
+msgid "暂无漂移条目"
+msgstr "暂无漂移条目"
 
 #: src/pages/ConfigSetDetail.tsx
 msgid "有未发布改动"
@@ -443,6 +594,22 @@ msgstr "未保存 diff"
 #: src/pages/ConfigSets.tsx
 msgid "未发布 · {0}"
 msgstr "未发布 · {0}"
+
+#: src/pages/Inbox.tsx
+msgid "未处理"
+msgstr "未处理"
+
+#: src/components/DegradedBanner.tsx
+msgid "本机处于降级状态"
+msgstr "本机处于降级状态"
+
+#: src/pages/MachineDetail.tsx
+msgid "本机漂移"
+msgstr "本机漂移"
+
+#: src/components/DegradedBanner.tsx
+msgid "本机的一次配置应用失败，且自动回滚也未成功。为避免进一步破坏，orciny 已停止向这台机器应用任何配置。请先在机器上确认 ~/.claude 的状态，再点击解除——解除后本机会转为「先看看」模式，差异会进收件箱而不是直接覆盖。"
+msgstr "本机的一次配置应用失败，且自动回滚也未成功。为避免进一步破坏，orciny 已停止向这台机器应用任何配置。请先在机器上确认 ~/.claude 的状态，再点击解除——解除后本机会转为「先看看」模式，差异会进收件箱而不是直接覆盖。"
 
 #: src/components/Sidebar.tsx
 #: src/pages/Machines.tsx
@@ -512,8 +679,8 @@ msgid "添加机器"
 msgstr "添加机器"
 
 #: src/pages/MachineDetail.tsx
-msgid "漂移"
-msgstr "漂移"
+#~ msgid "漂移"
+#~ msgstr "漂移"
 
 #: src/pages/MachineDetail.tsx
 msgid "漂移已忽略"
@@ -577,6 +744,18 @@ msgstr "确定删除凭据 {credName}？"
 msgid "确认"
 msgstr "确认"
 
+#: src/components/DegradedBanner.tsx
+msgid "确认已检查本机文件，并接受转为 survey？"
+msgstr "确认已检查本机文件，并接受转为 survey？"
+
+#: src/pages/Inbox.tsx
+msgid "确认收编"
+msgstr "确认收编"
+
+#: src/components/DegradedBanner.tsx
+msgid "确认解除"
+msgstr "确认解除"
+
 #: src/pages/Credentials.tsx
 msgid "确认轮换"
 msgstr "确认轮换"
@@ -618,6 +797,10 @@ msgstr "系统"
 msgid "编辑器"
 msgstr "编辑器"
 
+#: src/components/DegradedBanner.tsx
+msgid "解除降级"
+msgstr "解除降级"
+
 #: src/components/Sidebar.tsx
 msgid "订阅"
 msgstr "订阅"
@@ -648,6 +831,10 @@ msgstr "该凭据仍被配置集引用，请先去掉引用再删。"
 msgid "该功能将在 {milestone} 提供"
 msgstr "该功能将在 {milestone} 提供"
 
+#: src/components/DriftCard.tsx
+msgid "该文件含未能安全脱敏的凭据，请在 Web 上手工处理"
+msgstr "该文件含未能安全脱敏的凭据，请在 Web 上手工处理"
+
 #: src/pages/ConfigSets.tsx
 msgid "该配置集的全部版本历史将被删除，且无法恢复；已指派的机器会失去指派，但磁盘上的文件不会被动。确定删除？"
 msgstr "该配置集的全部版本历史将被删除，且无法恢复；已指派的机器会失去指派，但磁盘上的文件不会被动。确定删除？"
@@ -656,9 +843,22 @@ msgstr "该配置集的全部版本历史将被删除，且无法恢复；已指
 msgid "详情"
 msgstr "详情"
 
+#: src/lib/inbox.ts
+msgid "请先选择要收编的漂移条目"
+msgstr "请先选择要收编的漂移条目"
+
+#: src/pages/Inbox.tsx
+msgid "请取消其中一侧的选择后，再对保留侧执行收编。系统不会静默合并两边的改动。"
+msgstr "请取消其中一侧的选择后，再对保留侧执行收编。系统不会静默合并两边的改动。"
+
 #: src/components/ThemeToggle.tsx
 msgid "跟随系统"
 msgstr "跟随系统"
+
+#. placeholder {0}: c.path
+#: src/lib/inbox.ts
+msgid "路径 {0} 存在跨机器冲突，请先做三方对比"
+msgstr "路径 {0} 存在跨机器冲突，请先做三方对比"
 
 #: src/pages/Credentials.tsx
 msgid "轮换"
@@ -738,3 +938,11 @@ msgstr "重新注册"
 #: src/components/VariablesEditor.tsx
 msgid "键"
 msgstr "键"
+
+#: src/pages/MachineDetail.tsx
+msgid "降级"
+msgstr "降级"
+
+#: src/components/DriftCard.tsx
+msgid "需人工复核"
+msgstr "需人工复核"
