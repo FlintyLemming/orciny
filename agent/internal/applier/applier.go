@@ -252,8 +252,3 @@ func modeName(m uint8) string {
 	}
 	return "apply"
 }
-
-// merge 在 Task 4 实现。
-func (a *Applier) merge(abs string, s Step) error {
-	return fmt.Errorf("applier: keys 模式尚未实现")
-}
