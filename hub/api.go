@@ -109,3 +109,29 @@ func (h *Hub) ImportFindings(setID string) ([]importer.Finding, error) {
 func (h *Hub) ExtractCredential(setID, path, location, name string) error {
 	return h.importer.Extract(setID, path, location, name)
 }
+
+// AdoptDrift 收编选中的 open 漂移为新版本，并通知全部指派机器。
+func (h *Hub) AdoptDrift(eventIDs []string) (string, error) {
+	return h.AdoptDriftReviewed(eventIDs, nil)
+}
+
+// AdoptDriftReviewed 同 AdoptDrift，但允许调用方声明已人工确认的
+// restore_partial 条目（spec §8.3）。
+func (h *Hub) AdoptDriftReviewed(eventIDs, reviewed []string) (string, error) {
+	rev, err := h.drift.AdoptReviewed(eventIDs, reviewed)
+	if err != nil {
+		return "", err
+	}
+	return rev.Id, nil
+}
+
+// RestoreDrift 向相关机器下发恢复指令。状态要等 agent 回执才变。
+func (h *Hub) RestoreDrift(eventIDs []string) error {
+	return h.drift.Restore(eventIDs)
+}
+
+// IgnoreDrift 写忽略规则并立即通知来源机器。
+// global 为真时规则对全机队生效。
+func (h *Hub) IgnoreDrift(eventIDs []string, global bool) error {
+	return h.drift.Ignore(eventIDs, global)
+}

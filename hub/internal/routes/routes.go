@@ -82,6 +82,9 @@ func Register(e *core.ServeEvent, d Deps) error {
 	g.DELETE("/credentials/{id}", d.deleteCredential).Bind(su)
 	g.PUT("/machines/{id}/variables", d.setVariables).Bind(su)
 	g.POST("/machines/{id}/import", d.startImport).Bind(su)
+	g.POST("/drift/adopt", d.adoptDrift).Bind(su)
+	g.POST("/drift/restore", d.restoreDrift).Bind(su)
+	g.POST("/drift/ignore", d.ignoreDrift).Bind(su)
 
 	// 安装脚本不在 /api 下：它要能被 `curl -fsSL https://<hub>/install.sh` 直接取到。
 	// 无需认证——脚本不含秘密，token 由用户拼在命令行上（spec §9.1）。

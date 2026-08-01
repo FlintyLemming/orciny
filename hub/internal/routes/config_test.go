@@ -46,6 +46,12 @@ func (f *fakeAdmin) ImportFindings(string) ([]importer.Finding, error) {
 	return nil, nil
 }
 func (f *fakeAdmin) ExtractCredential(string, string, string, string) error { return nil }
+func (f *fakeAdmin) AdoptDrift([]string) (string, error)                   { return "rev-adopt", nil }
+func (f *fakeAdmin) AdoptDriftReviewed([]string, []string) (string, error) {
+	return "rev-adopt", nil
+}
+func (f *fakeAdmin) RestoreDrift([]string) error         { return nil }
+func (f *fakeAdmin) IgnoreDrift([]string, bool) error    { return nil }
 
 func newRouterServer(t *testing.T, d routes.Deps) *httptest.Server {
 	t.Helper()

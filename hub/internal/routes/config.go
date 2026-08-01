@@ -11,6 +11,7 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/blobs"
 	"github.com/FlintyLemming/orciny/hub/internal/configsets"
 	"github.com/FlintyLemming/orciny/hub/internal/credentials"
+	"github.com/FlintyLemming/orciny/hub/internal/drift"
 	"github.com/FlintyLemming/orciny/hub/internal/importer"
 	"github.com/FlintyLemming/orciny/hub/internal/machines"
 	"github.com/FlintyLemming/orciny/hub/internal/revisions"
@@ -32,6 +33,10 @@ type Admin interface {
 	DeleteConfigSet(setID string) error
 	ImportFindings(setID string) ([]importer.Finding, error)
 	ExtractCredential(setID, path, location, name string) error
+	AdoptDrift(eventIDs []string) (string, error)
+	AdoptDriftReviewed(eventIDs, reviewed []string) (string, error)
+	RestoreDrift(eventIDs []string) error
+	IgnoreDrift(eventIDs []string, global bool) error
 }
 
 // ---------- config sets ----------
@@ -399,6 +404,67 @@ func (d Deps) importFindings(e *core.RequestEvent) error {
 	return e.JSON(http.StatusOK, findings)
 }
 
+// ---------- drift inbox ----------
+
+func (d Deps) adoptDrift(e *core.RequestEvent) error {
+	if d.Admin == nil {
+		return e.InternalServerError("管理服务未就绪", nil)
+	}
+	var req struct {
+		Events   []string `json:"events"`
+		Reviewed []string `json:"reviewed"`
+	}
+	if err := e.BindBody(&req); err != nil || len(req.Events) == 0 {
+		return e.BadRequestError("需要 events", nil)
+	}
+	var (
+		revID string
+		err   error
+	)
+	if len(req.Reviewed) > 0 {
+		revID, err = d.Admin.AdoptDriftReviewed(req.Events, req.Reviewed)
+	} else {
+		revID, err = d.Admin.AdoptDrift(req.Events)
+	}
+	if err != nil {
+		return mapErr(e, err)
+	}
+	return e.JSON(http.StatusOK, map[string]any{"revision": revID})
+}
+
+func (d Deps) restoreDrift(e *core.RequestEvent) error {
+	if d.Admin == nil {
+		return e.InternalServerError("管理服务未就绪", nil)
+	}
+	var req struct {
+		Events []string `json:"events"`
+	}
+	if err := e.BindBody(&req); err != nil || len(req.Events) == 0 {
+		return e.BadRequestError("需要 events", nil)
+	}
+	if err := d.Admin.RestoreDrift(req.Events); err != nil {
+		return mapErr(e, err)
+	}
+	return e.NoContent(http.StatusNoContent)
+}
+
+func (d Deps) ignoreDrift(e *core.RequestEvent) error {
+	if d.Admin == nil {
+		return e.InternalServerError("管理服务未就绪", nil)
+	}
+	var req struct {
+		Events []string `json:"events"`
+		Global bool     `json:"global"`
+	}
+	if err := e.BindBody(&req); err != nil || len(req.Events) == 0 {
+		return e.BadRequestError("需要 events", nil)
+	}
+	if err := d.Admin.IgnoreDrift(req.Events, req.Global); err != nil {
+		return mapErr(e, err)
+	}
+	return e.NoContent(http.StatusNoContent)
+}
+
 // ---------- helpers ----------
 
 func (d Deps) knownRefs(app core.App) (map[string]bool, error) {
@@ -455,6 +521,19 @@ func mapErr(e *core.RequestEvent, err error) error {
 			"message": err.Error(),
 			"data":    map[string]any{},
 		})
+	case errors.Is(err, drift.ErrConflict):
+		// 跨机器同路径冲突：409 + 冲突路径（错误串里带 path）。
+		return e.JSON(http.StatusConflict, map[string]any{
+			"message": err.Error(),
+			"data":    map[string]any{"reason": "conflict"},
+		})
+	case errors.Is(err, drift.ErrNeedsReview):
+		return e.JSON(http.StatusConflict, map[string]any{
+			"message": err.Error(),
+			"data":    map[string]any{"reason": "needs_review"},
+		})
+	case errors.Is(err, drift.ErrMixedConfigSets):
+		return e.BadRequestError(err.Error(), nil)
 	case errors.Is(err, credentials.ErrShortValue),
 		errors.Is(err, credentials.ErrBadName):
 		return e.BadRequestError(err.Error(), nil)
@@ -488,5 +567,8 @@ func isBadRequest(err error) bool {
 		strings.Contains(s, "不可纳管") ||
 		strings.Contains(s, "超过") ||
 		strings.Contains(s, "mode") ||
-		strings.Contains(s, "格式")
+		strings.Contains(s, "格式") ||
+		strings.Contains(s, "未能安全脱敏") ||
+		strings.Contains(s, "没有选中") ||
+		strings.Contains(s, "已被处理过")
 }
