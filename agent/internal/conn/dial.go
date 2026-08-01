@@ -187,6 +187,9 @@ func (h *handler) OnClose(_ *gws.Conn, err error) {
 }
 
 // Dial 连接 hub 并完成握手，成功后立即上报 MachineInfo。
+// ClientReadMaxPayloadSize 返回 agent 侧 WS 的读上限，供测试核对两侧一致。
+func ClientReadMaxPayloadSize() int { return protocol.MaxPayload }
+
 func Dial(ctx context.Context, cfg Config) (*Session, error) {
 	if cfg.Rand == nil {
 		cfg.Rand = rand.Reader
@@ -205,6 +208,9 @@ func Dial(ctx context.Context, cfg Config) (*Session, error) {
 	socket, _, err := gws.NewClient(h, &gws.ClientOption{
 		Addr:             wsURL(cfg.HubURL),
 		HandshakeTimeout: cfg.HandshakeTimeout,
+		// 必须与 hub 侧同值：M1 的 ConfigSnapshot / BlobData 会逼近上限，
+		// 走库默认值会让超限连接以「莫名断开」的形式失败（spec §5.4）。
+		ReadMaxPayloadSize: protocol.MaxPayload,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("conn: 连接 hub: %w", err)

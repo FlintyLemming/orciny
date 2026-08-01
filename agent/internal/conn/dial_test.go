@@ -254,3 +254,10 @@ func TestDialFailsOnUnreachableHub(t *testing.T) {
 	})
 	require.Error(t, err)
 }
+
+// hub 与 agent 的读上限必须同源。M0 只设了 hub 侧，agent 走库默认值，
+// 而 M1 的 ConfigSnapshot / BlobData 会逼近 1 MiB（spec §5.4）。
+func TestClientReadMaxPayloadMatchesProtocol(t *testing.T) {
+	require.Equal(t, 1<<20, protocol.MaxPayload)
+	require.Equal(t, int(protocol.MaxPayload), conn.ClientReadMaxPayloadSize())
+}

@@ -76,8 +76,8 @@ func NewHandler(d Deps) *Handler {
 		h.log = d.App.Logger()
 	}
 	h.upgrader = gws.NewUpgrader(h, &gws.ServerOption{
-		// 握手报文很小，1MB 上限足够，也挡住了畸形的巨帧。
-		ReadMaxPayloadSize: 1 << 20,
+		// 与 agent 侧同源，见 protocol.MaxPayload。
+		ReadMaxPayloadSize: protocol.MaxPayload,
 	})
 	return h
 }
