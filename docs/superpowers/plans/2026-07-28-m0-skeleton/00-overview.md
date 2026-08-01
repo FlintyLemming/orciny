@@ -325,8 +325,8 @@ func (a *TestAgent) Connect(t *testing.T, th *TestHub) *agent.Session // 计划 
 
 **实测结论见 [acceptance.md](acceptance.md)。** 第 3 条与第 4 条后半待真机验收；
 第 8 条首测**未通过**（agent 连接期不消费 `inbox`，`CodeMachineRemoved` 撤销
-通知被丢弃），已在提交 `1666650` 修好并复测通过；第 5 条的「60 秒」与 spec 的
-70s 读超时不自洽，属 DoD 数字需修正。其余各条实测通过。
+通知被丢弃），已在提交 `1666650` 修好并复测通过；第 5 条的离线判定已按 M1
+spec §1.3 改为「75 秒内」（见 acceptance.md 的数字修正说明）。其余各条实测通过。
 
 | DoD # | 标准 | 由哪个子计划保证 |
 |---|---|---|
@@ -334,7 +334,7 @@ func (a *TestAgent) Connect(t *testing.T, th *TestHub) *agent.Session // 计划 
 | 2 | `docker compose up -d` 起 hub，可登录见空列表 | 09、08 |
 | 3 | 3 台真机一行接入，单台 < 2 分钟 | 09（install.sh）、04（enroll） |
 | 4 | `kill -9` → 5–10 秒转 offline，自动重启转回 online | 06、07、09（服务单元） |
-| 5 | 断网 60 秒转 offline，恢复自动重连 | 06、07 |
+| 5 | 断网 **75 秒内**转 offline，恢复自动重连 | 06、07 |
 | 6 | 重启 hub → 全部重连，无幽灵 online | 06 |
 | 7 | 篡改 `hub.pub` → 拒绝连接、明确日志、不再重试 | 05、07 |
 | 8 | UI 删除机器 → agent 收到原因并停止重试 | 06、07 |
