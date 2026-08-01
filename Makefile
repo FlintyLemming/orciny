@@ -28,6 +28,7 @@ dev:
 
 test:
 	go test -tags=testing ./...
+	cd hub/internal/site && npm test
 
 lint:
 	go vet ./...
