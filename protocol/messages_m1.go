@@ -84,11 +84,11 @@ type ConfigSnapshot struct {
 }
 
 type FileEntry struct {
-	Path string   `cbor:"0,keyasint"`
-	Hash string   `cbor:"1,keyasint"` // keys 模式为受管键子树的规范化 hash
-	Size uint32   `cbor:"2,keyasint"`
-	Mode uint32   `cbor:"3,keyasint"` // 0600 / 0644
-	Keys []string `cbor:"4,keyasint,omitempty"`
+	Path string   `cbor:"0,keyasint" json:"path"`
+	Hash string   `cbor:"1,keyasint" json:"hash"` // keys 模式为受管键子树的规范化 hash
+	Size uint32   `cbor:"2,keyasint" json:"size"`
+	Mode uint32   `cbor:"3,keyasint" json:"mode"` // 0600 / 0644
+	Keys []string `cbor:"4,keyasint,omitempty" json:"keys,omitempty"`
 }
 
 type BlobRequest struct {

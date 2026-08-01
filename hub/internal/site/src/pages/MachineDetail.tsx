@@ -9,7 +9,7 @@ import { Placeholder } from '@/components/Placeholder'
 import { navigate } from '@/router'
 import type { EventKind } from '@/types/collections'
 
-const eventLabel: Record<EventKind, React.ReactNode> = {
+const eventLabel: Partial<Record<EventKind, React.ReactNode>> = {
   'machine.enrolled': <Trans>已注册</Trans>,
   'machine.re-enrolled': <Trans>重新注册</Trans>,
   'machine.connected': <Trans>已连接</Trans>,
@@ -17,6 +17,21 @@ const eventLabel: Record<EventKind, React.ReactNode> = {
   'machine.removed': <Trans>已删除</Trans>,
   'token.issued': <Trans>签发注册 token</Trans>,
   'auth.failed': <Trans>认证失败</Trans>,
+  'configset.published': <Trans>配置集已发布</Trans>,
+  'configset.rolled_back': <Trans>配置集已回滚</Trans>,
+  'assign.changed': <Trans>指派已变更</Trans>,
+  'apply.ok': <Trans>应用成功</Trans>,
+  'apply.failed': <Trans>应用失败</Trans>,
+  'apply.rollback_failed': <Trans>回滚失败</Trans>,
+  'drift.reported': <Trans>上报漂移</Trans>,
+  'drift.adopted': <Trans>漂移已收编</Trans>,
+  'drift.restored': <Trans>漂移已恢复</Trans>,
+  'drift.ignored': <Trans>漂移已忽略</Trans>,
+  'drift.superseded': <Trans>漂移已覆盖</Trans>,
+  'credential.created': <Trans>凭据已创建</Trans>,
+  'credential.rotated': <Trans>凭据已轮换</Trans>,
+  'credential.deleted': <Trans>凭据已删除</Trans>,
+  'import.completed': <Trans>导入完成</Trans>,
 }
 
 export function MachineDetail({ id }: { id: string }) {
