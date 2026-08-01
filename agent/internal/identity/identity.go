@@ -36,6 +36,13 @@ var (
 	ErrNoIdentity = errors.New("identity: 本机尚无 agent 密钥，请先执行 orciny-agent enroll")
 	// ErrNoHubKey 表示还没钉扎 hub 公钥。
 	ErrNoHubKey = errors.New("identity: 尚未钉扎 hub 公钥，请先执行 orciny-agent enroll")
+	// ErrHubKeyUnusable 表示钉扎的 hub 公钥无法使用（文件损坏、长度不对、
+	// 不是合法 base64）。
+	//
+	// 它与「签名验证失败」同等对待，都进 Compromised 终态：一个被替换成垃圾
+	// 的钉扎公钥同样属于「需要人来判断」的情形（M0 spec §7.2 的精神，
+	// M1 spec §1.3 第 1 条）。自作主张重试只会掩盖问题。
+	ErrHubKeyUnusable = errors.New("identity: 钉扎的 hub 公钥无法使用")
 )
 
 // Identity 是本机的密钥对。
@@ -120,8 +127,9 @@ func PinHubKey(dir string, pub ed25519.PublicKey) error {
 
 // LoadHubKey 读取钉扎的 hub 公钥。
 //
-// 解析失败一律是硬错误：hub.pub 被改动意味着要么遭中间人，要么 hub 换了
-// 密钥，两种情况都需要人来判断（spec §7.2）。
+// 解析失败一律包装为 ErrHubKeyUnusable：hub.pub 被改动意味着要么遭中间人，
+// 要么文件损坏，两种情况都需要人来判断（spec §7.2 / M1 §1.3）。
+// 缺文件仍是 ErrNoHubKey——那是「还没 enroll」，不是「被破坏」。
 func LoadHubKey(dir string) (ed25519.PublicKey, error) {
 	path := filepath.Join(dir, HubKeyFile)
 	b, err := os.ReadFile(path)
@@ -129,11 +137,11 @@ func LoadHubKey(dir string) (ed25519.PublicKey, error) {
 		return nil, ErrNoHubKey
 	}
 	if err != nil {
-		return nil, fmt.Errorf("identity: 读取 %s: %w", path, err)
+		return nil, fmt.Errorf("%w: 读取 %s: %v", ErrHubKeyUnusable, path, err)
 	}
 	pub, err := protocol.DecodePublicKey(strings.TrimSpace(string(b)))
 	if err != nil {
-		return nil, fmt.Errorf("identity: %s 内容无法解析为 hub 公钥: %w", path, err)
+		return nil, fmt.Errorf("%w: %s 内容无法解析（%v）", ErrHubKeyUnusable, path, err)
 	}
 	return pub, nil
 }

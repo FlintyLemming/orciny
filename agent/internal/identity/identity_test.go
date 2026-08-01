@@ -105,7 +105,8 @@ func TestLoadHubKeyRejectsGarbage(t *testing.T) {
 	_, err := identity.LoadHubKey(dir)
 	require.Error(t, err)
 	// 被篡改的 hub.pub 会导致 agent 进入 Compromised（spec §7.2），
-	// 因此这里必须是硬错误，不能容错解析。
+	// 因此这里必须是硬错误，且能被 errors.Is 识别为 ErrHubKeyUnusable。
+	require.ErrorIs(t, err, identity.ErrHubKeyUnusable)
 }
 
 // 钉扎是一次性的：PinHubKey 覆盖已有文件的行为要明确。

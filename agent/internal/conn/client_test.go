@@ -2,7 +2,10 @@ package conn_test
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -10,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/FlintyLemming/orciny/agent/internal/conn"
+	"github.com/FlintyLemming/orciny/agent/internal/identity"
 	"github.com/FlintyLemming/orciny/internal/clock"
 	"github.com/FlintyLemming/orciny/protocol"
 )
@@ -214,6 +218,62 @@ func TestConnectedRejectionUsesFixedInterval(t *testing.T) {
 	sess.CloseForTest(&conn.RejectedError{Code: protocol.CodeUnknownFingerprint, Reason: "未登记"})
 
 	waitAndFire(t, clk, d, 5*time.Minute)
+}
+
+// hub.pub 被替换成垃圾时必须进 Compromised 终态，而不是无限重试。
+//
+// M0 验收记录 AB：那串被误当成合法的公钥其实是 SSH 格式，48 字节，
+// agent 在**加载**阶段就报错，走不到签名验证，于是落进通用退避
+// ——这条路径必须与签名验证失败同等对待（spec §1.3）。
+func TestCorruptHubKeyEntersCompromised(t *testing.T) {
+	for name, content := range map[string]string{
+		"垃圾内容": "这不是 base64!!!",
+		"长度不对": base64.StdEncoding.EncodeToString(make([]byte, 48)),
+		"空文件":  "",
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			idDir := filepath.Join(dir, identity.DirName)
+			_, err := identity.LoadOrCreate(idDir)
+			require.NoError(t, err)
+			require.NoError(t, os.WriteFile(
+				filepath.Join(idDir, identity.HubKeyFile), []byte(content), 0o600))
+
+			// Dial 直接走 LoadHubKey 的失败路径，模拟 Connect 的行为。
+			clk := clock.NewFake(epoch)
+			var states []conn.State
+			var mu sync.Mutex
+			c := conn.NewClient(conn.ClientConfig{
+				Dial: func(ctx context.Context) (*conn.Session, error) {
+					_, err := identity.LoadHubKey(idDir)
+					return nil, err
+				},
+				Clock: clk,
+				OnState: func(s conn.State, _ error) {
+					mu.Lock()
+					states = append(states, s)
+					mu.Unlock()
+				},
+			})
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			done := make(chan error, 1)
+			go func() { done <- c.Run(ctx) }()
+
+			select {
+			case err := <-done:
+				require.Error(t, err, "必须以终局错误退出，而不是继续重试")
+				require.ErrorIs(t, err, identity.ErrHubKeyUnusable)
+			case <-time.After(2 * time.Second):
+				t.Fatal("Run 未退出——说明它在无限重试")
+			}
+
+			mu.Lock()
+			defer mu.Unlock()
+			require.Contains(t, states, conn.StateCompromised)
+		})
+	}
 }
 
 func TestHubSignatureFailureEntersCompromised(t *testing.T) {

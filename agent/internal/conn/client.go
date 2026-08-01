@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/FlintyLemming/orciny/agent/internal/identity"
 	"github.com/FlintyLemming/orciny/internal/clock"
 	"github.com/FlintyLemming/orciny/protocol"
 )
@@ -164,6 +165,17 @@ func (c *Client) classify(err error) (time.Duration, error) {
 		c.setState(StateCompromised, err)
 		c.cfg.Logger.Error("hub 签名验证失败，停止一切重试。"+
 			"请确认 hub 是否更换过密钥，或本机是否遭到中间人攻击",
+			"error", err)
+		return 0, err
+	}
+
+	// 钉扎的 hub.pub 无法解析：与签名失败同等对待，进 Compromised
+	// （M1 spec §1.3 第 1 条 / M0 验收记录 AB）。
+	if errors.Is(err, identity.ErrHubKeyUnusable) {
+		c.setState(StateCompromised, err)
+		c.cfg.Logger.Error("钉扎的 hub 公钥无法使用，停止一切重试。"+
+			"这可能意味着密钥文件被损坏或篡改。请确认 hub 身份后重新 enroll："+
+			"orciny-agent enroll --hub <url> --token <token>",
 			"error", err)
 		return 0, err
 	}
