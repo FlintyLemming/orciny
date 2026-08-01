@@ -233,3 +233,10 @@ func TestRepeatedSnapshotIsIdempotent(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, first.ModTime(), after.ModTime(), "第二次不该碰文件")
 }
+
+func writeManaged(t *testing.T, r *rig, rel, content string) {
+	t.Helper()
+	p := filepath.Join(r.home, filepath.FromSlash(rel))
+	require.NoError(t, os.MkdirAll(filepath.Dir(p), 0o755))
+	require.NoError(t, os.WriteFile(p, []byte(content), 0o644))
+}

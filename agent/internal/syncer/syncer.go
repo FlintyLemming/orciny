@@ -108,6 +108,14 @@ func (s *Syncer) Handle(env protocol.Envelope) {
 			return
 		}
 		s.onBlob(bd)
+
+	case protocol.KindCollectRequest:
+		req, err := protocol.DecodePayload[protocol.CollectRequest](env)
+		if err != nil {
+			s.log.Warn("解析 CollectRequest 失败", "error", err)
+			return
+		}
+		s.collect(req)
 	}
 }
 
