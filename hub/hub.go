@@ -22,6 +22,7 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/events"
 	"github.com/FlintyLemming/orciny/hub/internal/handshake"
 	"github.com/FlintyLemming/orciny/hub/internal/identity"
+	"github.com/FlintyLemming/orciny/hub/internal/importer"
 	"github.com/FlintyLemming/orciny/hub/internal/machines"
 	"github.com/FlintyLemming/orciny/hub/internal/revisions"
 	"github.com/FlintyLemming/orciny/hub/internal/routes"
@@ -47,6 +48,7 @@ type Hub struct {
 	blobs    *blobs.Store
 	sets     *configsets.Service
 	revs     *revisions.Service
+	importer *importer.Service
 	sync     *configsync.Service
 
 	// pb 仅在 New 创建时非 nil。Attach 出来的实例由调用方驱动 serve。
@@ -113,10 +115,13 @@ func Attach(app core.App, cfg Config) (*Hub, error) {
 		h.blobs = blobs.New(e.App)
 		h.sets = configsets.NewService(e.App, h.blobs, h.events)
 		h.revs = revisions.NewService(e.App, h.blobs, h.events)
+		// 先建 importer（它要 Sender = h.machines），再建 configsync（它要 Importer）。
+		// 两者互相需要，但依赖方向是单向的，不存在真正的循环。
+		h.importer = importer.NewService(e.App, h.blobs, h.sets, h.creds, h.events, h.machines)
 		h.sync = configsync.NewService(configsync.Deps{
 			App: e.App, Blobs: h.blobs, Sets: h.sets, Revs: h.revs,
 			Creds: h.creds, Events: h.events, Sender: h.machines,
-			Logger: e.App.Logger(),
+			Importer: h.importer, Logger: e.App.Logger(),
 		})
 		// 离线补发：agent 一上线就无条件通知一次，幂等保证它在无事可做时
 		// 是零写入（spec §7.3）。
@@ -185,7 +190,7 @@ func (h *Hub) PublicKey() ed25519.PublicKey {
 }
 
 // IssueEnrollToken 签发一枚一次性注册 token。
-// 这是 hub 包对外暴露的唯一「管理动作」，供测试脚手架绕开 HTTP 认证使用。
+// 管理动作入口见 api.go；本方法历史最久，保留在这里。
 func (h *Hub) IssueEnrollToken() (string, time.Time, error) {
 	return h.enroll.IssueToken()
 }

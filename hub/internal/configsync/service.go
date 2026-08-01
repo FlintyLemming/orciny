@@ -35,6 +35,11 @@ type Deps struct {
 	Events *events.Writer
 	Sender Sender
 	Logger *slog.Logger
+	// Importer 处理采集结果。configsync 只做转交——把它做成接口而不是
+	// 直接依赖 importer 包，是因为 importer 也要 Sender，直接互相 import 会成环。
+	Importer interface {
+		HandleResult(machineID string, r protocol.CollectResult) error
+	}
 }
 
 type Service struct {
@@ -176,7 +181,12 @@ func (s *Service) DriftReport(machineID string, _ protocol.DriftReport) {
 	s.log.Debug("收到漂移上报（尚未接入处理）", "machine", machineID)
 }
 
-// CollectResult 在子计划 09 接上 importer.Service。
-func (s *Service) CollectResult(machineID string, _ protocol.CollectResult) {
-	s.log.Debug("收到采集结果（尚未接入处理）", "machine", machineID)
+func (s *Service) CollectResult(machineID string, r protocol.CollectResult) {
+	if s.d.Importer == nil {
+		s.log.Debug("未装配导入服务，忽略采集结果", "machine", machineID)
+		return
+	}
+	if err := s.d.Importer.HandleResult(machineID, r); err != nil {
+		s.log.Warn("处理采集结果失败", "machine", machineID, "error", err)
+	}
 }
