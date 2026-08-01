@@ -29,8 +29,29 @@ func newRootCmd() *cobra.Command {
 	root.PersistentFlags().String("dir", "", "agent 数据目录（默认 $ORCINY_HOME 或 ~/.orciny）")
 	root.AddCommand(newVersionCmd())
 	root.AddCommand(newEnrollCmd())
-	root.AddCommand(newRunCmd(), newStatusCmd())
+	root.AddCommand(newRunCmd(), newStatusCmd(), newSyncCmd())
 	return root
+}
+
+func newSyncCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "sync",
+		Short: "立即从 hub 拉取并应用当前配置",
+		Long: `立即从 hub 拉取当前指派的配置集并 apply，打印计划与结果后退出。
+
+本命令会短暂中断常驻 agent 的连接，它会在几秒内自动重连。`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			dir := dirFromFlags(cmd)
+			if _, err := loadConfigForCmd(dir); err != nil {
+				return err
+			}
+			rep, err := SyncOnce(cmd.Context(), SyncOptions{Dir: dir, Logger: slog.Default()})
+			if rep != nil {
+				fmt.Fprint(cmd.OutOrStdout(), formatSyncReport(rep))
+			}
+			return err
+		},
+	}
 }
 
 func newRunCmd() *cobra.Command {
@@ -73,7 +94,7 @@ func newRunCmd() *cobra.Command {
 func newStatusCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "status",
-		Short: "查看连接状态、hub 地址、指纹与版本",
+		Short: "查看连接状态、配置版本、健康与漂移",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			dir := dirFromFlags(cmd)
 			out := cmd.OutOrStdout()
@@ -91,6 +112,10 @@ func newStatusCmd() *cobra.Command {
 			fmt.Fprintf(out, "机器指纹   %s\n", id.Fingerprint())
 			fmt.Fprintf(out, "agent 版本 %s\n", orciny.Version)
 
+			if home, err := cfg.ManagedHomeDir(); err == nil {
+				fmt.Fprintf(out, "受管 HOME  %s\n", home)
+			}
+
 			st, err := LoadStatus(dir)
 			switch {
 			case errors.Is(err, os.ErrNotExist):
@@ -104,6 +129,8 @@ func newStatusCmd() *cobra.Command {
 					fmt.Fprintf(out, "最近错误   %s\n", st.LastError)
 				}
 			}
+
+			printConfigStatus(out, dir)
 			return nil
 		},
 	}

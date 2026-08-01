@@ -10,6 +10,7 @@ import (
 	"github.com/FlintyLemming/orciny/agent/internal/conn"
 	"github.com/FlintyLemming/orciny/agent/internal/identity"
 	"github.com/FlintyLemming/orciny/agent/internal/probe"
+	"github.com/FlintyLemming/orciny/agent/internal/state"
 	"github.com/FlintyLemming/orciny/protocol"
 )
 
@@ -45,15 +46,35 @@ func Connect(ctx context.Context, o ConnectOptions) (*Session, error) {
 		return nil, err
 	}
 
+	info := probe.Collect(ctx, orciny.Version)
+	// pause 是本地开关：握手时带上，让面板知道本机当前是否暂停配置管理。
+	if st, err := state.Load(o.Dir); err == nil {
+		info.LocalPaused = st.Paused
+		info.ManagedHome = managedHomeFromConfig(o.Dir)
+	}
+
 	return conn.Dial(ctx, conn.Config{
 		HubURL:           o.HubURL,
 		Identity:         id,
 		HubPub:           hubPub,
 		AgentVersion:     orciny.Version,
-		Info:             probe.Collect(ctx, orciny.Version),
+		Info:             info,
 		HandshakeTimeout: o.HandshakeTimeout,
 		ReadTimeout:      o.ReadTimeout,
 		Logger:           o.Logger,
 		OnMessage:        o.OnMessage,
 	})
+}
+
+// managedHomeFromConfig 读配置里的 managed_home；读不到就留空，不阻断握手。
+func managedHomeFromConfig(dir string) string {
+	cfg, err := LoadConfig(dir)
+	if err != nil {
+		return ""
+	}
+	home, err := cfg.ManagedHomeDir()
+	if err != nil {
+		return ""
+	}
+	return home
 }

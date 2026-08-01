@@ -32,6 +32,9 @@ type Deps struct {
 	Send              func(kind protocol.Kind, payload any) error
 	MachineName       string        // 面板上的备注名，供 {{machine.name}}
 	ReconcileInterval time.Duration // 0 → watcher 默认 5m
+	// OnApplied 在一次 apply（含失败回滚）完成后回调。CLI 的 sync 靠它
+	// 拿到 plan 与回执；常驻进程不设。survey 模式不触发（没有 ApplyAck）。
+	OnApplied func(ack protocol.ApplyAck, plan applier.Plan)
 }
 
 type Syncer struct {
@@ -193,11 +196,15 @@ func (s *Syncer) onBlob(bd protocol.BlobData) {
 		// hub 都找不到内容，本次彻底做不成——明确报回去，
 		// 绝不带着半份清单去写盘（spec §7.4「宁可不动」）。
 		s.log.Error("hub 找不到所需内容，已中止本次 apply", "hash", bd.Hash)
-		_ = s.d.Send(protocol.KindApplyAck, protocol.ApplyAck{
+		ack := protocol.ApplyAck{
 			RevisionID: rev,
 			OK:         false,
 			Error:      fmt.Sprintf("hub 缺少内容 %s，未做任何改动", bd.Hash),
-		})
+		}
+		_ = s.d.Send(protocol.KindApplyAck, ack)
+		if s.d.OnApplied != nil {
+			s.d.OnApplied(ack, applier.Plan{})
+		}
 		return
 	}
 	s.mu.Unlock()
@@ -235,9 +242,11 @@ func (s *Syncer) applyPending() {
 		s.log.Error("凑齐内容失败", "error", err)
 		// survey 没有 ApplyAck 通道可报；apply 才回执失败。
 		if snap.Mode != protocol.ModeSurvey {
-			_ = s.d.Send(protocol.KindApplyAck, protocol.ApplyAck{
-				RevisionID: snap.RevisionID, OK: false, Error: err.Error(),
-			})
+			ack := protocol.ApplyAck{RevisionID: snap.RevisionID, OK: false, Error: err.Error()}
+			_ = s.d.Send(protocol.KindApplyAck, ack)
+			if s.d.OnApplied != nil {
+				s.d.OnApplied(ack, applier.Plan{})
+			}
 		}
 		return
 	}
@@ -258,9 +267,11 @@ func (s *Syncer) applyPending() {
 	plan, err := applier.BuildPlan(snap, st, content, sec.Lookup)
 	if err != nil {
 		s.log.Error("生成 apply 计划失败", "error", err)
-		_ = s.d.Send(protocol.KindApplyAck, protocol.ApplyAck{
-			RevisionID: snap.RevisionID, OK: false, Error: err.Error(),
-		})
+		ack := protocol.ApplyAck{RevisionID: snap.RevisionID, OK: false, Error: err.Error()}
+		_ = s.d.Send(protocol.KindApplyAck, ack)
+		if s.d.OnApplied != nil {
+			s.d.OnApplied(ack, applier.Plan{})
+		}
 		return
 	}
 
@@ -287,6 +298,9 @@ func (s *Syncer) applyPending() {
 		"ok", ack.OK, "writes", plan.Writes(), "rolled_back", ack.RolledBack)
 	if err := s.d.Send(protocol.KindApplyAck, ack); err != nil {
 		s.log.Warn("上报回执失败", "error", err)
+	}
+	if s.d.OnApplied != nil {
+		s.d.OnApplied(ack, plan)
 	}
 }
 
