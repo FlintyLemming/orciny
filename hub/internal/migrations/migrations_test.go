@@ -89,3 +89,123 @@ func TestEnrollTokensAndEventsFields(t *testing.T) {
 	require.Equal(t, machines.Id, rel.CollectionId)
 	require.False(t, rel.Required, "机器被删后事件仍要保留，因此 machine 可空")
 }
+
+func TestM1CollectionsExist(t *testing.T) {
+	app := newApp(t)
+	for _, name := range []string{
+		"blobs", "config_sets", "revisions", "assignments",
+		"credentials", "variables", "drift_events", "ignore_rules",
+	} {
+		c, err := app.FindCollectionByNameOrId(name)
+		require.NoError(t, err, "collection %s 必须存在", name)
+		require.Nil(t, c.ListRule, "%s 的 list rule 必须是 nil（仅 superuser）", name)
+		require.Nil(t, c.ViewRule, "%s 的 view rule 必须是 nil", name)
+		require.Nil(t, c.CreateRule, "%s 的 create rule 必须是 nil", name)
+		require.Nil(t, c.UpdateRule, "%s 的 update rule 必须是 nil", name)
+		require.Nil(t, c.DeleteRule, "%s 的 delete rule 必须是 nil", name)
+	}
+}
+
+func TestConfigSetHeadIsRelationToRevisions(t *testing.T) {
+	app := newApp(t)
+	sets, err := app.FindCollectionByNameOrId("config_sets")
+	require.NoError(t, err)
+	revs, err := app.FindCollectionByNameOrId("revisions")
+	require.NoError(t, err)
+
+	head, ok := sets.Fields.GetByName("head").(*core.RelationField)
+	require.True(t, ok, "config_sets.head 必须是 relation")
+	require.Equal(t, revs.Id, head.CollectionId)
+}
+
+func TestRevisionsSeqIsUniquePerConfigSet(t *testing.T) {
+	app := newApp(t)
+	sets, err := app.FindCollectionByNameOrId("config_sets")
+	require.NoError(t, err)
+	set := core.NewRecord(sets)
+	set.Set("name", "主力配置")
+	require.NoError(t, app.Save(set))
+
+	revs, err := app.FindCollectionByNameOrId("revisions")
+	require.NoError(t, err)
+	mk := func(setID string, seq int) *core.Record {
+		r := core.NewRecord(revs)
+		r.Set("config_set", setID)
+		r.Set("seq", seq)
+		r.Set("files", []any{})
+		r.Set("manifest", map[string]any{"version": 1})
+		r.Set("checksum", "deadbeef")
+		r.Set("source", "publish")
+		return r
+	}
+	require.NoError(t, app.Save(mk(set.Id, 1)))
+	require.Error(t, app.Save(mk(set.Id, 1)), "同一配置集内 seq 必须唯一")
+
+	other := core.NewRecord(sets)
+	other.Set("name", "另一份")
+	require.NoError(t, app.Save(other))
+	require.NoError(t, app.Save(mk(other.Id, 1)), "不同配置集的 seq 互不干扰")
+}
+
+func TestAssignmentsOneConfigSetPerMachine(t *testing.T) {
+	app := newApp(t)
+	machines, err := app.FindCollectionByNameOrId("machines")
+	require.NoError(t, err)
+	m := core.NewRecord(machines)
+	m.Set("fingerprint", "fp-1")
+	m.Set("pub_key", "pk-1")
+	m.Set("status", "offline")
+	require.NoError(t, app.Save(m))
+
+	sets, err := app.FindCollectionByNameOrId("config_sets")
+	require.NoError(t, err)
+	mkSet := func(name string) string {
+		r := core.NewRecord(sets)
+		r.Set("name", name)
+		require.NoError(t, app.Save(r))
+		return r.Id
+	}
+
+	as, err := app.FindCollectionByNameOrId("assignments")
+	require.NoError(t, err)
+	mk := func(setID string) *core.Record {
+		r := core.NewRecord(as)
+		r.Set("machine", m.Id)
+		r.Set("config_set", setID)
+		r.Set("mode", "apply")
+		r.Set("state", "pending")
+		return r
+	}
+	require.NoError(t, app.Save(mk(mkSet("a"))))
+	require.Error(t, app.Save(mk(mkSet("b"))), "一机一配置集由唯一索引强制")
+}
+
+// 同一路径同一时刻只能有一条待处理漂移；已解决的不占位（部分唯一索引）。
+func TestDriftEventsOpenPathIsUnique(t *testing.T) {
+	app := newApp(t)
+	machines, err := app.FindCollectionByNameOrId("machines")
+	require.NoError(t, err)
+	m := core.NewRecord(machines)
+	m.Set("fingerprint", "fp-2")
+	m.Set("pub_key", "pk-2")
+	m.Set("status", "offline")
+	require.NoError(t, app.Save(m))
+
+	de, err := app.FindCollectionByNameOrId("drift_events")
+	require.NoError(t, err)
+	mk := func(state string) *core.Record {
+		r := core.NewRecord(de)
+		r.Set("machine", m.Id)
+		r.Set("path", ".claude/CLAUDE.md")
+		r.Set("kind", "modified")
+		r.Set("state", state)
+		return r
+	}
+	first := mk("open")
+	require.NoError(t, app.Save(first))
+	require.Error(t, app.Save(mk("open")), "同一路径只能有一条 open 漂移")
+
+	first.Set("state", "adopted")
+	require.NoError(t, app.Save(first))
+	require.NoError(t, app.Save(mk("open")), "旧的已收编，新的 open 应当可以建")
+}
