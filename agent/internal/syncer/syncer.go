@@ -230,25 +230,28 @@ func (s *Syncer) applyPending() {
 	s.pending, s.waiting = nil, nil
 	s.mu.Unlock()
 
-	// survey 模式不写盘（spec §7.6）：只做一次全量对账，
-	// 由子计划 15 接上上报路径。
+	content, err := s.contentFor(snap)
+	if err != nil {
+		s.log.Error("凑齐内容失败", "error", err)
+		// survey 没有 ApplyAck 通道可报；apply 才回执失败。
+		if snap.Mode != protocol.ModeSurvey {
+			_ = s.d.Send(protocol.KindApplyAck, protocol.ApplyAck{
+				RevisionID: snap.RevisionID, OK: false, Error: err.Error(),
+			})
+		}
+		return
+	}
+
+	// survey 模式不写盘（spec §7.6）：只做一次全量对账，把所有差异作为
+	// 漂移上报，由用户在收件箱里逐条决定收编还是恢复。
 	if snap.Mode == protocol.ModeSurvey {
-		s.log.Info("survey 模式，不写盘", "revision", snap.RevisionID)
+		s.survey(snap, content)
 		return
 	}
 
 	sec, err := secrets.Load(s.d.Dir)
 	if err != nil {
 		s.log.Error("读取凭据缓存失败", "error", err)
-		return
-	}
-
-	content, err := s.contentFor(snap)
-	if err != nil {
-		s.log.Error("凑齐内容失败", "error", err)
-		_ = s.d.Send(protocol.KindApplyAck, protocol.ApplyAck{
-			RevisionID: snap.RevisionID, OK: false, Error: err.Error(),
-		})
 		return
 	}
 
@@ -284,6 +287,82 @@ func (s *Syncer) applyPending() {
 		"ok", ack.OK, "writes", plan.Writes(), "rolled_back", ack.RolledBack)
 	if err := s.d.Send(protocol.KindApplyAck, ack); err != nil {
 		s.log.Warn("上报回执失败", "error", err)
+	}
+}
+
+// survey 用快照清单当基线做一次全量对账。
+//
+// 基线不能取 state.json ——本机可能根本没有（第一次指派、或者状态丢失）。
+// 因此用快照造一份「虚拟 state」：Blob 填清单里的 hash，Rendered 留空。
+// Rendered 留空是要紧的：填一个假值会让对账误判「一致」而漏报。
+// Scan 在 Rendered 为空时会回退到 blob 渲染结果做比对，因此内容真的一致
+// 时仍然安静。
+//
+// Health 写成 ok：degraded 解除后 hub 会下发 survey 快照，靠这条路径
+// 顺手清掉本机的 degraded 标记，不需要额外的协议消息。
+func (s *Syncer) survey(snap protocol.ConfigSnapshot, content map[string][]byte) {
+	sec, err := secrets.Load(s.d.Dir)
+	if err != nil {
+		s.log.Error("读取凭据缓存失败", "error", err)
+		return
+	}
+
+	virtual := &state.State{
+		ConfigSet: snap.ConfigSetID,
+		Revision:  snap.RevisionID,
+		Seq:       snap.Seq,
+		Checksum:  snap.Checksum,
+		Mode:      "survey",
+		Health:    state.HealthOK,
+		Files:     map[string]state.FileState{},
+		Ignored:   snap.IgnorePaths,
+		Manifest:  append(json.RawMessage(nil), snap.Manifest...),
+		AppliedAt: s.d.Clock.Now().UTC(),
+	}
+	for _, f := range snap.Files {
+		virtual.Files[f.Path] = state.FileState{
+			Blob: f.Hash, Mode: f.Mode, Size: f.Size, Keys: f.Keys,
+			// Rendered 故意留空：磁盘上从未写过这份内容。
+		}
+	}
+	// 内容也进本地缓存：收编 / 恢复 / 转 apply 时都要用得到，
+	// 而且它们可能发生在 hub 离线的时候。
+	for hash, raw := range content {
+		if err := s.cache.PutHash(hash, raw); err != nil {
+			s.log.Warn("缓存基线内容失败", "hash", hash, "error", err)
+		}
+	}
+
+	if err := state.Save(s.d.Dir, virtual); err != nil {
+		s.log.Error("写 state.json 失败", "error", err)
+	}
+	s.mu.Lock()
+	s.st = virtual
+	s.sec = sec
+	s.mu.Unlock()
+
+	w, err := s.ensureWatcher()
+	if err != nil {
+		s.log.Error("创建 watcher 失败", "error", err)
+		return
+	}
+	m, err := s.manifestOf(virtual)
+	if err != nil {
+		s.log.Error("解析 manifest 失败", "error", err)
+		return
+	}
+	if err := w.Reload(virtual, m, sec); err != nil {
+		s.log.Error("重载对账基线失败", "error", err)
+		return
+	}
+	items, err := w.Scan(true)
+	if err != nil {
+		s.log.Error("全量对账失败", "error", err)
+		return
+	}
+	s.log.Info("survey 全量对账完成", "revision", snap.RevisionID, "drifts", len(items))
+	if err := s.Report(items, true); err != nil {
+		s.log.Warn("上报对账结果失败", "error", err)
 	}
 }
 

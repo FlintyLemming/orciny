@@ -208,7 +208,18 @@ func (w *Watcher) Scan(full bool) ([]protocol.DriftItem, error) {
 
 		curHash := compareHash(content, keys)
 		fs, inBase := st.Files[e.Rel]
-		if inBase && fs.Rendered == curHash {
+		// 比对口径：优先用 Rendered（apply 后的真实基线）。
+		// Rendered 为空时（survey / 状态丢失自愈）回退到 blob 渲染结果——
+		// 磁盘从未被我们写过，但「与中台一致」仍然应该安静（spec §7.6）。
+		// 填假 Rendered 会误判一致而漏报；真的一致则靠这条回退路径安静。
+		baseHash := ""
+		if inBase {
+			baseHash = fs.Rendered
+			if baseHash == "" && fs.Blob != "" {
+				baseHash = expectedHash(w.cache, fs, sec, keys)
+			}
+		}
+		if inBase && baseHash != "" && baseHash == curHash {
 			continue // 与基线一致
 		}
 
@@ -218,7 +229,7 @@ func (w *Watcher) Scan(full bool) ([]protocol.DriftItem, error) {
 		}
 		if inBase {
 			it.Kind = protocol.DriftModified
-			it.BaseHash = fs.Rendered
+			it.BaseHash = baseHash
 		} else {
 			it.Kind = protocol.DriftAdded
 		}
@@ -296,6 +307,26 @@ func compareHash(content []byte, keys []string) string {
 		return CanonicalKeysHash(content, keys)
 	}
 	return blobcache.Hash(content)
+}
+
+// expectedHash 在 Rendered 为空时，用 blob 渲染结果推期望 hash。
+// 渲染失败（缺凭据等）返回空串，调用方会保守地报 modified。
+func expectedHash(cache *blobcache.Cache, fs state.FileState, sec *secrets.File, keys []string) string {
+	raw, err := cache.Get(fs.Blob)
+	if err != nil {
+		return ""
+	}
+	look := func(r protocol.Ref) (string, bool) {
+		if sec == nil {
+			return "", false
+		}
+		return sec.Lookup(r)
+	}
+	rendered, err := render.Render(raw, look)
+	if err != nil {
+		return ""
+	}
+	return compareHash(rendered, keys)
 }
 
 func ignored(patterns []string, rel string) bool {
