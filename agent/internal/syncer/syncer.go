@@ -6,28 +6,32 @@
 package syncer
 
 import (
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/FlintyLemming/orciny/agent/internal/applier"
 	"github.com/FlintyLemming/orciny/agent/internal/blobcache"
 	"github.com/FlintyLemming/orciny/agent/internal/secrets"
 	"github.com/FlintyLemming/orciny/agent/internal/state"
+	"github.com/FlintyLemming/orciny/agent/internal/watcher"
 	"github.com/FlintyLemming/orciny/internal/clock"
 	"github.com/FlintyLemming/orciny/protocol"
 )
 
 type Deps struct {
-	Dir         string // agent 目录（~/.orciny）
-	ManagedHome string
-	Clock       clock.Clock
-	Logger      *slog.Logger
-	FS          applier.FS
-	Send        func(kind protocol.Kind, payload any) error
-	MachineName string // 面板上的备注名，供 {{machine.name}}
+	Dir               string // agent 目录（~/.orciny）
+	ManagedHome       string
+	Clock             clock.Clock
+	Logger            *slog.Logger
+	FS                applier.FS
+	Send              func(kind protocol.Kind, payload any) error
+	MachineName       string        // 面板上的备注名，供 {{machine.name}}
+	ReconcileInterval time.Duration // 0 → watcher 默认 5m
 }
 
 type Syncer struct {
@@ -38,6 +42,8 @@ type Syncer struct {
 
 	mu      sync.Mutex
 	st      *state.State
+	sec     *secrets.File
+	watcher *watcher.Watcher
 	pending *protocol.ConfigSnapshot // 正在等 blob 的快照
 	waiting map[string]bool          // 还没到的 hash
 	content map[string][]byte        // 本次已凑齐的内容
@@ -116,20 +122,19 @@ func (s *Syncer) Handle(env protocol.Envelope) {
 			return
 		}
 		s.collect(req)
+
+	case protocol.KindDriftCommand:
+		cmd, err := protocol.DecodePayload[protocol.DriftCommand](env)
+		if err != nil {
+			s.log.Warn("解析 DriftCommand 失败", "error", err)
+			return
+		}
+		s.onDriftCommand(cmd)
 	}
 }
 
 // SyncNow 主动拉一次（CLI 的 orciny-agent sync）。
 func (s *Syncer) SyncNow() error { return s.pull() }
-
-// Report 上报漂移。子计划 13 接上 watcher 后会真正使用。
-func (s *Syncer) Report(items []protocol.DriftItem, full bool) error {
-	return s.d.Send(protocol.KindDriftReport, protocol.DriftReport{
-		Items: items,
-		Final: true,
-		Full:  full,
-	})
-}
 
 func (s *Syncer) pull() error {
 	have := ""
@@ -262,11 +267,17 @@ func (s *Syncer) applyPending() {
 			Path: sk.Rel, Action: protocol.ActionSkip, Error: sk.Reason,
 		})
 	}
+	// Manifest 随成功的快照冻结：watcher 与恢复都要用它展开受管范围（spec §4.1）。
+	if ack.OK && len(snap.Manifest) > 0 {
+		next.Manifest = json.RawMessage(append([]byte(nil), snap.Manifest...))
+	}
 	if err := state.Save(s.d.Dir, next); err != nil {
 		s.log.Error("写 state.json 失败", "error", err)
 	}
 	s.mu.Lock()
 	s.st = next
+	s.sec = sec
+	s.reloadWatcherLocked()
 	s.mu.Unlock()
 
 	s.log.Info("apply 完成", "revision", snap.RevisionID,
@@ -320,5 +331,11 @@ func (s *Syncer) saveSecrets(snap protocol.ConfigSnapshot) error {
 	if f.Vars == nil {
 		f.Vars = map[string]string{}
 	}
-	return secrets.Save(s.d.Dir, f)
+	if err := secrets.Save(s.d.Dir, f); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.sec = f
+	s.mu.Unlock()
+	return nil
 }

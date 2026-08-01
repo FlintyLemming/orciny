@@ -80,10 +80,11 @@ func Run(ctx context.Context, o RunOptions) error {
 			// 连接断了旧的 syncer 也就该退场。state.json 是跨连接的持久层。
 			var sess *Session
 			sync, err := syncer.New(syncer.Deps{
-				Dir:         o.Dir,
-				ManagedHome: managedHome,
-				Clock:       clock.System(),
-				Logger:      o.Logger,
+				Dir:               o.Dir,
+				ManagedHome:       managedHome,
+				Clock:             clock.System(),
+				Logger:            o.Logger,
+				ReconcileInterval: cfg.ReconcileEvery(),
 				Send: func(kind protocol.Kind, payload any) error {
 					if sess == nil {
 						return errors.New("agent: 连接尚未建立")
@@ -105,6 +106,18 @@ func Run(ctx context.Context, o RunOptions) error {
 			if err != nil {
 				return nil, err
 			}
+			// watcher 跟着连接的生命周期走：连接断了就停，重连时重起。
+			// state.json 是跨连接的持久层，因此重起不丢基线。
+			wctx, cancel := context.WithCancel(ctx)
+			go func() {
+				<-sess.Done()
+				cancel()
+			}()
+			go func() {
+				if err := sync.StartWatcher(wctx); err != nil {
+					o.Logger.Warn("文件监视退出", "error", err)
+				}
+			}()
 			return sess, nil
 		},
 		Clock:   clock.System(),
