@@ -19,6 +19,29 @@ const (
 	KindAuthFailed          = "auth.failed"
 )
 
+// M1 新增（spec §8.5）。events.kind 是自由文本，加取值不需要迁移。
+const (
+	KindConfigSetPublished  = "configset.published"
+	KindConfigSetRolledBack = "configset.rolled_back"
+	KindAssignChanged       = "assign.changed"
+
+	KindApplyOK             = "apply.ok"
+	KindApplyFailed         = "apply.failed"
+	KindApplyRollbackFailed = "apply.rollback_failed"
+
+	KindDriftReported   = "drift.reported"
+	KindDriftAdopted    = "drift.adopted"
+	KindDriftRestored   = "drift.restored"
+	KindDriftIgnored    = "drift.ignored"
+	KindDriftSuperseded = "drift.superseded"
+
+	KindCredentialCreated = "credential.created"
+	KindCredentialRotated = "credential.rotated"
+	KindCredentialDeleted = "credential.deleted"
+
+	KindImportCompleted = "import.completed"
+)
+
 // Writer 往 events collection 写记录。
 type Writer struct {
 	app core.App

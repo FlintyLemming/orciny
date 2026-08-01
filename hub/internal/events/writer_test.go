@@ -77,6 +77,25 @@ func TestEventDetailSurvivesRoundTrip(t *testing.T) {
 	require.Equal(t, "abc", d["fingerprint"])
 }
 
+// M1 的事件 kind 必须集中定义在 events 包，调用处不许写字面量。
+func TestM1EventKinds(t *testing.T) {
+	require.Equal(t, "configset.published", events.KindConfigSetPublished)
+	require.Equal(t, "configset.rolled_back", events.KindConfigSetRolledBack)
+	require.Equal(t, "assign.changed", events.KindAssignChanged)
+	require.Equal(t, "apply.ok", events.KindApplyOK)
+	require.Equal(t, "apply.failed", events.KindApplyFailed)
+	require.Equal(t, "apply.rollback_failed", events.KindApplyRollbackFailed)
+	require.Equal(t, "drift.reported", events.KindDriftReported)
+	require.Equal(t, "drift.adopted", events.KindDriftAdopted)
+	require.Equal(t, "drift.restored", events.KindDriftRestored)
+	require.Equal(t, "drift.ignored", events.KindDriftIgnored)
+	require.Equal(t, "drift.superseded", events.KindDriftSuperseded)
+	require.Equal(t, "credential.created", events.KindCredentialCreated)
+	require.Equal(t, "credential.rotated", events.KindCredentialRotated)
+	require.Equal(t, "credential.deleted", events.KindCredentialDeleted)
+	require.Equal(t, "import.completed", events.KindImportCompleted)
+}
+
 // detailOf 解出 detail 字段。JSON 字段没有点号取值的 getter，
 // 只能整段反序列化——顺带也验证了它确实是合法 JSON。
 func detailOf(t *testing.T, r *core.Record) map[string]any {
