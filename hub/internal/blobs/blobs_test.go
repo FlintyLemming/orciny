@@ -3,6 +3,7 @@ package blobs_test
 import (
 	"testing"
 
+	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 	"github.com/stretchr/testify/require"
 
@@ -94,4 +95,45 @@ func TestConcurrentPutSameHash(t *testing.T) {
 	recs, err := app.FindAllRecords("blobs")
 	require.NoError(t, err)
 	require.Len(t, recs, 1)
+}
+
+func TestGCOrphansOnlyDeletesUnreferenced(t *testing.T) {
+	app := newApp(t)
+	s := blobs.New(app)
+
+	kept, err := s.Put([]byte("被 revision 引用"))
+	require.NoError(t, err)
+	inDraft, err := s.Put([]byte("被草稿引用"))
+	require.NoError(t, err)
+	orphan, err := s.Put([]byte("没人引用"))
+	require.NoError(t, err)
+
+	sets, err := app.FindCollectionByNameOrId("config_sets")
+	require.NoError(t, err)
+	set := core.NewRecord(sets)
+	set.Set("name", "s1")
+	set.Set("draft", []map[string]any{{"path": "a", "hash": inDraft, "size": 1, "mode": 420}})
+	require.NoError(t, app.Save(set))
+
+	revsC, err := app.FindCollectionByNameOrId("revisions")
+	require.NoError(t, err)
+	rev := core.NewRecord(revsC)
+	rev.Set("config_set", set.Id)
+	rev.Set("seq", 1)
+	rev.Set("files", []map[string]any{{"path": "b", "hash": kept, "size": 1, "mode": 420}})
+	rev.Set("source", "publish")
+	require.NoError(t, app.Save(rev))
+
+	n, err := s.GCOrphans(set.Id)
+	require.NoError(t, err)
+	require.Equal(t, 1, n)
+
+	for _, h := range []string{kept, inDraft} {
+		ok, err := s.Has(h)
+		require.NoError(t, err)
+		require.True(t, ok, "被引用的 blob 不该被删")
+	}
+	ok, err := s.Has(orphan)
+	require.NoError(t, err)
+	require.False(t, ok)
 }

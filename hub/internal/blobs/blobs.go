@@ -103,3 +103,68 @@ func (s *Store) Has(hash string) (bool, error) {
 	}
 	return true, nil
 }
+
+// GCOrphans 删除没有任何引用的 blob。只在删除整个配置集之后调用
+// （spec §4.2：Revision 不可变不可删，平时引用计数只增）。
+//
+// setID 只用于日志：引用可能来自任何配置集，扫描范围永远是全库。
+func (s *Store) GCOrphans(setID string) (int, error) {
+	referenced := map[string]bool{}
+
+	collect := func(collection, field string) error {
+		recs, err := s.app.FindAllRecords(collection)
+		if err != nil {
+			return fmt.Errorf("blobs: 扫描 %s: %w", collection, err)
+		}
+		for _, r := range recs {
+			var entries []struct {
+				Hash string `json:"hash"`
+			}
+			// JSONField 读不了点号 key，必须走 UnmarshalJSONField。
+			if err := r.UnmarshalJSONField(field, &entries); err != nil {
+				continue // 空字段或形状不符：当作没有引用
+			}
+			for _, e := range entries {
+				if e.Hash != "" {
+					referenced[e.Hash] = true
+				}
+			}
+		}
+		return nil
+	}
+	if err := collect("revisions", "files"); err != nil {
+		return 0, err
+	}
+	if err := collect("config_sets", "draft"); err != nil {
+		return 0, err
+	}
+
+	drifts, err := s.app.FindAllRecords("drift_events")
+	if err != nil {
+		return 0, fmt.Errorf("blobs: 扫描 drift_events: %w", err)
+	}
+	for _, d := range drifts {
+		if id := d.GetString("current_blob"); id != "" {
+			if b, err := s.app.FindRecordById("blobs", id); err == nil && b != nil {
+				referenced[b.GetString("hash")] = true
+			}
+		}
+	}
+
+	all, err := s.app.FindAllRecords("blobs")
+	if err != nil {
+		return 0, fmt.Errorf("blobs: 扫描 blobs: %w", err)
+	}
+	n := 0
+	for _, b := range all {
+		if referenced[b.GetString("hash")] {
+			continue
+		}
+		if err := s.app.Delete(b); err != nil {
+			return n, fmt.Errorf("blobs: 删除孤儿 %s: %w", b.GetString("hash"), err)
+		}
+		n++
+	}
+	s.app.Logger().Info("清理孤儿 blob", "config_set", setID, "deleted", n)
+	return n, nil
+}
