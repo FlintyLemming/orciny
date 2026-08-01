@@ -10,8 +10,12 @@ import (
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 
+	"github.com/FlintyLemming/orciny/hub/internal/blobs"
+	"github.com/FlintyLemming/orciny/hub/internal/configsets"
+	"github.com/FlintyLemming/orciny/hub/internal/credentials"
 	"github.com/FlintyLemming/orciny/hub/internal/enroll"
 	"github.com/FlintyLemming/orciny/hub/internal/identity"
+	"github.com/FlintyLemming/orciny/hub/internal/revisions"
 	"github.com/FlintyLemming/orciny/hub/internal/ws"
 )
 
@@ -26,6 +30,15 @@ type Deps struct {
 	// 空值走 DefaultDownloadBase(Version)，即本 hub 版本对应的 github-dl.flinty.moe Worker；
 	// GitHub 直连兜底由 install-agent.sh 自行追加。
 	DownloadBase string
+
+	// Admin 是管理动作入口（由 *hub.Hub 实现）。nil 时管理端点返回 500。
+	Admin Admin
+
+	// 以下服务供路由直接做 CRUD / 读内容；nil 时对应端点返回 500。
+	Sets  *configsets.Service
+	Revs  *revisions.Service
+	Blobs *blobs.Store
+	Creds *credentials.Store
 }
 
 // Register 在 OnServe 阶段注册全部自定义路由。
@@ -47,6 +60,28 @@ func Register(e *core.ServeEvent, d Deps) error {
 	if d.WS != nil {
 		g.GET("/ws", func(e *core.RequestEvent) error { return d.WS.Upgrade(e) })
 	}
+
+	// --- M1 配置闭环管理端点（全部 superuser） ---
+	su := apis.RequireSuperuserAuth()
+	g.POST("/config-sets", d.createConfigSet).Bind(su)
+	g.POST("/config-sets/{id}/clone", d.cloneConfigSet).Bind(su)
+	g.DELETE("/config-sets/{id}", d.deleteConfigSet).Bind(su)
+	g.POST("/config-sets/{id}/files", d.setDraftFile).Bind(su)
+	g.DELETE("/config-sets/{id}/files", d.removeDraftFile).Bind(su)
+	g.PUT("/config-sets/{id}/manifest", d.setManifest).Bind(su)
+	g.POST("/config-sets/{id}/validate", d.validateConfigSet).Bind(su)
+	g.POST("/config-sets/{id}/publish", d.publishConfigSet).Bind(su)
+	g.POST("/config-sets/{id}/rollback", d.rollbackConfigSet).Bind(su)
+	g.GET("/config-sets/{id}/diff", d.diffConfigSet).Bind(su)
+	g.GET("/config-sets/{id}/findings", d.importFindings).Bind(su)
+	g.POST("/config-sets/{id}/extract", d.extractCredential).Bind(su)
+	g.GET("/blobs/{hash}", d.getBlob).Bind(su)
+	g.POST("/assignments", d.assign).Bind(su)
+	g.POST("/credentials", d.createCredential).Bind(su)
+	g.POST("/credentials/{id}/rotate", d.rotateCredential).Bind(su)
+	g.DELETE("/credentials/{id}", d.deleteCredential).Bind(su)
+	g.PUT("/machines/{id}/variables", d.setVariables).Bind(su)
+	g.POST("/machines/{id}/import", d.startImport).Bind(su)
 
 	// 安装脚本不在 /api 下：它要能被 `curl -fsSL https://<hub>/install.sh` 直接取到。
 	// 无需认证——脚本不含秘密，token 由用户拼在命令行上（spec §9.1）。

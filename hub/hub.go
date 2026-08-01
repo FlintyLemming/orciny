@@ -152,6 +152,11 @@ func Attach(app core.App, cfg Config) (*Hub, error) {
 			WS:           h.ws,
 			Version:      orciny.Version,
 			DownloadBase: h.cfg.DownloadBase,
+			Admin:        h,
+			Sets:         h.sets,
+			Revs:         h.revs,
+			Blobs:        h.blobs,
+			Creds:        h.creds,
 		}); err != nil {
 			return fmt.Errorf("注册路由: %w", err)
 		}
