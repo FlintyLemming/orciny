@@ -26,6 +26,9 @@ jobs:
 
       - run: go test -tags=testing ./...
 
+      - name: 凭据脱敏安全测试
+        run: go test -tags=testing -run TestSecurity -v ./agent/...
+
   web:
     runs-on: ubuntu-latest
     defaults:
