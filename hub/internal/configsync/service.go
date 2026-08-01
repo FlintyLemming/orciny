@@ -26,6 +26,13 @@ type Sender interface {
 	Online(machineID string) bool
 }
 
+// DriftHandler 是 configsync 对收件箱的全部需求。由 *drift.Service 实现。
+// 做成接口避免 configsync 与 drift 互相 import（drift 要 *configsync.Service 发指令）。
+type DriftHandler interface {
+	HandleReport(machineID string, rep protocol.DriftReport) error
+	IgnorePaths(machineID string) ([]string, error)
+}
+
 type Deps struct {
 	App    core.App
 	Blobs  *blobs.Store
@@ -40,12 +47,18 @@ type Deps struct {
 	Importer interface {
 		HandleResult(machineID string, r protocol.CollectResult) error
 	}
+	// Drift 处理漂移上报。两步装配：先建 configsync（此字段空），再建 drift，
+	// 最后 SetDrift（drift 构造时需要 *configsync.Service）。
+	Drift DriftHandler
 }
 
 type Service struct {
 	d   Deps
 	log *slog.Logger
 }
+
+// SetDrift 在装配阶段把收件箱接上。必须在任何 agent 消息到达之前调用。
+func (s *Service) SetDrift(d DriftHandler) { s.d.Drift = d }
 
 func NewService(d Deps) *Service {
 	log := d.Logger
@@ -125,7 +138,11 @@ func (s *Service) Snapshot(machineID string) (protocol.ConfigSnapshot, error) {
 }
 
 // ignorePaths 汇总全局规则与该机器的规则（spec §8.4）。
+// 真相在 drift.IgnorePaths；未装配 drift 时退回本地查询（单测用）。
 func (s *Service) ignorePaths(machineID string) ([]string, error) {
+	if s.d.Drift != nil {
+		return s.d.Drift.IgnorePaths(machineID)
+	}
 	recs, err := s.d.App.FindRecordsByFilter("ignore_rules",
 		"machine = '' || machine = {:m}", "path", 0, 0, map[string]any{"m": machineID})
 	if err != nil {
@@ -176,9 +193,15 @@ func (s *Service) BlobRequest(machineID string, r protocol.BlobRequest) {
 	}
 }
 
-// DriftReport 在子计划 13 接上 drift.Service。
-func (s *Service) DriftReport(machineID string, _ protocol.DriftReport) {
-	s.log.Debug("收到漂移上报（尚未接入处理）", "machine", machineID)
+// DriftReport 转交给收件箱。未装配时只记日志——开发期单测可能不接 drift。
+func (s *Service) DriftReport(machineID string, rep protocol.DriftReport) {
+	if s.d.Drift == nil {
+		s.log.Debug("未装配漂移服务，忽略上报", "machine", machineID)
+		return
+	}
+	if err := s.d.Drift.HandleReport(machineID, rep); err != nil {
+		s.log.Warn("处理漂移上报失败", "machine", machineID, "error", err)
+	}
 }
 
 func (s *Service) CollectResult(machineID string, r protocol.CollectResult) {

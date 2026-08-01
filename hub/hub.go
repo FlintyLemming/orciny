@@ -18,6 +18,7 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/configsets"
 	"github.com/FlintyLemming/orciny/hub/internal/configsync"
 	"github.com/FlintyLemming/orciny/hub/internal/credentials"
+	"github.com/FlintyLemming/orciny/hub/internal/drift"
 	"github.com/FlintyLemming/orciny/hub/internal/enroll"
 	"github.com/FlintyLemming/orciny/hub/internal/events"
 	"github.com/FlintyLemming/orciny/hub/internal/handshake"
@@ -50,6 +51,7 @@ type Hub struct {
 	revs     *revisions.Service
 	importer *importer.Service
 	sync     *configsync.Service
+	drift    *drift.Service
 
 	// pb 仅在 New 创建时非 nil。Attach 出来的实例由调用方驱动 serve。
 	pb *pocketbase.PocketBase
@@ -123,6 +125,13 @@ func Attach(app core.App, cfg Config) (*Hub, error) {
 			Creds: h.creds, Events: h.events, Sender: h.machines,
 			Importer: h.importer, Logger: e.App.Logger(),
 		})
+		// drift 需要 configsync（发 DriftCommand），configsync 需要 drift（转交上报）：
+		// 先建 configsync（Drift 留空），再建 drift，最后 SetDrift。
+		h.drift = drift.NewService(drift.Deps{
+			App: e.App, Blobs: h.blobs, Sets: h.sets, Revs: h.revs,
+			Events: h.events, Sync: h.sync, Logger: e.App.Logger(),
+		})
+		h.sync.SetDrift(h.drift)
 		// 离线补发：agent 一上线就无条件通知一次，幂等保证它在无事可做时
 		// 是零写入（spec §7.3）。
 		h.machines.OnOnline(h.sync.OnMachineOnline)
