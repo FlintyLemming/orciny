@@ -169,6 +169,32 @@ func (s *Service) ignorePaths(machineID string) ([]string, error) {
 // —— ws.AgentMessages 实现 ——
 
 func (s *Service) Pull(machineID string, p protocol.ConfigPull) {
+	// 状态丢失自愈（spec §7.6 第 3 条）：曾经对齐过的机器突然说
+	// 「我没有任何已应用的版本」，只可能是 state.json 丢了或损坏了。
+	// 此刻 agent 不知道基线是什么，直接下发 apply 会用中台内容盖掉
+	// 用户机器上的一切。一律打回 survey，让差异先进收件箱。
+	if p.Have == "" {
+		if assign, err := s.d.Sets.Assignment(machineID); err == nil &&
+			assign.GetString("applied_revision") != "" &&
+			assign.GetString("mode") != configsets.ModeSurvey {
+
+			s.log.Warn("机器报告状态丢失，打回 survey 模式", "machine", machineID,
+				"applied_revision", assign.GetString("applied_revision"))
+			assign.Set("mode", configsets.ModeSurvey)
+			assign.Set("state", configsets.StatePending)
+			assign.Set("applied_revision", "")
+			assign.Set("last_error", "本机状态丢失，已转为「先看看」模式，差异见收件箱")
+			if err := s.d.App.Save(assign); err != nil {
+				s.log.Warn("保存指派状态失败", "machine", machineID, "error", err)
+			}
+			if err := s.d.Events.Write(events.KindAssignChanged, machineID, map[string]any{
+				"reason": "state_lost", "mode": configsets.ModeSurvey,
+			}); err != nil {
+				s.log.Warn("写 assign.changed 事件失败", "error", err)
+			}
+		}
+	}
+
 	snap, err := s.Snapshot(machineID)
 	if err != nil {
 		if errors.Is(err, configsets.ErrNoAssignment) {

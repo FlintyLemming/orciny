@@ -343,3 +343,81 @@ func TestPullOfUnassignedMachineIsQuiet(t *testing.T) {
 	r.svc.Pull(m, protocol.ConfigPull{})
 	require.Empty(t, r.sender.of(protocol.KindConfigSnapshot))
 }
+
+// 状态丢失自愈：曾经对齐过的机器突然说「我什么都没有」，
+// 只可能是 state.json 丢了。绝不覆盖用户的文件，一律打回 survey
+// （spec §7.6 第 3 条）。
+func TestPullWithLostStateFallsBackToSurvey(t *testing.T) {
+	r := newRig(t)
+	m := r.machine(t, "fp-lost")
+	set, err := r.sets.Create("s", "")
+	require.NoError(t, err)
+	_, err = r.sets.SetDraftFile(set.Id, "a", []byte("x"), 0o644, nil)
+	require.NoError(t, err)
+	rev, err := r.revs.Publish(set.Id, "", "publish")
+	require.NoError(t, err)
+
+	assign, err := r.sets.Assign(m, set.Id, "apply")
+	require.NoError(t, err)
+	assign.Set("applied_revision", rev.Id)
+	assign.Set("state", "aligned")
+	require.NoError(t, r.app.Save(assign))
+
+	// agent 报告「我没有任何已应用的版本」
+	r.svc.Pull(m, protocol.ConfigPull{Have: ""})
+
+	sent := r.sender.of(protocol.KindConfigSnapshot)
+	require.Len(t, sent, 1)
+	require.Equal(t, protocol.ModeSurvey, sent[0].payload.(protocol.ConfigSnapshot).Mode,
+		"状态丢失必须打回 survey，绝不直接覆盖")
+
+	got, err := r.sets.Assignment(m)
+	require.NoError(t, err)
+	require.Equal(t, "survey", got.GetString("mode"), "指派模式也要落库改掉")
+	require.Equal(t, "pending", got.GetString("state"))
+}
+
+// 新机器（从未 apply 过）不算状态丢失，按指派时选的模式走。
+func TestPullOfFreshMachineKeepsApplyMode(t *testing.T) {
+	r := newRig(t)
+	m := r.machine(t, "fp-fresh")
+	set, err := r.sets.Create("s", "")
+	require.NoError(t, err)
+	_, err = r.sets.SetDraftFile(set.Id, "a", []byte("x"), 0o644, nil)
+	require.NoError(t, err)
+	_, err = r.revs.Publish(set.Id, "", "publish")
+	require.NoError(t, err)
+	_, err = r.sets.Assign(m, set.Id, "apply")
+	require.NoError(t, err)
+
+	r.svc.Pull(m, protocol.ConfigPull{Have: ""})
+	sent := r.sender.of(protocol.KindConfigSnapshot)
+	require.Len(t, sent, 1)
+	require.Equal(t, protocol.ModeApply, sent[0].payload.(protocol.ConfigSnapshot).Mode)
+}
+
+// 版本号对不上（比如 agent 停机期间中台发了新版）不算状态丢失。
+func TestPullWithStaleRevisionKeepsApplyMode(t *testing.T) {
+	r := newRig(t)
+	m := r.machine(t, "fp-stale")
+	set, err := r.sets.Create("s", "")
+	require.NoError(t, err)
+	_, err = r.sets.SetDraftFile(set.Id, "a", []byte("v1"), 0o644, nil)
+	require.NoError(t, err)
+	v1, err := r.revs.Publish(set.Id, "", "publish")
+	require.NoError(t, err)
+	_, err = r.sets.SetDraftFile(set.Id, "a", []byte("v2"), 0o644, nil)
+	require.NoError(t, err)
+	_, err = r.revs.Publish(set.Id, "", "publish")
+	require.NoError(t, err)
+
+	assign, err := r.sets.Assign(m, set.Id, "apply")
+	require.NoError(t, err)
+	assign.Set("applied_revision", v1.Id)
+	assign.Set("state", "aligned")
+	require.NoError(t, r.app.Save(assign))
+
+	r.svc.Pull(m, protocol.ConfigPull{Have: v1.Id})
+	sent := r.sender.of(protocol.KindConfigSnapshot)
+	require.Equal(t, protocol.ModeApply, sent[0].payload.(protocol.ConfigSnapshot).Mode)
+}
