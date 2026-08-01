@@ -10,6 +10,7 @@ import (
 	"github.com/FlintyLemming/orciny/agent/internal/conn"
 	"github.com/FlintyLemming/orciny/agent/internal/identity"
 	"github.com/FlintyLemming/orciny/agent/internal/probe"
+	"github.com/FlintyLemming/orciny/protocol"
 )
 
 // ConnectOptions 是 agent.Connect 的入参。
@@ -23,6 +24,9 @@ type ConnectOptions struct {
 	// （撤销通知、未知消息）用默认的文本格式打出来，与 agent 其余部分的
 	// JSON 日志不一致。
 	Logger *slog.Logger
+
+	// OnMessage 接收握手完成之后的业务消息（M1 配置下发）。
+	OnMessage func(protocol.Envelope)
 }
 
 // Session 是一条已建立的连接。这是 conn.Session 的别名，
@@ -50,5 +54,6 @@ func Connect(ctx context.Context, o ConnectOptions) (*Session, error) {
 		HandshakeTimeout: o.HandshakeTimeout,
 		ReadTimeout:      o.ReadTimeout,
 		Logger:           o.Logger,
+		OnMessage:        o.OnMessage,
 	})
 }

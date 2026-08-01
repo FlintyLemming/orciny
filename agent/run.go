@@ -4,6 +4,7 @@ import (
 	"context"
 	crand "crypto/rand"
 	"encoding/binary"
+	"errors"
 	"log/slog"
 	"math/rand/v2"
 	"path/filepath"
@@ -12,7 +13,9 @@ import (
 	"github.com/FlintyLemming/orciny"
 	"github.com/FlintyLemming/orciny/agent/internal/conn"
 	"github.com/FlintyLemming/orciny/agent/internal/identity"
+	"github.com/FlintyLemming/orciny/agent/internal/syncer"
 	"github.com/FlintyLemming/orciny/internal/clock"
+	"github.com/FlintyLemming/orciny/protocol"
 )
 
 // RunOptions 是 agent.Run 的入参。
@@ -45,10 +48,15 @@ func Run(ctx context.Context, o RunOptions) error {
 		return err
 	}
 
+	managedHome, err := cfg.ManagedHomeDir()
+	if err != nil {
+		return err
+	}
 	o.Logger.Info("agent 启动",
 		"version", orciny.Version,
 		"hub", cfg.HubURL,
 		"fingerprint", id.Fingerprint())
+	o.Logger.Info("受管 HOME", "path", managedHome)
 
 	writeStatus := func(state conn.State, cause error) {
 		s := &Status{
@@ -68,13 +76,36 @@ func Run(ctx context.Context, o RunOptions) error {
 
 	client := conn.NewClient(conn.ClientConfig{
 		Dial: func(ctx context.Context) (*Session, error) {
-			return Connect(ctx, ConnectOptions{
+			// syncer 每条连接一个：Send 绑定在具体会话上，
+			// 连接断了旧的 syncer 也就该退场。state.json 是跨连接的持久层。
+			var sess *Session
+			sync, err := syncer.New(syncer.Deps{
+				Dir:         o.Dir,
+				ManagedHome: managedHome,
+				Clock:       clock.System(),
+				Logger:      o.Logger,
+				Send: func(kind protocol.Kind, payload any) error {
+					if sess == nil {
+						return errors.New("agent: 连接尚未建立")
+					}
+					return sess.Send(kind, payload)
+				},
+			})
+			if err != nil {
+				return nil, err
+			}
+			sess, err = Connect(ctx, ConnectOptions{
 				Dir:              o.Dir,
 				HubURL:           cfg.HubURL,
 				HandshakeTimeout: o.HandshakeTimeout,
 				ReadTimeout:      o.ReadTimeout,
 				Logger:           o.Logger,
+				OnMessage:        sync.Handle,
 			})
+			if err != nil {
+				return nil, err
+			}
+			return sess, nil
 		},
 		Clock:   clock.System(),
 		Backoff: conn.NewBackoff(time.Second, time.Minute, 0.2, newRand().Float64),

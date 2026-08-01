@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -30,6 +31,9 @@ type fakeHub struct {
 	// 机器在面板上被删）。
 	revokeCode uint8
 	gotInfo    chan protocol.MachineInfo
+
+	mu     sync.Mutex
+	socket *gws.Conn
 }
 
 type fakeHandler struct {
@@ -63,6 +67,9 @@ func (f *fakeHandler) OnMessage(socket *gws.Conn, msg *gws.Message) {
 		b, _ := protocol.Encode(protocol.KindAuthResult, nil, res)
 		_ = socket.WriteMessage(gws.OpcodeBinary, b)
 	case protocol.KindMachineInfo:
+		f.h.mu.Lock()
+		f.h.socket = socket
+		f.h.mu.Unlock()
 		info, err := protocol.DecodePayload[protocol.MachineInfo](env)
 		if err == nil {
 			select {
@@ -78,6 +85,22 @@ func (f *fakeHandler) OnMessage(socket *gws.Conn, msg *gws.Message) {
 			_ = socket.WriteClose(1000, []byte("machine removed"))
 		}
 	}
+}
+
+// push 往已握手的连接上写一帧，供连接期消息路由测试使用。
+func (h *fakeHub) push(t *testing.T, kind protocol.Kind, payload any) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		h.mu.Lock()
+		defer h.mu.Unlock()
+		return h.socket != nil
+	}, 2*time.Second, 5*time.Millisecond, "等待 agent 完成握手")
+	h.mu.Lock()
+	socket := h.socket
+	h.mu.Unlock()
+	b, err := protocol.Encode(kind, nil, payload)
+	require.NoError(t, err)
+	require.NoError(t, socket.WriteMessage(gws.OpcodeBinary, b))
 }
 
 func newFakeHub(t *testing.T) *fakeHub {
@@ -260,4 +283,47 @@ func TestDialFailsOnUnreachableHub(t *testing.T) {
 func TestClientReadMaxPayloadMatchesProtocol(t *testing.T) {
 	require.Equal(t, 1<<20, protocol.MaxPayload)
 	require.Equal(t, int(protocol.MaxPayload), conn.ClientReadMaxPayloadSize())
+}
+
+// 连接期收到的业务消息要交给上层，而不是落进「忽略意外消息」的分支。
+// M0 的 AC 修正（inbox 无人消费）就是这个位置出的问题。
+func TestConnectedMessagesReachOnMessage(t *testing.T) {
+	got := make(chan protocol.Envelope, 4)
+	h := newFakeHub(t)
+	cfg := cfgFor(t, h, newIdentity(t))
+	cfg.OnMessage = func(env protocol.Envelope) { got <- env }
+
+	sess, err := conn.Dial(context.Background(), cfg)
+	require.NoError(t, err)
+	defer func() { _ = sess.Close() }()
+
+	h.push(t, protocol.KindConfigNotify, protocol.ConfigNotify{ConfigSetID: "set1"})
+
+	select {
+	case env := <-got:
+		require.Equal(t, protocol.KindConfigNotify, env.Kind)
+	case <-time.After(2 * time.Second):
+		t.Fatal("OnMessage 未收到 ConfigNotify")
+	}
+}
+
+// AuthResult 仍走原来的撤销通知路径，不该被 OnMessage 抢走。
+func TestAuthResultStillEndsSession(t *testing.T) {
+	h := newFakeHub(t)
+	cfg := cfgFor(t, h, newIdentity(t))
+	cfg.OnMessage = func(protocol.Envelope) { t.Error("AuthResult 不该走 OnMessage") }
+
+	sess, err := conn.Dial(context.Background(), cfg)
+	require.NoError(t, err)
+	h.push(t, protocol.KindAuthResult,
+		protocol.AuthResult{OK: false, Code: protocol.CodeMachineRemoved, Reason: "已删除"})
+
+	select {
+	case <-sess.Done():
+		var rej *conn.RejectedError
+		require.ErrorAs(t, sess.Err(), &rej)
+		require.Equal(t, protocol.CodeMachineRemoved, rej.Code)
+	case <-time.After(2 * time.Second):
+		t.Fatal("连接未因撤销通知结束")
+	}
 }

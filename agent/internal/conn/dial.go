@@ -48,6 +48,13 @@ type Config struct {
 	HandshakeTimeout time.Duration
 	ReadTimeout      time.Duration
 
+	// OnMessage 接收握手完成之后收到的业务消息（M1 的配置下发）。
+	// 为 nil 时这些消息被记 debug 日志后丢弃。
+	//
+	// 它跑在读循环那个 goroutine 上：实现方必须自己保证不长时间阻塞，
+	// 否则会卡住这条连接的后续收信（含心跳）。
+	OnMessage func(protocol.Envelope)
+
 	Rand   io.Reader
 	Logger *slog.Logger
 }
@@ -108,6 +115,7 @@ type handler struct {
 	readTimeout time.Duration
 	log         *slog.Logger
 	session     *Session
+	onMessage   func(protocol.Envelope)
 
 	// connected 在握手完成后置真，用来分开两个阶段的收信规则：
 	// 握手期的帧要交给 await，连接期的帧由 onConnected 直接处理。
@@ -142,13 +150,17 @@ func (h *handler) OnMessage(socket *gws.Conn, msg *gws.Message) {
 
 // onConnected 处理握手完成之后收到的帧。
 //
-// M0 里 hub 在连接期只会发一种业务帧：`AuthResult{OK:false}`，即 spec §3.3 的
-// 「授权已撤销」通知（唯一触发场景是机器在面板上被删，§6.4c）。把它记成连接
-// 结束的原因，重连循环就能像处理握手期的拒绝一样按 `Code` 分流——spec §3.3
-// 要的正是「agent 侧只有一条处理路径」。
+// AuthResult{OK:false} 是 spec §3.3 的「授权已撤销」通知（唯一触发场景是
+// 机器在面板上被删，§6.4c）。把它记成连接结束的原因，重连循环就能像处理
+// 握手期的拒绝一样按 `Code` 分流。其余业务消息（M1 配置下发）交给上层。
 func (h *handler) onConnected(socket *gws.Conn, env protocol.Envelope) {
 	if env.Kind != protocol.KindAuthResult {
-		h.log.Warn("忽略连接期收到的意外消息", "kind", env.Kind.String())
+		// M1：配置类消息交给上层的 syncer。
+		if h.onMessage != nil {
+			h.onMessage(env)
+			return
+		}
+		h.log.Debug("未装配消息处理器，忽略", "kind", env.Kind.String())
 		return
 	}
 	err := rejectionFrom(env)
@@ -203,6 +215,7 @@ func Dial(ctx context.Context, cfg Config) (*Session, error) {
 		done:        make(chan struct{}),
 		readTimeout: cfg.ReadTimeout,
 		log:         cfg.Logger,
+		onMessage:   cfg.OnMessage,
 	}
 
 	socket, _, err := gws.NewClient(h, &gws.ClientOption{

@@ -14,12 +14,16 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 
 	"github.com/FlintyLemming/orciny"
+	"github.com/FlintyLemming/orciny/hub/internal/blobs"
+	"github.com/FlintyLemming/orciny/hub/internal/configsets"
+	"github.com/FlintyLemming/orciny/hub/internal/configsync"
 	"github.com/FlintyLemming/orciny/hub/internal/credentials"
 	"github.com/FlintyLemming/orciny/hub/internal/enroll"
 	"github.com/FlintyLemming/orciny/hub/internal/events"
 	"github.com/FlintyLemming/orciny/hub/internal/handshake"
 	"github.com/FlintyLemming/orciny/hub/internal/identity"
 	"github.com/FlintyLemming/orciny/hub/internal/machines"
+	"github.com/FlintyLemming/orciny/hub/internal/revisions"
 	"github.com/FlintyLemming/orciny/hub/internal/routes"
 	"github.com/FlintyLemming/orciny/hub/internal/ws"
 
@@ -40,6 +44,10 @@ type Hub struct {
 	machines *machines.Manager
 	ws       *ws.Handler
 	creds    *credentials.Store
+	blobs    *blobs.Store
+	sets     *configsets.Service
+	revs     *revisions.Service
+	sync     *configsync.Service
 
 	// pb 仅在 New 创建时非 nil。Attach 出来的实例由调用方驱动 serve。
 	pb *pocketbase.PocketBase
@@ -102,6 +110,18 @@ func Attach(app core.App, cfg Config) (*Hub, error) {
 			return err
 		}
 
+		h.blobs = blobs.New(e.App)
+		h.sets = configsets.NewService(e.App, h.blobs, h.events)
+		h.revs = revisions.NewService(e.App, h.blobs, h.events)
+		h.sync = configsync.NewService(configsync.Deps{
+			App: e.App, Blobs: h.blobs, Sets: h.sets, Revs: h.revs,
+			Creds: h.creds, Events: h.events, Sender: h.machines,
+			Logger: e.App.Logger(),
+		})
+		// 离线补发：agent 一上线就无条件通知一次，幂等保证它在无事可做时
+		// 是零写入（spec §7.3）。
+		h.machines.OnOnline(h.sync.OnMachineOnline)
+
 		// 内存里的注册表此刻是空的，库里可能还留着上次进程退出时的 online。
 		// 必须赶在 WS 端点接客之前翻掉，否则会和真实重连交叉写状态。
 		if err := h.machines.ResetGhosts(); err != nil {
@@ -115,6 +135,7 @@ func Attach(app core.App, cfg Config) (*Hub, error) {
 			Registry:          h.machines,
 			Events:            h.events,
 			Clock:             h.cfg.Clock,
+			Agent:             h.sync,
 			HandshakeTimeout:  h.cfg.HandshakeTimeout,
 			ReadTimeout:       h.cfg.ReadTimeout,
 			HeartbeatInterval: h.cfg.HeartbeatInterval,
