@@ -150,3 +150,19 @@ rm -rf ~/.orciny
 ```
 
 删完记得在面板上把这台机器也删掉。
+
+## 已知限制：`~/.claude.json` 的竞写
+
+Claude Code 自己也在写 `~/.claude.json`（记录 project 状态等运行时数据），
+并且它不使用原子写。orciny-agent 在合并受管键（默认只有 `mcpServers`）时
+会做三件事缓解：读之前记 mtime + size、写之前再查一次、变了就重读重试
+（最多 3 次），最终写入走「临时文件 + rename」。
+
+**仍然存在的窗口**：Claude Code 在 agent 完成检查到 rename 之间的那一瞬间
+重写该文件时，agent 的写入可能被覆盖。下一次对账（默认 ≤5 分钟）会发现
+并重新应用。
+
+**inotify watch 数**：`skills/**` 递归监视通常占用几十个 watch，
+远低于 Linux 默认的 8192 上限（`/proc/sys/fs/inotify/max_user_watches`）。
+若同一台机器上跑了多个大量占用 watch 的工具而报 `no space left on device`，
+调高该内核参数即可。
