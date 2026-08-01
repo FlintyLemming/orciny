@@ -95,8 +95,23 @@ func (fx *fixture) rebuild(t *testing.T, report func([]protocol.DriftItem, bool)
 	fx.w = w
 }
 
-// advance 推进假时钟。定时器挂在 Run 那个 goroutine 上，一次性推进可能
-// 赶在它前面，因此按 M0 教训 L 的做法：轮询里反复推进直到定时器已挂上。
+// notify 注入事件并等到 debounce 定时器挂上。
+//
+// Run 启动后 reconcile ticker 一直在册，TimerCount 恒 ≥ 1；
+// 若只等「有定时器」再 Advance，会赶在 debounce 臂上之前把时钟推走，
+// 事件就丢了（M0 教训 L 的变体）。
+func (fx *fixture) notify(t *testing.T, path string) {
+	t.Helper()
+	before := fx.clk.TimerCount()
+	fx.w.Notify(path)
+	require.Eventually(t, func() bool {
+		n := fx.clk.TimerCount()
+		// 新挂 debounce：1→2；或替换仍在册的 debounce：保持 ≥ 2
+		return n > before || n >= 2
+	}, 2*time.Second, 5*time.Millisecond, "debounce 定时器未挂上")
+}
+
+// advance 推进假时钟。调用前须已有在册定时器（ticker 或 debounce）。
 func (fx *fixture) advance(t *testing.T, d time.Duration) {
 	t.Helper()
 	require.Eventually(t, func() bool {
