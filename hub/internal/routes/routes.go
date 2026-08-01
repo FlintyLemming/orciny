@@ -82,6 +82,7 @@ func Register(e *core.ServeEvent, d Deps) error {
 	g.DELETE("/credentials/{id}", d.deleteCredential).Bind(su)
 	g.PUT("/machines/{id}/variables", d.setVariables).Bind(su)
 	g.POST("/machines/{id}/import", d.startImport).Bind(su)
+	g.POST("/machines/{id}/clear-degraded", d.clearDegraded).Bind(su)
 	g.POST("/drift/adopt", d.adoptDrift).Bind(su)
 	g.POST("/drift/restore", d.restoreDrift).Bind(su)
 	g.POST("/drift/ignore", d.ignoreDrift).Bind(su)

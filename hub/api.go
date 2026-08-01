@@ -135,3 +135,8 @@ func (h *Hub) RestoreDrift(eventIDs []string) error {
 func (h *Hub) IgnoreDrift(eventIDs []string, global bool) error {
 	return h.drift.Ignore(eventIDs, global)
 }
+
+// ClearDegraded 解除机器的 degraded 状态，打回 survey 让差异先进收件箱。
+func (h *Hub) ClearDegraded(machineID string) error {
+	return h.sync.ClearDegraded(machineID)
+}

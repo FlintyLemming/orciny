@@ -230,6 +230,32 @@ func (s *Service) BlobRequest(machineID string, r protocol.BlobRequest) {
 	}
 }
 
+// ClearDegraded 解除机器的 degraded 状态（spec §7.4 第 2 条）。
+//
+// 打回 survey 而不是 apply：一次失败的 apply 加上一次失败的回滚之后，
+// 谁也不知道机器上现在是什么样子。让差异先进收件箱，由人看过再决定。
+func (s *Service) ClearDegraded(machineID string) error {
+	assign, err := s.d.Sets.Assignment(machineID)
+	if err != nil {
+		return err
+	}
+	if assign.GetString("state") != configsets.StateDegraded {
+		return nil
+	}
+	assign.Set("state", configsets.StatePending)
+	assign.Set("mode", configsets.ModeSurvey)
+	assign.Set("last_error", "")
+	if err := s.d.App.Save(assign); err != nil {
+		return fmt.Errorf("configsync: 保存指派状态: %w", err)
+	}
+	if err := s.d.Events.Write(events.KindAssignChanged, machineID, map[string]any{
+		"reason": "degraded_cleared", "mode": configsets.ModeSurvey,
+	}); err != nil {
+		s.log.Warn("写 assign.changed 事件失败", "error", err)
+	}
+	return s.NotifyMachine(machineID, protocol.ReasonAssigned)
+}
+
 // DriftReport 转交给收件箱。未装配时只记日志——开发期单测可能不接 drift。
 func (s *Service) DriftReport(machineID string, rep protocol.DriftReport) {
 	if s.d.Drift == nil {

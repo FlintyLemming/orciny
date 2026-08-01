@@ -37,6 +37,7 @@ type Admin interface {
 	AdoptDriftReviewed(eventIDs, reviewed []string) (string, error)
 	RestoreDrift(eventIDs []string) error
 	IgnoreDrift(eventIDs []string, global bool) error
+	ClearDegraded(machineID string) error
 }
 
 // ---------- config sets ----------
@@ -460,6 +461,20 @@ func (d Deps) ignoreDrift(e *core.RequestEvent) error {
 		return e.BadRequestError("需要 events", nil)
 	}
 	if err := d.Admin.IgnoreDrift(req.Events, req.Global); err != nil {
+		return mapErr(e, err)
+	}
+	return e.NoContent(http.StatusNoContent)
+}
+
+func (d Deps) clearDegraded(e *core.RequestEvent) error {
+	if d.Admin == nil {
+		return e.InternalServerError("管理服务未就绪", nil)
+	}
+	id := e.Request.PathValue("id")
+	if id == "" {
+		return e.BadRequestError("需要机器 id", nil)
+	}
+	if err := d.Admin.ClearDegraded(id); err != nil {
 		return mapErr(e, err)
 	}
 	return e.NoContent(http.StatusNoContent)

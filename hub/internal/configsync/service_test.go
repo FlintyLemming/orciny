@@ -396,6 +396,56 @@ func TestPullOfFreshMachineKeepsApplyMode(t *testing.T) {
 	require.Equal(t, protocol.ModeApply, sent[0].payload.(protocol.ConfigSnapshot).Mode)
 }
 
+// degraded 解除：hub 侧打回 survey，并通知 agent 清掉 health。
+func TestClearDegradedResetsToSurvey(t *testing.T) {
+	r := newRig(t)
+	m := r.machine(t, "fp-degraded")
+	set, err := r.sets.Create("s", "")
+	require.NoError(t, err)
+	_, err = r.sets.SetDraftFile(set.Id, "a", []byte("x"), 0o644, nil)
+	require.NoError(t, err)
+	rev, err := r.revs.Publish(set.Id, "", "publish")
+	require.NoError(t, err)
+	_, err = r.sets.Assign(m, set.Id, "apply")
+	require.NoError(t, err)
+
+	r.svc.ApplyAck(m, protocol.ApplyAck{RevisionID: rev.Id, OK: false, RolledBack: false,
+		Error: "回滚也失败了"})
+	a, err := r.sets.Assignment(m)
+	require.NoError(t, err)
+	require.Equal(t, "degraded", a.GetString("state"))
+
+	require.NoError(t, r.svc.ClearDegraded(m))
+
+	a, err = r.sets.Assignment(m)
+	require.NoError(t, err)
+	require.Equal(t, "survey", a.GetString("mode"),
+		"不知道机器被写成什么样了，不能直接 apply")
+	require.Equal(t, "pending", a.GetString("state"))
+	require.Empty(t, a.GetString("last_error"))
+
+	// 通知 agent 重新拉取（它会拿到一份 survey 快照）
+	require.NotEmpty(t, r.sender.of(protocol.KindConfigNotify))
+}
+
+func TestClearDegradedOnHealthyMachineIsNoop(t *testing.T) {
+	r := newRig(t)
+	m := r.machine(t, "fp-ok")
+	set, err := r.sets.Create("s", "")
+	require.NoError(t, err)
+	_, err = r.sets.SetDraftFile(set.Id, "a", []byte("x"), 0o644, nil)
+	require.NoError(t, err)
+	_, err = r.revs.Publish(set.Id, "", "publish")
+	require.NoError(t, err)
+	_, err = r.sets.Assign(m, set.Id, "apply")
+	require.NoError(t, err)
+
+	require.NoError(t, r.svc.ClearDegraded(m))
+	a, err := r.sets.Assignment(m)
+	require.NoError(t, err)
+	require.Equal(t, "apply", a.GetString("mode"), "健康的机器不该被改成 survey")
+}
+
 // 版本号对不上（比如 agent 停机期间中台发了新版）不算状态丢失。
 func TestPullWithStaleRevisionKeepsApplyMode(t *testing.T) {
 	r := newRig(t)

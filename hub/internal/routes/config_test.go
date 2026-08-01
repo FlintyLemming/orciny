@@ -52,6 +52,7 @@ func (f *fakeAdmin) AdoptDriftReviewed([]string, []string) (string, error) {
 }
 func (f *fakeAdmin) RestoreDrift([]string) error         { return nil }
 func (f *fakeAdmin) IgnoreDrift([]string, bool) error    { return nil }
+func (f *fakeAdmin) ClearDegraded(string) error          { return nil }
 
 func newRouterServer(t *testing.T, d routes.Deps) *httptest.Server {
 	t.Helper()
