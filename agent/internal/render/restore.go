@@ -1,6 +1,7 @@
 package render
 
 import (
+	"bytes"
 	"sort"
 	"strings"
 
@@ -82,7 +83,33 @@ func RestoreWithBase(content, base []byte, creds, vars map[string]string) Restor
 	}
 
 	res.Content = []byte(out)
+
+	// 往返律是正确性支点（spec §6.1）：restore 的产物必须能被 render 回原内容。
+	// 典型反例是值恰好落在 "{" 后面，替换后变成 "{{{cred.x}}"，Parse 会挂；
+	// 或 "{{" + 值 经 EscapeLiteral 后再替换，占位符边界错位。
+	// 对不上或解不动时丢弃内容（Safe=false），调用方只报路径。
+	if res.Safe {
+		back, err := Render(res.Content, restoreLookup(creds, vars))
+		if err != nil || !bytes.Equal(back, content) {
+			res.Safe = false
+		}
+	}
 	return res
+}
+
+func restoreLookup(creds, vars map[string]string) func(protocol.Ref) (string, bool) {
+	return func(r protocol.Ref) (string, bool) {
+		switch r.Kind {
+		case protocol.RefCred:
+			v, ok := creds[r.Name]
+			return v, ok
+		case protocol.RefVar:
+			v, ok := vars[r.Name]
+			return v, ok
+		default:
+			return "", false
+		}
+	}
 }
 
 type replacement struct {
