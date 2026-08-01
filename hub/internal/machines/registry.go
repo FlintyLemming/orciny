@@ -12,6 +12,9 @@ type Conn interface {
 	Fingerprint() string
 	MachineID() string
 	RemoteAddr() string
+	// Send 发一条任意消息。M1 的下发链路走它（ConfigNotify / ConfigSnapshot /
+	// BlobData / DriftCommand / CollectRequest）。
+	Send(kind protocol.Kind, payload any) error
 	// SendAuthResult 用于事后的「授权已撤销」通知（spec §3.3）。
 	SendAuthResult(ok bool, reason string, code uint8) error
 	Close(code uint16, reason string) error

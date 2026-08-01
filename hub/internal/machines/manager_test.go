@@ -28,11 +28,25 @@ type fakeConn struct {
 	closed   bool
 	closeMsg string
 	results  []protocol.AuthResult
+	sent     []struct {
+		kind    protocol.Kind
+		payload any
+	}
 }
 
 func (c *fakeConn) Fingerprint() string { return c.fp }
 func (c *fakeConn) MachineID() string   { return c.id }
 func (c *fakeConn) RemoteAddr() string  { return "127.0.0.1:1234" }
+
+func (c *fakeConn) Send(kind protocol.Kind, payload any) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.sent = append(c.sent, struct {
+		kind    protocol.Kind
+		payload any
+	}{kind, payload})
+	return nil
+}
 
 func (c *fakeConn) SendAuthResult(ok bool, reason string, code uint8) error {
 	c.mu.Lock()
@@ -305,6 +319,47 @@ func TestRegisterUnknownMachineFails(t *testing.T) {
 	err := f.mgr.Register(&fakeConn{fp: "fp-x", id: "不存在的id"})
 	require.Error(t, err)
 	require.Equal(t, 0, f.mgr.Count())
+}
+
+func TestSendToRoutesByMachineID(t *testing.T) {
+	f := newFixture(t)
+	c := f.newMachine(t, "fp-send")
+	require.NoError(t, f.mgr.Register(c))
+
+	require.True(t, f.mgr.Online(c.id))
+	require.NoError(t, f.mgr.SendTo(c.id, protocol.KindConfigNotify,
+		protocol.ConfigNotify{ConfigSetID: "set1", Reason: protocol.ReasonPublished}))
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	require.Len(t, c.sent, 1)
+	require.Equal(t, protocol.KindConfigNotify, c.sent[0].kind)
+}
+
+func TestSendToOfflineMachine(t *testing.T) {
+	f := newFixture(t)
+	c := f.newMachine(t, "fp-offline")
+	require.False(t, f.mgr.Online(c.id))
+	require.ErrorIs(t, f.mgr.SendTo(c.id, protocol.KindConfigNotify, protocol.ConfigNotify{}),
+		machines.ErrOffline)
+}
+
+// 上线回调是离线补发的入口（spec §7.3）：agent 一上线就无条件发一次
+// ConfigNotify，幂等保证它在无事可做时是零写入。
+func TestOnOnlineFiresAfterRegister(t *testing.T) {
+	f := newFixture(t)
+	c := f.newMachine(t, "fp-cb")
+
+	got := make(chan string, 1)
+	f.mgr.OnOnline(func(machineID string) { got <- machineID })
+
+	require.NoError(t, f.mgr.Register(c))
+	select {
+	case v := <-got:
+		require.Equal(t, c.id, v)
+	case <-time.After(2 * time.Second):
+		t.Fatal("上线回调未触发")
+	}
 }
 
 func TestThreeMachinesAreIndependent(t *testing.T) {

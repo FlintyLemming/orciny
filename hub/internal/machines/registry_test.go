@@ -14,6 +14,7 @@ type stubConn struct{ fp string }
 func (s stubConn) Fingerprint() string                      { return s.fp }
 func (s stubConn) MachineID() string                        { return "m1" }
 func (s stubConn) RemoteAddr() string                       { return "127.0.0.1:1" }
+func (s stubConn) Send(protocol.Kind, any) error            { return nil }
 func (s stubConn) SendAuthResult(bool, string, uint8) error { return nil }
 func (s stubConn) Close(uint16, string) error               { return nil }
 

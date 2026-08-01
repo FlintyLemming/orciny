@@ -1,6 +1,7 @@
 package machines
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -11,6 +12,12 @@ import (
 	"github.com/FlintyLemming/orciny/internal/clock"
 	"github.com/FlintyLemming/orciny/protocol"
 )
+
+// ErrOffline 表示目标机器当前没有活跃连接。
+//
+// 这不是错误路径的终点：下发是「hub 发信号、agent 主动拉」，
+// 离线的机器会在上线后由 OnOnline 回调补发（spec §7.3）。
+var ErrOffline = errors.New("machines: 机器不在线")
 
 // Manager 是连接注册表与在线状态机。
 //
@@ -32,6 +39,8 @@ type Manager struct {
 	done     chan struct{}
 	stopOnce sync.Once
 	wg       sync.WaitGroup
+
+	onOnline []func(string)
 }
 
 func NewManager(app core.App, ev *events.Writer, clk clock.Clock, grace time.Duration) *Manager {
@@ -92,7 +101,58 @@ func (m *Manager) Register(c Conn) error {
 			m.app.Logger().Warn("写 machine.connected 事件失败", "error", err)
 		}
 	}
+
+	// 回调放在最后：它会去查库读指派，必须等状态写完。
+	// 起 goroutine 是因为回调里要发 WS 消息，而 Register 跑在读循环上，
+	// 阻塞它会卡住这条连接的后续收信。
+	m.mu.Lock()
+	callbacks := make([]func(string), len(m.onOnline))
+	copy(callbacks, m.onOnline)
+	m.mu.Unlock()
+	for _, fn := range callbacks {
+		go fn(c.MachineID())
+	}
 	return nil
+}
+
+// SendTo 按机器 id 找到当前连接并发一条消息。
+//
+// 注册表按 fingerprint 索引，这里线性扫描：机队规模是「个人的几台机器」，
+// 加一张反向索引只会多一处要同步的状态。
+func (m *Manager) SendTo(machineID string, kind protocol.Kind, payload any) error {
+	m.mu.Lock()
+	var target Conn
+	for _, c := range m.conns {
+		if c.MachineID() == machineID {
+			target = c
+			break
+		}
+	}
+	m.mu.Unlock()
+
+	if target == nil {
+		return fmt.Errorf("%w: %s", ErrOffline, machineID)
+	}
+	return target.Send(kind, payload)
+}
+
+func (m *Manager) Online(machineID string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, c := range m.conns {
+		if c.MachineID() == machineID {
+			return true
+		}
+	}
+	return false
+}
+
+// OnOnline 登记「机器上线」回调。configsync 用它补发 ConfigNotify。
+// 只在装配期调用，因此不做并发保护之外的处理。
+func (m *Manager) OnOnline(fn func(machineID string)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.onOnline = append(m.onOnline, fn)
 }
 
 // Unregister 在连接关闭时调用。
