@@ -51,13 +51,13 @@ func TestParseRoundTrip(t *testing.T) {
 
 func TestValidateRejectsBadManifest(t *testing.T) {
 	for name, m := range map[string]manifest.Manifest{
-		"版本不对":  {Version: 2, Include: []manifest.Include{{Path: "a", Mode: manifest.ModeFile}}},
+		"版本不对":      {Version: 2, Include: []manifest.Include{{Path: "a", Mode: manifest.ModeFile}}},
 		"空 include": {Version: 1},
-		"未知 mode": {Version: 1, Include: []manifest.Include{{Path: "a", Mode: "weird"}}},
-		"keys 无键": {Version: 1, Include: []manifest.Include{{Path: "a", Mode: manifest.ModeKeys}}},
-		"绝对路径":  {Version: 1, Include: []manifest.Include{{Path: "/etc/passwd", Mode: manifest.ModeFile}}},
-		"含 ..":    {Version: 1, Include: []manifest.Include{{Path: "../x", Mode: manifest.ModeFile}}},
-		"恒排除路径": {Version: 1, Include: []manifest.Include{{Path: ".claude/.credentials.json", Mode: manifest.ModeFile}}},
+		"未知 mode":   {Version: 1, Include: []manifest.Include{{Path: "a", Mode: "weird"}}},
+		"keys 无键":   {Version: 1, Include: []manifest.Include{{Path: "a", Mode: manifest.ModeKeys}}},
+		"绝对路径":      {Version: 1, Include: []manifest.Include{{Path: "/etc/passwd", Mode: manifest.ModeFile}}},
+		"含 ..":      {Version: 1, Include: []manifest.Include{{Path: "../x", Mode: manifest.ModeFile}}},
+		"恒排除路径":     {Version: 1, Include: []manifest.Include{{Path: ".claude/.credentials.json", Mode: manifest.ModeFile}}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			require.Error(t, m.Validate())

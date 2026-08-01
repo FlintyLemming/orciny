@@ -192,8 +192,8 @@ func manifestOfState(st *state.State) (manifest.Manifest, error) {
 //
 // agent 不引 go-difflib（那是 hub 侧依赖，agent 要瘦）。输出形如：
 //
-//	- 旧行
-//	+ 新行
+//   - 旧行
+//   - 新行
 //
 // 公共行不打印，避免把整个文件刷到屏幕上。
 func lineDiff(a, b string) []string {

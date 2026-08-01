@@ -15,7 +15,7 @@ import (
 // 抽取为凭据 / 保留明文（二次确认）/ 把该文件移出纳管范围。
 type Finding struct {
 	Path      string `json:"path"`
-	Location  string `json:"location"`  // 结构化位置，如 env.ANTHROPIC_AUTH_TOKEN
+	Location  string `json:"location"` // 结构化位置，如 env.ANTHROPIC_AUTH_TOKEN
 	Key       string `json:"key"`
 	Masked    string `json:"masked"`    // 前 4 后 4，中间省略
 	Suggested string `json:"suggested"` // 由键名派生的建议凭据名
