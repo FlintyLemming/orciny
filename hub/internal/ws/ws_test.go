@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -320,4 +321,121 @@ func TestGarbageFrameClosesConnection(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("无法解码的帧应当导致断开——对面不是我们的 agent")
 	}
+}
+
+type recordingAgent struct {
+	mu   sync.Mutex
+	pull []string
+	acks []protocol.ApplyAck
+}
+
+func (r *recordingAgent) Pull(machineID string, _ protocol.ConfigPull) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.pull = append(r.pull, machineID)
+}
+func (r *recordingAgent) BlobRequest(string, protocol.BlobRequest) {}
+func (r *recordingAgent) ApplyAck(_ string, a protocol.ApplyAck) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.acks = append(r.acks, a)
+}
+func (r *recordingAgent) DriftReport(string, protocol.DriftReport)     {}
+func (r *recordingAgent) CollectResult(string, protocol.CollectResult) {}
+
+func (r *recordingAgent) counts() (int, int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.pull), len(r.acks)
+}
+
+// newAuthedPair 起一个握手完成的连接，可选修改 Deps。
+func newAuthedPair(t *testing.T, tweak func(*ws.Deps)) (*ws.Handler, *rawClient) {
+	t.Helper()
+
+	hubPub, hubPriv, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	_ = hubPub
+	agentPub, agentPriv, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	fp := protocol.Fingerprint(agentPub)
+
+	reg := &recordingRegistry{
+		registered: make(chan string, 4),
+		infos:      make(chan protocol.MachineInfo, 4),
+	}
+	d := ws.Deps{
+		Handshake: handshake.NewServer(
+			mapStore{fp: {ID: "m1", PubKey: agentPub}},
+			keySigner{hubPriv},
+			semver.MustParse("0.1.0"),
+			rand.Reader,
+		),
+		Registry:          reg,
+		HandshakeTimeout:  2 * time.Second,
+		ReadTimeout:       2 * time.Second,
+		HeartbeatInterval: time.Hour,
+	}
+	if tweak != nil {
+		tweak(&d)
+	}
+	h := ws.NewHandler(d)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = h.UpgradeHTTP(w, r)
+	}))
+	t.Cleanup(func() {
+		h.CloseAll()
+		srv.Close()
+		h.Wait()
+	})
+
+	url := "ws" + strings.TrimPrefix(srv.URL, "http")
+	c := dial(t, url)
+
+	nonce, _ := protocol.NewNonce(rand.Reader)
+	c.send(t, protocol.KindHello, protocol.Hello{
+		AgentVersion: "0.1.0", Fingerprint: fp, ClientNonce: nonce,
+	})
+	ch, err := protocol.DecodePayload[protocol.Challenge](c.recv(t))
+	require.NoError(t, err)
+	c.send(t, protocol.KindAuth, protocol.Auth{
+		AgentSig: ed25519.Sign(agentPriv, protocol.AgentSigPayload(ch.ServerNonce, nonce)),
+	})
+	res, err := protocol.DecodePayload[protocol.AuthResult](c.recv(t))
+	require.NoError(t, err)
+	require.True(t, res.OK)
+
+	select {
+	case <-reg.registered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("连接未被登记")
+	}
+	return h, c
+}
+
+// 已认证连接上收到 M1 的消息必须转给业务层，而不是落进
+// 「已认证连接收到意外消息」的 default 分支。
+func TestAuthenticatedMessagesAreRouted(t *testing.T) {
+	rec := &recordingAgent{}
+	h, client := newAuthedPair(t, func(d *ws.Deps) { d.Agent = rec })
+	defer func() { _ = client.conn.WriteClose(1000, nil) }()
+
+	client.send(t, protocol.KindConfigPull, protocol.ConfigPull{Have: "rev1"})
+	client.send(t, protocol.KindApplyAck, protocol.ApplyAck{RevisionID: "rev1", OK: true})
+
+	require.Eventually(t, func() bool {
+		p, a := rec.counts()
+		return p == 1 && a == 1
+	}, 2*time.Second, 5*time.Millisecond)
+	_ = h
+}
+
+// Agent 为 nil 时不能 panic：只关心握手的测试不必装配业务层。
+func TestRoutingIsNoopWhenAgentIsNil(t *testing.T) {
+	h, client := newAuthedPair(t, nil)
+	defer func() { _ = client.conn.WriteClose(1000, nil) }()
+	client.send(t, protocol.KindConfigPull, protocol.ConfigPull{})
+	require.Eventually(t, func() bool { return h.LiveCount() == 1 },
+		2*time.Second, 5*time.Millisecond, "连接不该因此断开")
 }

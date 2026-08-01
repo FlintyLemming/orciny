@@ -16,6 +16,21 @@ import (
 	"github.com/FlintyLemming/orciny/protocol"
 )
 
+// AgentMessages 是 ws 对业务层的全部需求。由 *configsync.Service 实现。
+//
+// 接口定义在这一侧、由业务层反向满足，是为了避免 ws 与 configsync 互相
+// import：configsync 要 Sender（machines.Manager 提供），ws 要 AgentMessages。
+//
+// 全部方法都不返回错误：ws 是搬运工，处理失败该由业务层自己记日志与写事件，
+// 让它冒泡到读循环只会诱使人在这里写 WriteClose。
+type AgentMessages interface {
+	Pull(machineID string, p protocol.ConfigPull)
+	BlobRequest(machineID string, r protocol.BlobRequest)
+	ApplyAck(machineID string, a protocol.ApplyAck)
+	DriftReport(machineID string, d protocol.DriftReport)
+	CollectResult(machineID string, c protocol.CollectResult)
+}
+
 // Deps 是 ws 需要的全部依赖。
 type Deps struct {
 	App       core.App
@@ -23,6 +38,7 @@ type Deps struct {
 	Registry  machines.Registry
 	Events    *events.Writer
 	Clock     clock.Clock
+	Agent     AgentMessages
 
 	HandshakeTimeout  time.Duration
 	ReadTimeout       time.Duration
@@ -121,6 +137,13 @@ func (h *Handler) CloseAll() {
 // 这是关停时的必要一步：读循环会写库（machines.Manager），若在数据库拆掉
 // 之后才跑完，PocketBase 内部会对着 nil 的 DB 解引用。
 func (h *Handler) Wait() { h.wg.Wait() }
+
+// LiveCount 返回当前活跃连接数，仅供测试使用。
+func (h *Handler) LiveCount() int {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return len(h.live)
+}
 
 // —— gws.Event 实现 ——
 
@@ -254,10 +277,36 @@ func (h *Handler) handleAuthenticated(c *Conn, env protocol.Envelope) {
 		if err := h.d.Registry.UpdateInfo(c, info); err != nil {
 			h.log.Warn("更新机器信息失败", "fingerprint", c.Fingerprint(), "error", err)
 		}
+	case protocol.KindConfigPull:
+		dispatch(h, c, env, func(p protocol.ConfigPull) { h.d.Agent.Pull(c.MachineID(), p) })
+	case protocol.KindBlobRequest:
+		dispatch(h, c, env, func(r protocol.BlobRequest) { h.d.Agent.BlobRequest(c.MachineID(), r) })
+	case protocol.KindApplyAck:
+		dispatch(h, c, env, func(a protocol.ApplyAck) { h.d.Agent.ApplyAck(c.MachineID(), a) })
+	case protocol.KindDriftReport:
+		dispatch(h, c, env, func(d protocol.DriftReport) { h.d.Agent.DriftReport(c.MachineID(), d) })
+	case protocol.KindCollectResult:
+		dispatch(h, c, env, func(r protocol.CollectResult) { h.d.Agent.CollectResult(c.MachineID(), r) })
 	default:
 		// 已认证连接上收到握手类消息属于异常，但不值得断开。
 		h.log.Warn("已认证连接收到意外消息", "kind", env.Kind.String(), "fingerprint", c.Fingerprint())
 	}
+}
+
+// dispatch 解 payload 并交给业务层。Agent 为 nil 时静默丢弃——
+// 只关心握手的测试不必装配业务层，留一条会 nil deref 的路径不如不走。
+func dispatch[T any](h *Handler, c *Conn, env protocol.Envelope, fn func(T)) {
+	if h.d.Agent == nil {
+		h.log.Debug("未装配业务层，忽略消息", "kind", env.Kind.String())
+		return
+	}
+	v, err := protocol.DecodePayload[T](env)
+	if err != nil {
+		h.log.Warn("解析消息失败", "kind", env.Kind.String(),
+			"fingerprint", c.Fingerprint(), "error", err)
+		return
+	}
+	fn(v)
 }
 
 // heartbeat 按配置的间隔主动 ping。心跳不走信封——直接用 WebSocket 原生帧，
