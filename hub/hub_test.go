@@ -1,14 +1,21 @@
 package hub_test
 
 import (
+	"bytes"
+	"encoding/base64"
+	"net/http"
 	"testing"
 	"time"
 
+	"github.com/pocketbase/pocketbase/apis"
+	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 	"github.com/stretchr/testify/require"
 
 	"github.com/FlintyLemming/orciny"
 	"github.com/FlintyLemming/orciny/hub"
+	"github.com/FlintyLemming/orciny/hub/internal/credentials"
+	"github.com/FlintyLemming/orciny/hub/internal/events"
 	"github.com/FlintyLemming/orciny/internal/clock"
 )
 
@@ -76,4 +83,37 @@ func TestStartOnAttachedHubIsRejected(t *testing.T) {
 
 	err = h.Start()
 	require.Error(t, err, "Attach 出来的 hub 没有 pocketbase 实例，Start 必须明确报错而不是 panic")
+}
+
+// 库里有凭据但主密钥解不开时必须拒绝启动（spec §6.6）。
+func TestServeFailsWhenMasterKeyDoesNotMatch(t *testing.T) {
+	app, err := tests.NewTestApp(t.TempDir())
+	require.NoError(t, err)
+	t.Cleanup(app.Cleanup)
+
+	// 先用当前主密钥存一条凭据
+	key, err := credentials.LoadMasterKey(app.DataDir())
+	require.NoError(t, err)
+	store := credentials.NewStore(app, key, events.NewWriter(app))
+	_, err = store.Create("k", "sk-value-1234", "")
+	require.NoError(t, err)
+
+	// 再把主密钥换掉，模拟「恢复备份时忘了带密钥文件」
+	t.Setenv(credentials.EnvKeyName,
+		base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{7}, 32)))
+
+	h, err := hub.Attach(app, hub.Config{})
+	require.NoError(t, err)
+	t.Cleanup(h.Shutdown)
+
+	se := new(core.ServeEvent)
+	se.App = app
+	router, err := apis.NewRouter(app)
+	require.NoError(t, err)
+	se.Router = router
+	se.Server = &http.Server{}
+
+	err = app.OnServe().Trigger(se, func(*core.ServeEvent) error { return nil })
+	require.Error(t, err, "主密钥不匹配必须让 serve 失败")
+	require.ErrorContains(t, err, "主密钥")
 }

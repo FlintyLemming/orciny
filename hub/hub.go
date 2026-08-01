@@ -14,6 +14,7 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 
 	"github.com/FlintyLemming/orciny"
+	"github.com/FlintyLemming/orciny/hub/internal/credentials"
 	"github.com/FlintyLemming/orciny/hub/internal/enroll"
 	"github.com/FlintyLemming/orciny/hub/internal/events"
 	"github.com/FlintyLemming/orciny/hub/internal/handshake"
@@ -38,6 +39,7 @@ type Hub struct {
 	enroll   *enroll.Service
 	machines *machines.Manager
 	ws       *ws.Handler
+	creds    *credentials.Store
 
 	// pb 仅在 New 创建时非 nil。Attach 出来的实例由调用方驱动 serve。
 	pb *pocketbase.PocketBase
@@ -88,6 +90,17 @@ func Attach(app core.App, cfg Config) (*Hub, error) {
 			return fmt.Errorf("加载 hub 密钥: %w", err)
 		}
 		e.App.Logger().Info("hub 身份就绪", "fingerprint", h.identity.Fingerprint())
+
+		// 凭据主密钥。必须排在 ws 之前：一台解不开凭据的 hub 不该接客
+		// ——它会把空值下发到全机队（spec §6.6）。
+		key, err := credentials.LoadMasterKey(e.App.DataDir())
+		if err != nil {
+			return fmt.Errorf("加载凭据主密钥: %w", err)
+		}
+		h.creds = credentials.NewStore(e.App, key, h.events)
+		if err := h.creds.VerifyAll(); err != nil {
+			return err
+		}
 
 		// 内存里的注册表此刻是空的，库里可能还留着上次进程退出时的 online。
 		// 必须赶在 WS 端点接客之前翻掉，否则会和真实重连交叉写状态。
