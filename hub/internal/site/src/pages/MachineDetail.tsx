@@ -1,16 +1,24 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '@nanostores/react'
 import { Trans } from '@lingui/react/macro'
 import { ArrowLeft } from 'lucide-react'
 import { $machines, subscribeMachines } from '@/stores/machines'
 import { $events, subscribeEvents } from '@/stores/events'
 import { $configSets, subscribeConfigSets } from '@/stores/configsets'
+import {
+  $drifts,
+  filterDrifts,
+  subscribeDrifts,
+  toDriftEvent,
+} from '@/stores/drift'
 import { StatusDot } from '@/components/StatusDot'
-import { Placeholder } from '@/components/Placeholder'
 import { AssignDialog } from '@/components/AssignDialog'
 import { VariablesEditor } from '@/components/VariablesEditor'
+import { DegradedBanner } from '@/components/DegradedBanner'
+import { ApplyHistory } from '@/components/ApplyHistory'
+import { DriftCard } from '@/components/DriftCard'
 import { navigate } from '@/router'
-import { assignConfigSet } from '@/lib/api'
+import { assignConfigSet, clearDegraded } from '@/lib/api'
 import { pb } from '@/lib/pb'
 import {
   COLLECTION_ASSIGNMENTS,
@@ -43,19 +51,32 @@ const eventLabel: Partial<Record<EventKind, React.ReactNode>> = {
   'import.completed': <Trans>导入完成</Trans>,
 }
 
+const stateLabel: Record<string, React.ReactNode> = {
+  pending: <Trans>待对齐</Trans>,
+  applying: <Trans>应用中</Trans>,
+  aligned: <Trans>已对齐</Trans>,
+  failed: <Trans>失败</Trans>,
+  degraded: <Trans>降级</Trans>,
+  paused: <Trans>已暂停</Trans>,
+}
+
 export function MachineDetail({ id }: { id: string }) {
   const machines = useStore($machines)
   const events = useStore($events)
   const configSets = useStore($configSets)
+  const drifts = useStore($drifts)
   const machine = machines.find((m) => m.id === id)
 
   const [assignment, setAssignment] = useState<AssignmentRecord | null>(null)
   const [showAssign, setShowAssign] = useState(false)
   const [error, setError] = useState('')
+  const [clearBusy, setClearBusy] = useState(false)
+  const [assignTick, setAssignTick] = useState(0)
 
   useEffect(() => subscribeMachines(), [])
   useEffect(() => subscribeEvents(id), [id])
   useEffect(() => subscribeConfigSets(), [])
+  useEffect(() => subscribeDrifts(), [])
 
   useEffect(() => {
     let cancelled = false
@@ -74,7 +95,12 @@ export function MachineDetail({ id }: { id: string }) {
     return () => {
       cancelled = true
     }
-  }, [id, showAssign])
+  }, [id, showAssign, assignTick])
+
+  const openDrifts = useMemo(
+    () => filterDrifts(drifts, 'open', id).map(toDriftEvent),
+    [drifts, id],
+  )
 
   if (!machine) {
     return (
@@ -82,6 +108,19 @@ export function MachineDetail({ id }: { id: string }) {
         <Trans>找不到这台机器。</Trans>
       </p>
     )
+  }
+
+  async function handleClearDegraded() {
+    setClearBusy(true)
+    setError('')
+    try {
+      await clearDegraded(id)
+      setAssignTick((n) => n + 1)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setClearBusy(false)
+    }
   }
 
   return (
@@ -116,6 +155,15 @@ export function MachineDetail({ id }: { id: string }) {
         </dl>
       </section>
 
+      {assignment && (
+        <DegradedBanner
+          state={assignment.state}
+          lastError={assignment.last_error}
+          busy={clearBusy}
+          onClear={() => void handleClearDegraded()}
+        />
+      )}
+
       {error && <p className="text-sm text-rose-600">{error}</p>}
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -131,12 +179,14 @@ export function MachineDetail({ id }: { id: string }) {
               </div>
               <div>
                 <dt className="text-xs text-ink3"><Trans>模式</Trans></dt>
-                <dd>{assignment.mode}</dd>
+                <dd>
+                  {assignment.mode === 'apply' ? <Trans>应用</Trans> : <Trans>先看看（survey）</Trans>}
+                </dd>
               </div>
               <div>
                 <dt className="text-xs text-ink3"><Trans>状态</Trans></dt>
                 <dd>
-                  {assignment.state}
+                  {stateLabel[assignment.state] ?? assignment.state}
                   {assignment.last_error && (
                     <span className="mt-1 block text-xs text-rose-600">{assignment.last_error}</span>
                   )}
@@ -173,10 +223,38 @@ export function MachineDetail({ id }: { id: string }) {
         </section>
 
         <section className="rounded-lg border border-line bg-surface p-4">
-          <h2 className="mb-2 text-sm font-semibold">
-            <Trans>漂移</Trans>
-          </h2>
-          <Placeholder milestone="M1" />
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-sm font-semibold">
+              <Trans>本机漂移</Trans>
+            </h2>
+            {openDrifts.length > 0 && (
+              <button
+                type="button"
+                onClick={() => navigate('inbox')}
+                className="text-xs text-accent"
+              >
+                <Trans>去收件箱</Trans>
+              </button>
+            )}
+          </div>
+          {openDrifts.length === 0 ? (
+            <p className="text-sm text-ink3">
+              <Trans>无未处理漂移。</Trans>
+            </p>
+          ) : (
+            <ul className="max-h-80 space-y-2 overflow-auto">
+              {openDrifts.slice(0, 5).map((e) => (
+                <li key={e.id}>
+                  <DriftCard event={e} selected={false} onToggle={() => navigate('inbox')} />
+                </li>
+              ))}
+              {openDrifts.length > 5 && (
+                <li className="text-xs text-ink3">
+                  <Trans>另有 {openDrifts.length - 5} 条，请到收件箱处理</Trans>
+                </li>
+              )}
+            </ul>
+          )}
         </section>
 
         <section className="rounded-lg border border-line bg-surface p-4">
@@ -186,6 +264,13 @@ export function MachineDetail({ id }: { id: string }) {
           <VariablesEditor machineId={id} />
         </section>
       </div>
+
+      <section className="rounded-lg border border-line bg-surface p-5">
+        <h2 className="mb-3 text-sm font-semibold">
+          <Trans>apply 回执历史</Trans>
+        </h2>
+        <ApplyHistory events={events} />
+      </section>
 
       <section className="rounded-lg border border-line bg-surface p-5">
         <h2 className="mb-3 text-sm font-semibold">
@@ -218,7 +303,10 @@ export function MachineDetail({ id }: { id: string }) {
           onClose={() => setShowAssign(false)}
           onSubmit={({ configSet, mode }) => {
             void assignConfigSet(id, configSet, mode)
-              .then(() => setShowAssign(false))
+              .then(() => {
+                setShowAssign(false)
+                setAssignTick((n) => n + 1)
+              })
               .catch((e: Error) => setError(e.message))
           }}
         />
