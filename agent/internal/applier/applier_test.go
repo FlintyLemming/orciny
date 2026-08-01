@@ -43,9 +43,15 @@ func (f failFS) Stat(path string) (os.FileInfo, error) { return f.inner.Stat(pat
 
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
+	home := t.TempDir()
+	// macOS 的 /var → /private/var：ResolveUnder 会 EvalSymlinks，
+	// failFS 用相对路径匹配时必须同一口径，否则写失败注入永远不触发。
+	if resolved, err := filepath.EvalSymlinks(home); err == nil {
+		home = resolved
+	}
 	fx := &fixture{
 		dir:    t.TempDir(),
-		home:   t.TempDir(),
+		home:   home,
 		clk:    clock.NewFake(time.Date(2026, 7, 31, 12, 0, 0, 0, time.UTC)),
 		failOn: map[string]bool{},
 	}

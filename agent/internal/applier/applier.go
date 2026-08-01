@@ -81,6 +81,9 @@ func (a *Applier) ApplyWithHook(
 	if next == nil {
 		next = &state.State{Files: map[string]state.FileState{}, Health: state.HealthOK}
 	}
+	if next.Health == "" {
+		next.Health = state.HealthOK
+	}
 
 	// degraded 是终态，只有人工解除才出来（spec §7.4 第 2 条）：
 	// 一次写坏之后继续按新版本去写，只会把现场破坏得更彻底。
