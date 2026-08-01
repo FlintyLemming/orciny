@@ -56,14 +56,15 @@ func TestDebounceCollapsesBurst(t *testing.T) {
 	go func() { _ = fx.w.Run(ctx) }()
 
 	fx.write(t, ".claude/CLAUDE.md", "改了\n")
-	for range 5 {
-		fx.notify(t, ".claude/CLAUDE.md")
+	// 第一次 Notify 等到 debounce 挂上；其余只注入信号，模拟突发。
+	fx.notify(t, ".claude/CLAUDE.md")
+	for range 4 {
+		fx.w.Notify(".claude/CLAUDE.md")
 	}
 	require.Equal(t, 0, rep.count(), "去抖窗口内不该上报")
 
-	fx.advance(t, 2*time.Second)
-	require.Eventually(t, func() bool { return rep.count() == 1 },
-		2*time.Second, 5*time.Millisecond, "去抖到期后应当上报一次")
+	fx.waitReport(t, rep.count, 1)
+	require.Equal(t, 1, rep.count(), "突发只应合并成一次上报")
 	require.Equal(t, []string{".claude/CLAUDE.md"}, rep.paths())
 }
 
@@ -80,8 +81,7 @@ func TestThrottleSuppressesRepeatWithin30s(t *testing.T) {
 
 	fx.write(t, ".claude/CLAUDE.md", "第一次改\n")
 	fx.notify(t, ".claude/CLAUDE.md")
-	fx.advance(t, 2*time.Second)
-	require.Eventually(t, func() bool { return rep.count() == 1 }, 2*time.Second, 5*time.Millisecond)
+	fx.waitReport(t, rep.count, 1)
 
 	fx.write(t, ".claude/CLAUDE.md", "第二次改\n")
 	fx.notify(t, ".claude/CLAUDE.md")
@@ -91,9 +91,7 @@ func TestThrottleSuppressesRepeatWithin30s(t *testing.T) {
 
 	fx.advance(t, 30*time.Second)
 	fx.notify(t, ".claude/CLAUDE.md")
-	fx.advance(t, 2*time.Second)
-	require.Eventually(t, func() bool { return rep.count() == 2 },
-		2*time.Second, 5*time.Millisecond, "过了节流窗口应当再报")
+	fx.waitReport(t, rep.count, 2)
 }
 
 // 定时全量对账兜底 fsnotify 漏事件（网络文件系统、容器 bind mount）。

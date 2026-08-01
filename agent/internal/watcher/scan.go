@@ -45,13 +45,13 @@ type Options struct {
 
 // Watcher 持有当前基线与 secrets，对磁盘做对账扫描，并可跑 fsnotify 主循环。
 type Watcher struct {
-	o       Options
-	clk     clock.Clock
-	log     *slog.Logger
-	cache   *blobcache.Cache
-	report  func(items []protocol.DriftItem, full bool) error
-	debounce      time.Duration
-	reconcile     time.Duration
+	o              Options
+	clk            clock.Clock
+	log            *slog.Logger
+	cache          *blobcache.Cache
+	report         func(items []protocol.DriftItem, full bool) error
+	debounce       time.Duration
+	reconcile      time.Duration
 	throttleWindow time.Duration
 
 	mu           sync.Mutex

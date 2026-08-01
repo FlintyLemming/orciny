@@ -100,14 +100,22 @@ func (fx *fixture) rebuild(t *testing.T, report func([]protocol.DriftItem, bool)
 // Run 启动后 reconcile ticker 一直在册，TimerCount 恒 ≥ 1；
 // 若只等「有定时器」再 Advance，会赶在 debounce 臂上之前把时钟推走，
 // 事件就丢了（M0 教训 L 的变体）。
+//
+// 更细的坑：Run 的 goroutine 还没挂上 ticker 时 TimerCount==0，
+// 若用「n > before」判断，ticker 一挂上（n=1）条件就成立，
+// 此时 debounce 还没臂——随后 Advance 只推进空窗，上报永远不来。
+// 所以必须先等到 Run 就绪（≥1），再等到 debounce 也在册（≥2）。
 func (fx *fixture) notify(t *testing.T, path string) {
 	t.Helper()
-	before := fx.clk.TimerCount()
-	fx.w.Notify(path)
 	require.Eventually(t, func() bool {
-		n := fx.clk.TimerCount()
-		// 新挂 debounce：1→2；或替换仍在册的 debounce：保持 ≥ 2
-		return n > before || n >= 2
+		return fx.clk.TimerCount() >= 1
+	}, 2*time.Second, 5*time.Millisecond, "Run 尚未挂上 reconcile ticker")
+
+	// manual 通道容量 1：若上一次信号还没被消费，这里是 no-op。
+	// 重试直到 debounce 确实在册（ticker + debounce = 2）。
+	require.Eventually(t, func() bool {
+		fx.w.Notify(path)
+		return fx.clk.TimerCount() >= 2
 	}, 2*time.Second, 5*time.Millisecond, "debounce 定时器未挂上")
 }
 
@@ -118,6 +126,24 @@ func (fx *fixture) advance(t *testing.T, d time.Duration) {
 		return fx.clk.TimerCount() > 0
 	}, 2*time.Second, 5*time.Millisecond, "定时器未挂上")
 	fx.clk.Advance(d)
+}
+
+// waitReport 推进去抖窗口直到 rep 达到 want 次上报。
+//
+// 假时钟下 Advance 瞬间让 debounceC 与 manual 可能同时就绪，select 若先走
+// manual 会丢弃已到期的滴答并重新 arm——再推一轮即可。真时钟下两次事件
+// 间隔不会是 0，不会踩到这条路径。
+func (fx *fixture) waitReport(t *testing.T, count func() int, want int) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		if count() >= want {
+			return true
+		}
+		if fx.clk.TimerCount() >= 2 {
+			fx.clk.Advance(2 * time.Second)
+		}
+		return false
+	}, 2*time.Second, 5*time.Millisecond, "去抖到期后应当上报（want %d）", want)
 }
 
 func TestScanCleanStateHasNoDrift(t *testing.T) {
