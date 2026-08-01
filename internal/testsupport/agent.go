@@ -17,14 +17,21 @@ import (
 // agent.yml 已写好。
 type TestAgent struct {
 	Dir         string
+	ManagedHome string
 	IdentityDir string
 	Fingerprint string
 	MachineID   string
 }
 
 // NewTestAgent 走真实的公开 enroll 入口接入给定的 TestHub。
-func NewTestAgent(t *testing.T, th *TestHub) *TestAgent {
+//
+// managedHome 必须显式给出（spec §2.3）：它是被管理的 HOME，
+// 即 ~/.claude 所在之处。参数而不是可选项，是为了让「忘了隔离」这件事
+// 在编译期就发生——一次疏忽会让集成测试去改开发者本人的 ~/.claude。
+// 不关心配置管理的用例传 t.TempDir() 即可。
+func NewTestAgent(t *testing.T, th *TestHub, managedHome string) *TestAgent {
 	t.Helper()
+	require.NotEmpty(t, managedHome, "managedHome 必须显式给出")
 
 	dir := t.TempDir()
 	token, _, err := th.Hub.IssueEnrollToken()
@@ -38,8 +45,15 @@ func NewTestAgent(t *testing.T, th *TestHub) *TestAgent {
 	})
 	require.NoError(t, err, "agent enroll")
 
+	// enroll 写过 agent.yml 了，这里补上 managed_home。
+	cfg, err := agent.LoadConfig(dir)
+	require.NoError(t, err, "读回 agent.yml")
+	cfg.ManagedHome = managedHome
+	require.NoError(t, agent.SaveConfig(dir, cfg), "写回 agent.yml")
+
 	return &TestAgent{
 		Dir:         dir,
+		ManagedHome: managedHome,
 		IdentityDir: filepath.Join(dir, "identity"),
 		Fingerprint: res.Fingerprint,
 		MachineID:   res.MachineID,

@@ -20,7 +20,7 @@ import (
 
 func TestEnrollEndToEnd(t *testing.T) {
 	th := testsupport.NewTestHub(t)
-	ta := testsupport.NewTestAgent(t, th)
+	ta := testsupport.NewTestAgent(t, th, t.TempDir())
 
 	require.Len(t, ta.Fingerprint, 32)
 
@@ -39,7 +39,7 @@ func TestEnrollEndToEnd(t *testing.T) {
 
 func TestReEnrollSameMachine(t *testing.T) {
 	th := testsupport.NewTestHub(t)
-	ta := testsupport.NewTestAgent(t, th)
+	ta := testsupport.NewTestAgent(t, th, t.TempDir())
 
 	token, _, err := th.Hub.IssueEnrollToken()
 	require.NoError(t, err)
@@ -59,7 +59,7 @@ func TestThreeAgentsEnrollIndependently(t *testing.T) {
 
 	fps := map[string]bool{}
 	for i := 0; i < 3; i++ {
-		ta := testsupport.NewTestAgent(t, th)
+		ta := testsupport.NewTestAgent(t, th, t.TempDir())
 		require.False(t, fps[ta.Fingerprint], "三台机器的指纹必须互不相同")
 		fps[ta.Fingerprint] = true
 	}
@@ -71,7 +71,7 @@ func TestThreeAgentsEnrollIndependently(t *testing.T) {
 
 func TestAgentHandshakeAgainstRealHub(t *testing.T) {
 	th := testsupport.NewTestHub(t)
-	ta := testsupport.NewTestAgent(t, th)
+	ta := testsupport.NewTestAgent(t, th, t.TempDir())
 
 	s := ta.Connect(t, th)
 	select {
@@ -83,7 +83,7 @@ func TestAgentHandshakeAgainstRealHub(t *testing.T) {
 
 func TestAgentWithTamperedHubKeyRefusesToConnect(t *testing.T) {
 	th := testsupport.NewTestHub(t)
-	ta := testsupport.NewTestAgent(t, th)
+	ta := testsupport.NewTestAgent(t, th, t.TempDir())
 
 	// 篡改钉扎的 hub 公钥（对应 DoD #7）
 	other, _, err := ed25519.GenerateKey(rand.Reader)
@@ -101,7 +101,7 @@ func TestAgentWithTamperedHubKeyRefusesToConnect(t *testing.T) {
 
 func TestUnenrolledAgentIsRejectedWithCode(t *testing.T) {
 	th := testsupport.NewTestHub(t)
-	ta := testsupport.NewTestAgent(t, th)
+	ta := testsupport.NewTestAgent(t, th, t.TempDir())
 
 	// 删掉 hub 侧的机器记录，模拟「指纹未登记」
 	m, err := th.App.FindRecordById("machines", ta.MachineID)
@@ -114,4 +114,23 @@ func TestUnenrolledAgentIsRejectedWithCode(t *testing.T) {
 	})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "code=1", "应带 CodeUnknownFingerprint")
+}
+
+// 两个 HOME 必须真的分开（spec §2.3）。
+func TestTestAgentHasSeparateHomes(t *testing.T) {
+	th := testsupport.NewTestHub(t)
+	managed := t.TempDir()
+	ta := testsupport.NewTestAgent(t, th, managed)
+
+	require.Equal(t, managed, ta.ManagedHome)
+	require.NotEqual(t, ta.Dir, ta.ManagedHome, "agent 数据目录与受管 HOME 不能是同一个")
+
+	cfg, err := agent.LoadConfig(ta.Dir)
+	require.NoError(t, err)
+	require.Equal(t, managed, cfg.ManagedHome, "managed_home 必须落进 agent.yml")
+
+	home, err := os.UserHomeDir()
+	if err == nil {
+		require.NotEqual(t, home, ta.ManagedHome, "测试绝不能指向开发者本人的 home")
+	}
 }

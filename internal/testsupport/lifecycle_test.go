@@ -15,7 +15,7 @@ import (
 
 func TestConnectMarksMachineOnline(t *testing.T) {
 	th := testsupport.NewTestHub(t)
-	ta := testsupport.NewTestAgent(t, th)
+	ta := testsupport.NewTestAgent(t, th, t.TempDir())
 	require.Equal(t, "offline", th.MachineStatus(t, ta.MachineID))
 
 	ta.Connect(t, th)
@@ -25,7 +25,7 @@ func TestConnectMarksMachineOnline(t *testing.T) {
 
 func TestMachineInfoLandsInRecord(t *testing.T) {
 	th := testsupport.NewTestHub(t)
-	ta := testsupport.NewTestAgent(t, th)
+	ta := testsupport.NewTestAgent(t, th, t.TempDir())
 	ta.Connect(t, th)
 	th.RequireStatus(t, ta.MachineID, "online")
 
@@ -38,7 +38,7 @@ func TestMachineInfoLandsInRecord(t *testing.T) {
 // 断开后 6 秒无重连 → offline（spec §12.2）
 func TestDisconnectGoesOfflineAfterGrace(t *testing.T) {
 	th := testsupport.NewTestHub(t)
-	ta := testsupport.NewTestAgent(t, th)
+	ta := testsupport.NewTestAgent(t, th, t.TempDir())
 	s := ta.Connect(t, th)
 	th.RequireStatus(t, ta.MachineID, "online")
 
@@ -51,7 +51,7 @@ func TestDisconnectGoesOfflineAfterGrace(t *testing.T) {
 // 断开后 3 秒内重连 → 状态始终 online，不产生 disconnected 事件
 func TestReconnectWithinGraceStaysOnline(t *testing.T) {
 	th := testsupport.NewTestHub(t)
-	ta := testsupport.NewTestAgent(t, th)
+	ta := testsupport.NewTestAgent(t, th, t.TempDir())
 	s := ta.Connect(t, th)
 	th.RequireStatus(t, ta.MachineID, "online")
 
@@ -69,7 +69,7 @@ func TestReconnectWithinGraceStaysOnline(t *testing.T) {
 // 同指纹二次连接 → 旧连接被踢，状态保持 online，不产生 disconnected 事件
 func TestSecondConnectionKeepsOnline(t *testing.T) {
 	th := testsupport.NewTestHub(t)
-	ta := testsupport.NewTestAgent(t, th)
+	ta := testsupport.NewTestAgent(t, th, t.TempDir())
 
 	first := ta.Connect(t, th)
 	th.RequireStatus(t, ta.MachineID, "online")
@@ -91,7 +91,7 @@ func TestSecondConnectionKeepsOnline(t *testing.T) {
 // 删除机器 → 活跃连接被踢
 func TestDeleteMachineKicksConnection(t *testing.T) {
 	th := testsupport.NewTestHub(t)
-	ta := testsupport.NewTestAgent(t, th)
+	ta := testsupport.NewTestAgent(t, th, t.TempDir())
 	s := ta.Connect(t, th)
 	th.RequireStatus(t, ta.MachineID, "online")
 
@@ -115,7 +115,7 @@ func TestThreeAgentsConnectIndependently(t *testing.T) {
 
 	agents := make([]*testsupport.TestAgent, 3)
 	for i := range agents {
-		agents[i] = testsupport.NewTestAgent(t, th)
+		agents[i] = testsupport.NewTestAgent(t, th, t.TempDir())
 		agents[i].Connect(t, th)
 	}
 	for _, a := range agents {
@@ -134,7 +134,7 @@ func TestThreeAgentsConnectIndependently(t *testing.T) {
 // hub 重启 → 幽灵 online 被清理
 func TestHubRestartClearsGhosts(t *testing.T) {
 	th := testsupport.NewTestHub(t)
-	ta := testsupport.NewTestAgent(t, th)
+	ta := testsupport.NewTestAgent(t, th, t.TempDir())
 	ta.Connect(t, th)
 	th.RequireStatus(t, ta.MachineID, "online")
 
@@ -148,7 +148,7 @@ func TestHubRestartClearsGhosts(t *testing.T) {
 // 这里只验证「线接对了」。
 func TestAgentRunConnectsAndStopsCleanly(t *testing.T) {
 	th := testsupport.NewTestHub(t)
-	ta := testsupport.NewTestAgent(t, th)
+	ta := testsupport.NewTestAgent(t, th, t.TempDir())
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
