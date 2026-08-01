@@ -157,6 +157,14 @@ export interface VariableRecord {
 export type DriftKind = 'added' | 'modified' | 'deleted'
 export type DriftState = 'open' | 'adopted' | 'restored' | 'ignored' | 'superseded'
 
+export interface BlobRecord {
+  id: string
+  hash: string
+  size: number
+  content: string
+  created: string
+}
+
 export interface DriftEventRecord {
   id: string
   machine: string
@@ -174,6 +182,11 @@ export interface DriftEventRecord {
   resolved_at: string
   created: string
   updated: string
+  expand?: {
+    machine?: MachineRecord
+    config_set?: ConfigSetRecord
+    current_blob?: BlobRecord
+  }
 }
 
 export interface IgnoreRuleRecord {

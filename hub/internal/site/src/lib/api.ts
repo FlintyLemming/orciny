@@ -177,6 +177,25 @@ export function extractCredential(setId: string, path: string, location: string,
   return postJSON(`/api/orciny/config-sets/${setId}/extract`, { path, location, name })
 }
 
+export function adoptDrift(events: string[], reviewed: string[] = []) {
+  return postJSON<{ revision: string }>('/api/orciny/drift/adopt', {
+    events,
+    reviewed: reviewed.length > 0 ? reviewed : undefined,
+  })
+}
+
+export function restoreDrift(events: string[]) {
+  return postJSON('/api/orciny/drift/restore', { events })
+}
+
+export function ignoreDrift(events: string[], global = false) {
+  return postJSON('/api/orciny/drift/ignore', { events, global })
+}
+
+export function clearDegraded(machineId: string) {
+  return postJSON(`/api/orciny/machines/${machineId}/clear-degraded`)
+}
+
 /** 把 PB 草稿条目规范化成小写键（兼容旧数据的 Path/Hash 大写）。 */
 export function normalizeFileEntry(raw: Record<string, unknown>): FileEntry {
   return {

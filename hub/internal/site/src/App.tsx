@@ -11,6 +11,7 @@ import { ConfigSets } from '@/pages/ConfigSets'
 import { ConfigSetDetail } from '@/pages/ConfigSetDetail'
 import { Credentials } from '@/pages/Credentials'
 import { ImportWizard } from '@/pages/ImportWizard'
+import { Inbox } from '@/pages/Inbox'
 
 export function App() {
   const authed = useStore($authed)
@@ -24,7 +25,7 @@ export function App() {
       {route.key === 'configsets' && (route.param ? <ConfigSetDetail id={route.param} /> : <ConfigSets />)}
       {route.key === 'credentials' && <Credentials />}
       {route.key === 'import' && <ImportWizard machineId={route.param} />}
-      {route.key === 'inbox' && <Placeholder milestone="M1" />}
+      {route.key === 'inbox' && <Inbox />}
       {(route.key === 'overview' || route.key === 'usage' || route.key === 'subscriptions') && (
         <Placeholder milestone="M2" />
       )}
