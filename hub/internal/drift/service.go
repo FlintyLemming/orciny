@@ -1,7 +1,6 @@
 package drift
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -15,9 +14,6 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/revisions"
 	"github.com/FlintyLemming/orciny/protocol"
 )
-
-// ErrConflict 表示多台机器改了同一路径，收编前必须先做三方对比（子计划 14）。
-var ErrConflict = errors.New("drift: 多台机器改了同一路径，必须先做三方对比")
 
 // Deps 是 drift.Service 的全部外部依赖。
 type Deps struct {

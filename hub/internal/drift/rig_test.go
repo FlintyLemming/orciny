@@ -1,6 +1,7 @@
 package drift_test
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/pocketbase/pocketbase/core"
@@ -9,12 +10,51 @@ import (
 
 	"github.com/FlintyLemming/orciny/hub/internal/blobs"
 	"github.com/FlintyLemming/orciny/hub/internal/configsets"
+	"github.com/FlintyLemming/orciny/hub/internal/configsync"
 	"github.com/FlintyLemming/orciny/hub/internal/credentials"
 	"github.com/FlintyLemming/orciny/hub/internal/drift"
 	"github.com/FlintyLemming/orciny/hub/internal/events"
 	_ "github.com/FlintyLemming/orciny/hub/internal/migrations"
 	"github.com/FlintyLemming/orciny/hub/internal/revisions"
+	"github.com/FlintyLemming/orciny/protocol"
 )
+
+type sentMsg struct {
+	machine string
+	kind    protocol.Kind
+	payload any
+}
+
+type fakeSender struct {
+	mu     sync.Mutex
+	sent   []sentMsg
+	online map[string]bool
+}
+
+func (f *fakeSender) SendTo(machineID string, kind protocol.Kind, payload any) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.sent = append(f.sent, sentMsg{machineID, kind, payload})
+	return nil
+}
+
+func (f *fakeSender) Online(machineID string) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.online[machineID]
+}
+
+func (f *fakeSender) of(kind protocol.Kind) []sentMsg {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []sentMsg
+	for _, m := range f.sent {
+		if m.kind == kind {
+			out = append(out, m)
+		}
+	}
+	return out
+}
 
 type rig struct {
 	app       *tests.TestApp
@@ -22,6 +62,8 @@ type rig struct {
 	sets      *configsets.Service
 	revs      *revisions.Service
 	events    *events.Writer
+	sync      *configsync.Service
+	sender    *fakeSender
 	svc       *drift.Service
 	machineID string
 	setID     string
@@ -38,18 +80,30 @@ func newRig(t *testing.T) *rig {
 	ev := events.NewWriter(app)
 	key, err := credentials.LoadMasterKey(t.TempDir())
 	require.NoError(t, err)
-	_ = credentials.NewStore(app, key, ev) // 确保主密钥存在，后续若需凭据可复用
+	creds := credentials.NewStore(app, key, ev)
+
+	sender := &fakeSender{online: map[string]bool{}}
+	sets := configsets.NewService(app, b, ev)
+	revs := revisions.NewService(app, b, ev)
+	syncSvc := configsync.NewService(configsync.Deps{
+		App: app, Blobs: b, Sets: sets, Revs: revs, Creds: creds,
+		Events: ev, Sender: sender,
+	})
 
 	r := &rig{
 		app:    app,
 		blobs:  b,
-		sets:   configsets.NewService(app, b, ev),
-		revs:   revisions.NewService(app, b, ev),
+		sets:   sets,
+		revs:   revs,
 		events: ev,
+		sync:   syncSvc,
+		sender: sender,
 	}
 	r.svc = drift.NewService(drift.Deps{
 		App: app, Blobs: b, Sets: r.sets, Revs: r.revs, Events: ev,
+		Sync: r.sync,
 	})
+	r.sync.SetDrift(r.svc)
 
 	// 预置一台机器
 	c, err := app.FindCollectionByNameOrId("machines")
@@ -58,8 +112,10 @@ func newRig(t *testing.T) *rig {
 	m.Set("fingerprint", "fp-drift-1")
 	m.Set("pub_key", "pk-drift-1")
 	m.Set("status", "online")
+	m.Set("name", "主力机")
 	require.NoError(t, app.Save(m))
 	r.machineID = m.Id
+	r.sender.online[m.Id] = true
 
 	return r
 }
@@ -79,6 +135,60 @@ func (r *rig) assign(t *testing.T) {
 	r.revID = rev.Id
 }
 
+func (r *rig) createMachine(t *testing.T, fp, name string) string {
+	t.Helper()
+	c, err := r.app.FindCollectionByNameOrId("machines")
+	require.NoError(t, err)
+	m := core.NewRecord(c)
+	m.Set("fingerprint", fp)
+	m.Set("pub_key", "pk-"+fp)
+	m.Set("status", "online")
+	if name != "" {
+		m.Set("name", name)
+	}
+	require.NoError(t, r.app.Save(m))
+	r.sender.online[m.Id] = true
+	return m.Id
+}
+
+// secondMachine 再建一台机器并指派到同一配置集。
+func (r *rig) secondMachine(t *testing.T) string {
+	t.Helper()
+	id := r.createMachine(t, "fp-drift-2", "副机")
+	if r.setID != "" {
+		_, err := r.sets.Assign(id, r.setID, configsets.ModeApply)
+		require.NoError(t, err)
+	}
+	return id
+}
+
+// secondMachineWithOwnSet 再建一台机器，配独立配置集并发布。
+func (r *rig) secondMachineWithOwnSet(t *testing.T) (machineID, setID string) {
+	t.Helper()
+	machineID = r.createMachine(t, "fp-drift-own", "独立机")
+	set, err := r.sets.Create("另一套", "")
+	require.NoError(t, err)
+	_, err = r.sets.SetDraftFile(set.Id, "b", []byte("基线\n"), 0o644, nil)
+	require.NoError(t, err)
+	_, err = r.revs.Publish(set.Id, "v1", "publish")
+	require.NoError(t, err)
+	_, err = r.sets.Assign(machineID, set.Id, configsets.ModeApply)
+	require.NoError(t, err)
+	return machineID, set.Id
+}
+
+func (r *rig) report(t *testing.T, items ...protocol.DriftItem) {
+	t.Helper()
+	r.reportAs(t, r.machineID, items...)
+}
+
+func (r *rig) reportAs(t *testing.T, machineID string, items ...protocol.DriftItem) {
+	t.Helper()
+	require.NoError(t, r.svc.HandleReport(machineID, protocol.DriftReport{
+		Items: items, Final: true,
+	}))
+}
+
 func (r *rig) drifts(t *testing.T) []*core.Record {
 	t.Helper()
 	recs, err := r.app.FindRecordsByFilter("drift_events",
@@ -87,11 +197,11 @@ func (r *rig) drifts(t *testing.T) []*core.Record {
 	return recs
 }
 
+// openDrifts 返回全部 open 漂移（跨机器），供冲突与多选测试使用。
 func (r *rig) openDrifts(t *testing.T) []*core.Record {
 	t.Helper()
 	recs, err := r.app.FindRecordsByFilter("drift_events",
-		"machine = {:m} && state = 'open'", "path", 0, 0,
-		map[string]any{"m": r.machineID})
+		"state = 'open'", "path", 0, 0, nil)
 	require.NoError(t, err)
 	return recs
 }
@@ -143,14 +253,7 @@ func (r *rig) addIgnoreRule(t *testing.T, machineID, path string) {
 
 func (r *rig) otherMachineID(t *testing.T) string {
 	t.Helper()
-	c, err := r.app.FindCollectionByNameOrId("machines")
-	require.NoError(t, err)
-	m := core.NewRecord(c)
-	m.Set("fingerprint", "fp-drift-other")
-	m.Set("pub_key", "pk-drift-other")
-	m.Set("status", "offline")
-	require.NoError(t, r.app.Save(m))
-	return m.Id
+	return r.createMachine(t, "fp-drift-other", "")
 }
 
 func (r *rig) requireEvent(t *testing.T, kind string) {
