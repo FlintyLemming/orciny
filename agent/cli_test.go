@@ -13,18 +13,12 @@ import (
 	"github.com/FlintyLemming/orciny/agent/internal/state"
 )
 
+// bytes 仍被 TestVersionCommandPrintsVersion 使用。
+
 // runCLI 跑一条 agent 子命令，合并 stdout/stderr 返回。
 func runCLI(t *testing.T, dir string, args ...string) (string, error) {
 	t.Helper()
-	var out bytes.Buffer
-	root := newRootCmd()
-	root.SetOut(&out)
-	root.SetErr(&out)
-	full := append([]string{}, args...)
-	full = append(full, "--dir", dir)
-	root.SetArgs(full)
-	err := root.Execute()
-	return out.String(), err
+	return RunCLIForTest(dir, args...)
 }
 
 // seedEnrolled 写 agent.yml + identity，模拟 enroll 之后的本机状态。

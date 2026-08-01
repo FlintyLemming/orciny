@@ -30,6 +30,7 @@ func newRootCmd() *cobra.Command {
 	root.AddCommand(newVersionCmd())
 	root.AddCommand(newEnrollCmd())
 	root.AddCommand(newRunCmd(), newStatusCmd(), newSyncCmd())
+	root.AddCommand(newDriftCmd(), newPauseCmd(), newResumeCmd())
 	return root
 }
 
