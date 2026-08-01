@@ -8,11 +8,11 @@ import { $route, navigate, type RouteKey } from '@/router'
 const items: { key: RouteKey; icon: typeof Server; label: React.ReactNode; milestone?: string }[] = [
   { key: 'overview', icon: Gauge, label: <Trans>总览</Trans>, milestone: 'M2' },
   { key: 'machines', icon: Server, label: <Trans>机器</Trans> },
-  { key: 'configsets', icon: Layers, label: <Trans>配置集</Trans>, milestone: 'M1' },
+  { key: 'configsets', icon: Layers, label: <Trans>配置集</Trans> },
   { key: 'inbox', icon: Inbox, label: <Trans>收件箱</Trans>, milestone: 'M1' },
   { key: 'usage', icon: Boxes, label: <Trans>用量</Trans>, milestone: 'M2' },
   { key: 'subscriptions', icon: CreditCard, label: <Trans>订阅</Trans>, milestone: 'M2' },
-  { key: 'credentials', icon: KeyRound, label: <Trans>凭据</Trans>, milestone: 'M1' },
+  { key: 'credentials', icon: KeyRound, label: <Trans>凭据</Trans> },
   { key: 'settings', icon: Cog, label: <Trans>设置</Trans> },
 ]
 
