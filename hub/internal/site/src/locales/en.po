@@ -13,6 +13,22 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+#: src/pages/ImportWizard.tsx
+msgid "1. 采集"
+msgstr ""
+
+#: src/pages/ImportWizard.tsx
+msgid "2. 纳管范围"
+msgstr ""
+
+#: src/pages/ImportWizard.tsx
+msgid "3. 敏感项"
+msgstr ""
+
+#: src/pages/ImportWizard.tsx
+msgid "4. 发布"
+msgstr ""
+
 #: src/pages/Settings.tsx
 msgid "agent 更新策略"
 msgstr "Agent update policy"
@@ -31,6 +47,28 @@ msgstr "Claude Code"
 msgid "hub 版本"
 msgstr "Hub version"
 
+#. placeholder {0}: s.expand.head.seq
+#. placeholder {1}: s.note || '—'
+#: src/pages/ConfigSets.tsx
+msgid "v{0} · {1}"
+msgstr ""
+
+#: src/pages/MachineDetail.tsx
+msgid "上报漂移"
+msgstr ""
+
+#: src/pages/ImportWizard.tsx
+msgid "下一步：发布"
+msgstr ""
+
+#: src/pages/ImportWizard.tsx
+msgid "下一步：敏感项"
+msgstr ""
+
+#: src/components/AssignDialog.tsx
+msgid "不写盘，差异进收件箱"
+msgstr ""
+
 #: src/pages/MachineDetail.tsx
 msgid "主机名"
 msgstr "Hostname"
@@ -38,6 +76,54 @@ msgstr "Hostname"
 #: src/pages/MachineDetail.tsx
 msgid "事件流"
 msgstr "Event stream"
+
+#: src/components/AssignDialog.tsx
+msgid "仅对账（survey）"
+msgstr ""
+
+#: src/pages/ImportWizard.tsx
+msgid "从在线机器采集 ~/.claude 配置，生成草稿配置集。"
+msgstr ""
+
+#: src/pages/MachineDetail.tsx
+msgid "从本机导入"
+msgstr ""
+
+#: src/pages/ConfigSetDetail.tsx
+msgid "从草稿中移除 {selected}？"
+msgstr ""
+
+#: src/components/PublishDialog.tsx
+msgid "例如：同步 CLAUDE.md 更新"
+msgstr ""
+
+#: src/pages/ConfigSetDetail.tsx
+msgid "保存中…"
+msgstr ""
+
+#: src/pages/ConfigSetDetail.tsx
+msgid "保存到草稿"
+msgstr ""
+
+#: src/components/VariablesEditor.tsx
+msgid "保存变量"
+msgstr ""
+
+#: src/components/FindingList.tsx
+msgid "保留明文"
+msgstr ""
+
+#: src/components/VariablesEditor.tsx
+msgid "值"
+msgstr ""
+
+#: src/pages/Credentials.tsx
+msgid "值（至少 {MIN_LEN} 字符）"
+msgstr ""
+
+#: src/pages/ConfigSets.tsx
+msgid "克隆"
+msgstr ""
 
 #: src/pages/Settings.tsx
 msgid "公钥指纹"
@@ -53,8 +139,43 @@ msgid "最后心跳"
 msgstr "Last seen"
 
 #: src/components/Sidebar.tsx
+#: src/pages/Credentials.tsx
 msgid "凭据"
 msgstr "Credentials"
+
+#: src/pages/Credentials.tsx
+msgid "凭据值至少 {MIN_LEN} 个字符"
+msgstr ""
+
+#: src/pages/ImportWizard.tsx
+msgid "凭据名称"
+msgstr ""
+
+#: src/pages/MachineDetail.tsx
+msgid "凭据已创建"
+msgstr ""
+
+#: src/pages/MachineDetail.tsx
+msgid "凭据已删除"
+msgstr ""
+
+#: src/pages/MachineDetail.tsx
+msgid "凭据已轮换"
+msgstr ""
+
+#: src/pages/Credentials.tsx
+msgid "列表只显示末四位。值不会出现在版本历史或日志里。"
+msgstr ""
+
+#: src/pages/ConfigSets.tsx
+#: src/pages/Credentials.tsx
+msgid "创建"
+msgstr ""
+
+#: src/pages/ConfigSets.tsx
+#: src/pages/Credentials.tsx
+msgid "删除"
+msgstr ""
 
 #: src/pages/Machines.tsx
 msgid "删除后该机器的 agent 会停止重试，需要重新 enroll。确定删除？"
@@ -64,13 +185,62 @@ msgstr "Once deleted, this machine's agent stops retrying and must enroll again.
 msgid "删除机器"
 msgstr "Delete machine"
 
+#: src/pages/ConfigSetDetail.tsx
+#: src/pages/ConfigSets.tsx
+#: src/pages/Credentials.tsx
 #: src/pages/Machines.tsx
 msgid "加载中…"
 msgstr "Loading…"
 
+#: src/pages/ImportWizard.tsx
+msgid "勾选取消不想纳管的文件，然后继续。"
+msgstr ""
+
+#: src/components/PublishDialog.tsx
+#: src/pages/ConfigSetDetail.tsx
+#: src/pages/ImportWizard.tsx
+msgid "发布"
+msgstr ""
+
+#: src/pages/ConfigSetDetail.tsx
+msgid "发布中"
+msgstr ""
+
+#: src/components/PublishDialog.tsx
+msgid "发布中…"
+msgstr ""
+
+#: src/pages/ConfigSetDetail.tsx
+msgid "发布失败"
+msgstr ""
+
+#: src/components/PublishDialog.tsx
+msgid "发布配置集"
+msgstr ""
+
+#: src/components/AssignDialog.tsx
+#: src/components/FindingList.tsx
+#: src/components/PublishDialog.tsx
+#: src/pages/ConfigSets.tsx
+#: src/pages/Credentials.tsx
+msgid "取消"
+msgstr ""
+
 #: src/pages/Machines.tsx
 msgid "名称"
 msgstr "Name"
+
+#: src/pages/Credentials.tsx
+msgid "名称（字母数字_-）"
+msgstr ""
+
+#: src/components/VersionHistory.tsx
+msgid "回滚"
+msgstr ""
+
+#: src/pages/MachineDetail.tsx
+msgid "回滚失败"
+msgstr ""
 
 #: src/components/AddMachineDialog.tsx
 msgid "在目标机器上执行这行命令即可接入："
@@ -80,6 +250,10 @@ msgstr "Run this command on the target machine to connect it:"
 msgid "在线"
 msgstr "Online"
 
+#: src/pages/ImportWizard.tsx
+msgid "处理敏感项：抽取为凭据（推荐）、保留明文（进版本历史）、或移出纳管。"
+msgstr ""
+
 #: src/pages/Settings.tsx
 msgid "备份"
 msgstr "Backups"
@@ -87,6 +261,10 @@ msgstr "Backups"
 #: src/pages/Settings.tsx
 msgid "备份与恢复在 PocketBase 管理后台操作。注意：hub 的私钥也在数据目录里， 恢复时若丢了它，所有 agent 都需要重新 enroll。"
 msgstr "Backup and restore are handled in the PocketBase admin UI. Note: the hub's private key also lives in the data directory — if a restore loses it, every agent must enroll again."
+
+#: src/pages/Credentials.tsx
+msgid "备注（可选）"
+msgstr ""
 
 #: src/components/AddMachineDialog.tsx
 msgid "复制安装命令"
@@ -100,9 +278,49 @@ msgstr "Pass this fingerprint to the agent via --hub-key for out-of-band verific
 msgid "密码"
 msgstr "Password"
 
+#: src/components/VersionHistory.tsx
+msgid "对比"
+msgstr ""
+
+#: src/pages/ImportWizard.tsx
+msgid "导入向导"
+msgstr ""
+
+#: src/pages/MachineDetail.tsx
+msgid "导入完成"
+msgstr ""
+
+#: src/components/PublishDialog.tsx
+msgid "将影响 {affectedMachines} 台机器"
+msgstr ""
+
+#: src/components/AssignDialog.tsx
+msgid "将覆盖本机 {applyFileCount} 个文件"
+msgstr ""
+
+#: src/components/AssignDialog.tsx
+msgid "将覆盖本机受管文件"
+msgstr ""
+
+#: src/components/VersionHistory.tsx
+msgid "尚未发布任何版本。"
+msgstr ""
+
+#: src/pages/MachineDetail.tsx
+msgid "尚未指派配置集。"
+msgstr ""
+
 #: src/pages/MachineDetail.tsx
 msgid "已删除"
 msgstr "Removed"
+
+#: src/pages/ConfigSetDetail.tsx
+msgid "已对齐 head"
+msgstr ""
+
+#: src/pages/MachineDetail.tsx
+msgid "已应用版本"
+msgstr ""
 
 #: src/pages/MachineDetail.tsx
 msgid "已断开"
@@ -120,6 +338,22 @@ msgstr "Enrolled"
 msgid "已连接"
 msgstr "Connected"
 
+#: src/pages/MachineDetail.tsx
+msgid "应用失败"
+msgstr ""
+
+#: src/pages/MachineDetail.tsx
+msgid "应用成功"
+msgstr ""
+
+#: src/components/AssignDialog.tsx
+msgid "应用配置集"
+msgstr ""
+
+#: src/pages/ImportWizard.tsx
+msgid "开始采集"
+msgstr ""
+
 #: src/components/Sidebar.tsx
 msgid "总览"
 msgstr "Overview"
@@ -132,9 +366,25 @@ msgstr "Open backup settings"
 msgid "找不到这台机器。"
 msgstr "Machine not found."
 
+#: src/components/FindingList.tsx
+msgid "抽取为凭据"
+msgstr ""
+
 #: src/pages/Machines.tsx
 msgid "持续在线"
 msgstr "Currently online"
+
+#: src/pages/MachineDetail.tsx
+msgid "指派"
+msgstr ""
+
+#: src/pages/MachineDetail.tsx
+msgid "指派已变更"
+msgstr ""
+
+#: src/components/AssignDialog.tsx
+msgid "指派配置集"
+msgstr ""
 
 #: src/pages/MachineDetail.tsx
 msgid "指纹"
@@ -144,13 +394,55 @@ msgstr "Fingerprint"
 msgid "收件箱"
 msgstr "Inbox"
 
+#: src/pages/ConfigSetDetail.tsx
+msgid "文件"
+msgstr ""
+
+#: src/pages/Credentials.tsx
+msgid "新值（至少 {MIN_LEN} 字符）"
+msgstr ""
+
+#: src/pages/ConfigSets.tsx
+#: src/pages/Credentials.tsx
+msgid "新建"
+msgstr ""
+
+#: src/pages/ConfigSets.tsx
+msgid "新配置集名称"
+msgstr ""
+
+#: src/components/DiffView.tsx
+msgid "无内容 diff"
+msgstr ""
+
+#: src/components/DiffView.tsx
+msgid "无差异"
+msgstr ""
+
 #: src/components/AddMachineDialog.tsx
 msgid "无法写入剪贴板，请手动复制上面的命令。"
 msgstr "Couldn't write to the clipboard — please copy the command above manually."
 
+#: src/pages/ConfigSets.tsx
+msgid "暂停下发"
+msgstr ""
+
 #: src/pages/MachineDetail.tsx
 msgid "暂无事件。"
 msgstr "No events yet."
+
+#: src/pages/ConfigSetDetail.tsx
+msgid "有未发布改动"
+msgstr ""
+
+#: src/pages/ConfigSetDetail.tsx
+msgid "未保存 diff"
+msgstr ""
+
+#. placeholder {0}: s.note || '—'
+#: src/pages/ConfigSets.tsx
+msgid "未发布 · {0}"
+msgstr ""
 
 #: src/components/Sidebar.tsx
 #: src/pages/Machines.tsx
@@ -165,9 +457,41 @@ msgstr "Machine variables"
 msgid "机器名称"
 msgstr "Machine name"
 
+#: src/components/VersionHistory.tsx
+msgid "查看 diff"
+msgstr ""
+
+#: src/pages/ImportWizard.tsx
+msgid "校验未通过"
+msgstr ""
+
+#: src/components/PublishDialog.tsx
+msgid "校验未通过，无法发布"
+msgstr ""
+
+#: src/pages/ImportWizard.tsx
+msgid "校验通过，可以发布为 v1。"
+msgstr ""
+
+#: src/pages/MachineDetail.tsx
+msgid "模式"
+msgstr ""
+
+#: src/components/AssignDialog.tsx
+msgid "模式（必选）"
+msgstr ""
+
+#: src/components/PublishDialog.tsx
+msgid "正在校验…"
+msgstr ""
+
 #: src/components/AddMachineDialog.tsx
 msgid "正在签发注册 token…"
 msgstr "Issuing enroll token…"
+
+#: src/pages/ImportWizard.tsx
+msgid "没有待处理的敏感项。"
+msgstr ""
 
 #: src/components/ThemeToggle.tsx
 msgid "浅色"
@@ -176,6 +500,11 @@ msgstr "Light"
 #: src/components/ThemeToggle.tsx
 msgid "深色"
 msgstr "Dark"
+
+#: src/components/VariablesEditor.tsx
+#: src/pages/ConfigSetDetail.tsx
+msgid "添加"
+msgstr ""
 
 #: src/components/AddMachineDialog.tsx
 #: src/pages/Machines.tsx
@@ -186,6 +515,32 @@ msgstr "Add machine"
 msgid "漂移"
 msgstr "Drift"
 
+#: src/pages/MachineDetail.tsx
+msgid "漂移已忽略"
+msgstr ""
+
+#: src/pages/MachineDetail.tsx
+msgid "漂移已恢复"
+msgstr ""
+
+#: src/pages/MachineDetail.tsx
+msgid "漂移已收编"
+msgstr ""
+
+#: src/pages/MachineDetail.tsx
+msgid "漂移已覆盖"
+msgstr ""
+
+#: src/pages/ConfigSetDetail.tsx
+msgid "版本历史"
+msgstr ""
+
+#: src/components/PublishDialog.tsx
+#: src/pages/ImportWizard.tsx
+msgid "版本说明"
+msgstr ""
+
+#: src/pages/MachineDetail.tsx
 #: src/pages/Machines.tsx
 msgid "状态"
 msgstr "Status"
@@ -206,13 +561,49 @@ msgstr "Sign in"
 msgid "登录中…"
 msgstr "Signing in…"
 
+#: src/pages/ConfigSetDetail.tsx
+msgid "相对 HOME 的路径，例如 .claude/CLAUDE.md"
+msgstr ""
+
+#: src/components/AssignDialog.tsx
+msgid "确定"
+msgstr ""
+
+#: src/pages/Credentials.tsx
+msgid "确定删除凭据 {credName}？"
+msgstr ""
+
+#: src/components/FindingList.tsx
+msgid "确认"
+msgstr ""
+
+#: src/pages/Credentials.tsx
+msgid "确认轮换"
+msgstr ""
+
 #: src/components/StatusDot.tsx
 msgid "离线"
 msgstr "Offline"
 
+#: src/components/FindingList.tsx
+msgid "移出纳管"
+msgstr ""
+
+#: src/pages/ConfigSetDetail.tsx
+msgid "移除"
+msgstr ""
+
+#: src/pages/ImportWizard.tsx
+msgid "稍后在编辑器里处理"
+msgstr ""
+
 #: src/pages/Settings.tsx
 msgid "站点信息"
 msgstr "Site info"
+
+#: src/pages/ImportWizard.tsx
+msgid "等待采集超时，请确认机器在线后重试"
+msgstr ""
 
 #: src/pages/MachineDetail.tsx
 msgid "签发注册 token"
@@ -222,6 +613,10 @@ msgstr "Enroll token issued"
 #: src/pages/Machines.tsx
 msgid "系统"
 msgstr "OS"
+
+#: src/pages/ConfigSetDetail.tsx
+msgid "编辑器"
+msgstr ""
 
 #: src/components/Sidebar.tsx
 msgid "订阅"
@@ -241,9 +636,21 @@ msgstr "Settings"
 msgid "该 token 一次性使用，{0} 后过期。新机器上线后本窗口会自动关闭。"
 msgstr "This token is single-use and expires in {0}. This dialog closes automatically once the new machine comes online."
 
+#: src/components/FindingList.tsx
+msgid "该值将进入不可变的版本历史。确定保留明文？"
+msgstr ""
+
+#: src/pages/Credentials.tsx
+msgid "该凭据仍被配置集引用，请先去掉引用再删。"
+msgstr ""
+
 #: src/components/Placeholder.tsx
 msgid "该功能将在 {milestone} 提供"
 msgstr "Coming in {milestone}"
+
+#: src/pages/ConfigSets.tsx
+msgid "该配置集的全部版本历史将被删除，且无法恢复；已指派的机器会失去指派，但磁盘上的文件不会被动。确定删除？"
+msgstr ""
 
 #: src/pages/Machines.tsx
 msgid "详情"
@@ -253,17 +660,41 @@ msgstr "Details"
 msgid "跟随系统"
 msgstr "System"
 
+#: src/pages/Credentials.tsx
+msgid "轮换"
+msgstr ""
+
+#: src/pages/Credentials.tsx
+msgid "轮换凭据"
+msgstr ""
+
+#: src/pages/ConfigSetDetail.tsx
+msgid "返回"
+msgstr ""
+
 #: src/pages/MachineDetail.tsx
 msgid "返回列表"
 msgstr "Back to list"
+
+#: src/pages/Credentials.tsx
+msgid "还没有凭据。"
+msgstr ""
 
 #: src/pages/Machines.tsx
 msgid "还没有机器。点「添加机器」拿到一行安装命令。"
 msgstr "No machines yet. Click \"Add machine\" to get a one-line install command."
 
+#: src/pages/ConfigSets.tsx
+msgid "还没有配置集。从一台机器导入，或点右上角新建。"
+msgstr ""
+
 #: src/components/Shell.tsx
 msgid "退出"
 msgstr "Sign out"
+
+#: src/pages/ConfigSetDetail.tsx
+msgid "选择左侧文件开始编辑"
+msgstr ""
 
 #: src/pages/Login.tsx
 msgid "邮箱"
@@ -277,10 +708,33 @@ msgstr "Incorrect email or password"
 msgid "配置对齐状态"
 msgstr "Config alignment"
 
+#: src/components/AssignDialog.tsx
 #: src/components/Sidebar.tsx
+#: src/pages/ConfigSets.tsx
+#: src/pages/MachineDetail.tsx
 msgid "配置集"
 msgstr "Config sets"
+
+#: src/pages/ConfigSets.tsx
+msgid "配置集名称"
+msgstr ""
+
+#: src/pages/MachineDetail.tsx
+msgid "配置集已发布"
+msgstr ""
+
+#: src/pages/MachineDetail.tsx
+msgid "配置集已回滚"
+msgstr ""
+
+#: src/pages/ImportWizard.tsx
+msgid "采集中…"
+msgstr ""
 
 #: src/pages/MachineDetail.tsx
 msgid "重新注册"
 msgstr "Re-enrolled"
+
+#: src/components/VariablesEditor.tsx
+msgid "键"
+msgstr ""
