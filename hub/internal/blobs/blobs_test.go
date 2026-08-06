@@ -54,6 +54,29 @@ func TestGetRoundTrips(t *testing.T) {
 	require.Equal(t, content, got)
 }
 
+// 空内容是合法草稿：UI「添加文件」会先以空 body 建条目。
+// PocketBase FileField 不能存 0 字节文件，Put/Get 必须特判。
+func TestPutGetEmptyContent(t *testing.T) {
+	app := newApp(t)
+	s := blobs.New(app)
+
+	h, err := s.Put(nil)
+	require.NoError(t, err)
+	require.Equal(t, blobs.Hash(nil), h)
+
+	got, err := s.Get(h)
+	require.NoError(t, err)
+	require.Empty(t, got)
+
+	// 去重路径：再 Put 一次不该报错或新建记录
+	h2, err := s.Put([]byte{})
+	require.NoError(t, err)
+	require.Equal(t, h, h2)
+	recs, err := app.FindAllRecords("blobs")
+	require.NoError(t, err)
+	require.Len(t, recs, 1)
+}
+
 func TestGetMissingReturnsErrNotFound(t *testing.T) {
 	app := newApp(t)
 	s := blobs.New(app)

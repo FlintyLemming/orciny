@@ -47,14 +47,18 @@ func (s *Store) PutTx(txApp core.App, content []byte) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("blobs: 找不到 collection: %w", err)
 	}
-	f, err := filesystem.NewFileFromBytes(content, h)
-	if err != nil {
-		return "", fmt.Errorf("blobs: 构造文件: %w", err)
-	}
 	r := core.NewRecord(c)
 	r.Set("hash", h)
 	r.Set("size", len(content))
-	r.Set("content", f)
+	// PocketBase 的 NewFileFromBytes 拒绝空内容（cannot create an empty file）。
+	// 空文件是合法草稿（UI「添加文件」先建空再编辑），size=0 且不挂 content 文件。
+	if len(content) > 0 {
+		f, err := filesystem.NewFileFromBytes(content, h)
+		if err != nil {
+			return "", fmt.Errorf("blobs: 构造文件: %w", err)
+		}
+		r.Set("content", f)
+	}
 	if err := txApp.Save(r); err != nil {
 		// 并发写同一 hash 时唯一索引会让后来者失败。此时对方已经写成功，
 		// 结果与我们想要的完全一致，因此当成成功。
@@ -74,6 +78,10 @@ func (s *Store) Get(hash string) ([]byte, error) {
 	}
 	name := r.GetString("content")
 	if name == "" {
+		// size=0 的空 blob 故意不挂 content 文件（见 PutTx）。
+		if r.GetInt("size") == 0 {
+			return []byte{}, nil
+		}
 		return nil, fmt.Errorf("%w: %s（记录在但文件为空）", ErrNotFound, hash)
 	}
 

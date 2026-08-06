@@ -128,3 +128,14 @@ func TestSetDraftFileRejectsOversizeAndBadPath(t *testing.T) {
 	_, err = s.SetDraftFile(set.Id, ".claude/.credentials.json", []byte("x"), 0o600, nil)
 	require.ErrorContains(t, err, "恒排除")
 }
+
+func TestSetDraftFileEmptyContent(t *testing.T) {
+	_, s := newService(t)
+	set, err := s.Create("s", "")
+	require.NoError(t, err)
+
+	e, err := s.SetDraftFile(set.Id, ".claude/settings.json", []byte{}, 0o644, nil)
+	require.NoError(t, err)
+	require.Equal(t, uint32(0), e.Size)
+	require.NotEmpty(t, e.Hash)
+}
