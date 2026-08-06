@@ -91,7 +91,12 @@ export function CodeEditor({ value, path, onChange, knownRefs, readOnly }: CodeE
       }),
       EditorView.theme({
         '&': { height: '100%', fontSize: '13px' },
-        '.cm-scroller': { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' },
+        // scroller 自己滚，宿主高度由外层 flex 槽决定，避免内容把编辑器撑到盖住下方 diff
+        '.cm-scroller': {
+          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+          overflow: 'auto',
+        },
+        '.cm-content': { minHeight: '100%' },
       }),
       EditorState.readOnly.of(!!readOnly),
     ]
@@ -117,5 +122,6 @@ export function CodeEditor({ value, path, onChange, knownRefs, readOnly }: CodeE
     }
   }, [value])
 
-  return <div ref={host} className="h-full min-h-[320px] overflow-hidden rounded border border-line bg-surface" />
+  // min-h-0：作为 flex 子项时可被压缩；不要写死 min-h，否则下方 diff 一出现就会和编辑器重叠
+  return <div ref={host} className="h-full min-h-0 overflow-hidden rounded border border-line bg-surface" />
 }

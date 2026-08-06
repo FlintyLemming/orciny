@@ -24,7 +24,7 @@ export function DiffView({
 
   if (localRows) {
     return (
-      <pre className="overflow-auto rounded border border-line bg-wash p-3 font-mono text-xs leading-5">
+      <pre className="max-h-full overflow-auto rounded border border-line bg-wash p-3 font-mono text-xs leading-5">
         {localRows.map((r, i) => (
           <div
             key={i}
