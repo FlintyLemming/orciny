@@ -14,6 +14,8 @@ import { FileTree } from '@/components/FileTree'
 import { CodeEditor } from '@/components/CodeEditor'
 import { DiffView } from '@/components/DiffView'
 import { PublishDialog } from '@/components/PublishDialog'
+import { AddFileDialog } from '@/components/AddFileDialog'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { VersionHistory } from '@/components/VersionHistory'
 import {
   getBlob,
@@ -37,6 +39,8 @@ export function ConfigSetDetail({ id }: { id: string }) {
   const [baseline, setBaseline] = useState('')
   const [draftState, setDraftState] = useState<DraftState>('clean')
   const [showPublish, setShowPublish] = useState(false)
+  const [showAddFile, setShowAddFile] = useState(false)
+  const [pendingDeletePath, setPendingDeletePath] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [affected, setAffected] = useState(0)
@@ -50,6 +54,9 @@ export function ConfigSetDetail({ id }: { id: string }) {
   }, [set])
 
   const paths = draftFiles.map((f) => f.path)
+  const selectedEntry = draftFiles.find((f) => f.path === selected)
+  const selectedHash = selectedEntry?.hash ?? ''
+  const unsaved = Boolean(selected) && content !== baseline
 
   const knownRefs = useMemo(() => {
     const refs = creds.map((c) => `cred.${c.name}`)
@@ -68,41 +75,51 @@ export function ConfigSetDetail({ id }: { id: string }) {
       .catch(() => setAffected(0))
   }, [id])
 
+  // 只在「选中路径」或「该文件的 hash」变化时重载内容。
+  // 不能依赖整个 draftFiles：保存/实时推送会换新数组引用，
+  // 否则会把编辑器里尚未落库的内容冲掉。
   useEffect(() => {
     if (!selected) {
       setContent('')
       setBaseline('')
       return
     }
-    const entry = draftFiles.find((f) => f.path === selected)
-    if (!entry?.hash) {
+    if (!selectedHash) {
       setContent('')
       setBaseline('')
       return
     }
     let cancelled = false
-    void getBlob(entry.hash).then((text) => {
-      if (cancelled) return
-      setContent(text)
-      setBaseline(text)
-    }).catch((e: Error) => {
-      if (!cancelled) setError(e.message)
-    })
+    void getBlob(selectedHash)
+      .then((text) => {
+        if (cancelled) return
+        setContent(text)
+        setBaseline(text)
+      })
+      .catch((e: Error) => {
+        if (!cancelled) setError(e.message)
+      })
     return () => {
       cancelled = true
     }
-  }, [selected, draftFiles])
+  }, [selected, selectedHash])
+
+  /** 把编辑器里未落库的内容写入草稿。发布/切文件前必须先调用。 */
+  async function flushUnsaved(): Promise<void> {
+    if (!selected || !set || content === baseline) return
+    const entry = draftFiles.find((f) => f.path === selected)
+    await setDraftFile(set.id, selected, content, entry?.mode || 0o644, entry?.keys)
+    setDraftState((s) => nextDraftState(s, { type: 'save' }))
+    setBaseline(content)
+    await reloadConfigSet(set.id)
+  }
 
   async function handleSave() {
     if (!selected || !set) return
     setSaving(true)
     setError('')
     try {
-      const entry = draftFiles.find((f) => f.path === selected)
-      await setDraftFile(set.id, selected, content, entry?.mode || 0o644, entry?.keys)
-      setDraftState((s) => nextDraftState(s, { type: 'save' }))
-      setBaseline(content)
-      await reloadConfigSet(set.id)
+      await flushUnsaved()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -110,12 +127,42 @@ export function ConfigSetDetail({ id }: { id: string }) {
     }
   }
 
-  async function handleDeleteFile() {
-    if (!selected || !set) return
-    if (!window.confirm(t`从草稿中移除 ${selected}？`)) return
+  async function handleSelectFile(path: string) {
+    if (path === selected) return
+    setError('')
     try {
-      await removeDraftFile(set.id, selected)
-      setSelected('')
+      await flushUnsaved()
+      setSelected(path)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  async function openPublish() {
+    setError('')
+    setSaving(true)
+    try {
+      // 发布冻结的是服务端草稿；编辑器本地改动若不先 flush，
+      // 会把「新建空文件 + 只在前端写过内容」发成空文件。
+      await flushUnsaved()
+      setShowPublish(true)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDeleteFile(path: string) {
+    if (!set) return
+    try {
+      await removeDraftFile(set.id, path)
+      if (selected === path) {
+        setSelected('')
+        setContent('')
+        setBaseline('')
+      }
+      setPendingDeletePath(null)
       setDraftState((s) => nextDraftState(s, { type: 'edit' }))
       await reloadConfigSet(set.id)
     } catch (e) {
@@ -123,18 +170,17 @@ export function ConfigSetDetail({ id }: { id: string }) {
     }
   }
 
-  async function handleAddFile() {
+  async function handleAddFile(path: string) {
     if (!set) return
-    const path = window.prompt(t`相对 HOME 的路径，例如 .claude/CLAUDE.md`)
-    if (!path) return
-    try {
-      await setDraftFile(set.id, path, '', 0o644)
-      setDraftState((s) => nextDraftState(s, { type: 'edit' }))
-      await reloadConfigSet(set.id)
-      setSelected(path)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    }
+    // 切到新文件前先落盘当前编辑，避免未保存内容丢失
+    await flushUnsaved()
+    await setDraftFile(set.id, path, '', 0o644)
+    setDraftState((s) => nextDraftState(s, { type: 'edit' }))
+    await reloadConfigSet(set.id)
+    setSelected(path)
+    setContent('')
+    setBaseline('')
+    setShowAddFile(false)
   }
 
   if (!set) {
@@ -146,7 +192,7 @@ export function ConfigSetDetail({ id }: { id: string }) {
   }
 
   return (
-    <div className="flex h-full flex-col gap-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -180,62 +226,65 @@ export function ConfigSetDetail({ id }: { id: string }) {
         </button>
         <button
           type="button"
-          disabled={draftState === 'clean' || draftState === 'publishing'}
-          onClick={() => setShowPublish(true)}
+          disabled={draftState === 'clean' || draftState === 'publishing' || saving}
+          onClick={() => void openPublish()}
           className="rounded bg-accent px-3 py-1.5 text-sm text-white disabled:opacity-40"
         >
-          <Trans>发布</Trans>
+          {saving ? <Trans>保存中…</Trans> : <Trans>发布</Trans>}
         </button>
       </div>
 
       {error && <p className="text-sm text-rose-600">{error}</p>}
 
       {tab === 'history' ? (
-        <VersionHistory
-          setId={set.id}
-          revisions={revisions}
-          onRolledBack={() => {
-            void reloadConfigSet(set.id)
-            setDraftState('clean')
-          }}
-        />
+        <div className="min-h-0 flex-1 overflow-auto">
+          <VersionHistory
+            setId={set.id}
+            revisions={revisions}
+            onRolledBack={() => {
+              void reloadConfigSet(set.id)
+              setDraftState('clean')
+            }}
+          />
+        </div>
       ) : (
-        <div className="grid min-h-0 flex-1 grid-cols-[220px_1fr] gap-3">
-          <aside className="flex flex-col overflow-auto rounded-lg border border-line bg-surface p-2">
+        <div className="grid min-h-0 flex-1 grid-cols-[220px_1fr] gap-3 overflow-hidden">
+          <aside className="flex min-h-0 flex-col overflow-auto rounded-lg border border-line bg-surface p-2">
             <div className="mb-2 flex items-center justify-between px-1">
               <span className="text-xs font-semibold text-ink3">
                 <Trans>文件</Trans>
               </span>
-              <button type="button" onClick={() => void handleAddFile()} className="text-xs text-accent">
+              <button type="button" onClick={() => setShowAddFile(true)} className="text-xs text-accent">
                 <Trans>添加</Trans>
               </button>
             </div>
-            <FileTree paths={paths} selected={selected} onSelect={setSelected} />
+            <FileTree paths={paths} selected={selected} onSelect={(p) => void handleSelectFile(p)} />
           </aside>
 
-          <div className="flex min-h-0 flex-col gap-2">
+          <div className="flex min-h-0 flex-col gap-2 overflow-hidden">
             {selected ? (
               <>
-                <div className="flex items-center gap-2">
+                <div className="flex shrink-0 items-center gap-2">
                   <span className="font-mono text-xs text-ink2">{selected}</span>
                   <div className="flex-1" />
                   <button
                     type="button"
-                    disabled={saving || content === baseline}
+                    disabled={saving || !unsaved}
                     onClick={() => void handleSave()}
                     className="rounded bg-wash px-2 py-1 text-xs disabled:opacity-40"
                   >
-                    {saving ? <Trans>保存中…</Trans> : <Trans>保存到草稿</Trans>}
+                    {saving ? <Trans>保存中…</Trans> : unsaved ? <Trans>保存到草稿</Trans> : <Trans>已保存</Trans>}
                   </button>
                   <button
                     type="button"
-                    onClick={() => void handleDeleteFile()}
+                    onClick={() => setPendingDeletePath(selected)}
                     className="rounded px-2 py-1 text-xs text-rose-600 hover:bg-wash"
                   >
                     <Trans>移除</Trans>
                   </button>
                 </div>
-                <div className="min-h-0 flex-1">
+                {/* 编辑器吃剩余高度；必须 overflow-hidden，否则 CM 会按内容撑破 flex 槽盖住下方 diff */}
+                <div className="min-h-0 flex-1 overflow-hidden">
                   <CodeEditor
                     value={content}
                     path={selected}
@@ -246,12 +295,15 @@ export function ConfigSetDetail({ id }: { id: string }) {
                     }}
                   />
                 </div>
+                {/* diff 按内容增高，但封顶 40%，内部滚动，避免和编辑器抢高度/重叠 */}
                 {content !== baseline && (
-                  <div>
-                    <h3 className="mb-1 text-xs font-semibold text-ink3">
+                  <div className="flex min-h-0 max-h-[40%] shrink-0 flex-col overflow-hidden">
+                    <h3 className="mb-1 shrink-0 text-xs font-semibold text-ink3">
                       <Trans>未保存 diff</Trans>
                     </h3>
-                    <DiffView localBefore={baseline} localAfter={content} />
+                    <div className="min-h-0 flex-1 overflow-auto">
+                      <DiffView localBefore={baseline} localAfter={content} />
+                    </div>
                   </div>
                 )}
               </>
@@ -262,6 +314,14 @@ export function ConfigSetDetail({ id }: { id: string }) {
             )}
           </div>
         </div>
+      )}
+
+      {showAddFile && (
+        <AddFileDialog
+          existingPaths={paths}
+          onSubmit={handleAddFile}
+          onClose={() => setShowAddFile(false)}
+        />
       )}
 
       {showPublish && (
@@ -277,6 +337,17 @@ export function ConfigSetDetail({ id }: { id: string }) {
             setDraftState('clean')
             void reloadConfigSet(set.id)
           }}
+        />
+      )}
+
+      {pendingDeletePath && (
+        <ConfirmDialog
+          title={t`移除文件`}
+          message={t`从草稿中移除 ${pendingDeletePath}？`}
+          confirmLabel={t`移除`}
+          danger
+          onConfirm={() => void handleDeleteFile(pendingDeletePath)}
+          onClose={() => setPendingDeletePath(null)}
         />
       )}
     </div>
