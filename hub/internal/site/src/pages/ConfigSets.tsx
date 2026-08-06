@@ -11,6 +11,8 @@ import {
 } from '@/stores/configsets'
 import { createConfigSet, cloneConfigSet, deleteConfigSet } from '@/lib/api'
 import { navigate } from '@/router'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { PromptDialog } from '@/components/PromptDialog'
 
 export function ConfigSets() {
   const { t } = useLingui()
@@ -21,6 +23,8 @@ export function ConfigSets() {
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const [cloneTarget, setCloneTarget] = useState<{ id: string; name: string } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
 
   useEffect(() => subscribeConfigSets(), [])
 
@@ -40,12 +44,12 @@ export function ConfigSets() {
     }
   }
 
-  async function handleClone(id: string, srcName: string) {
-    const n = window.prompt(t`新配置集名称`, `${srcName}-copy`)
-    if (!n) return
+  async function handleClone(id: string, n: string) {
     setBusy(true)
+    setErr('')
     try {
       const res = await cloneConfigSet(id, n)
+      setCloneTarget(null)
       navigate('configsets', res.id)
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
@@ -55,13 +59,11 @@ export function ConfigSets() {
   }
 
   async function handleDelete(id: string) {
-    const ok = window.confirm(
-      t`该配置集的全部版本历史将被删除，且无法恢复；已指派的机器会失去指派，但磁盘上的文件不会被动。确定删除？`,
-    )
-    if (!ok) return
     setBusy(true)
+    setErr('')
     try {
       await deleteConfigSet(id)
+      setDeleteTarget(null)
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
     } finally {
@@ -151,7 +153,7 @@ export function ConfigSets() {
               type="button"
               title={t`克隆`}
               disabled={busy}
-              onClick={() => void handleClone(s.id, s.name)}
+              onClick={() => setCloneTarget({ id: s.id, name: s.name })}
               className="rounded p-1.5 text-ink2 hover:bg-wash"
             >
               <Copy size={14} />
@@ -160,7 +162,7 @@ export function ConfigSets() {
               type="button"
               title={t`删除`}
               disabled={busy}
-              onClick={() => void handleDelete(s.id)}
+              onClick={() => setDeleteTarget(s.id)}
               className="rounded p-1.5 text-rose-600 hover:bg-wash"
             >
               <Trash2 size={14} />
@@ -168,6 +170,30 @@ export function ConfigSets() {
           </li>
         ))}
       </ul>
+
+      {cloneTarget && (
+        <PromptDialog
+          title={t`克隆配置集`}
+          label={t`新配置集名称`}
+          defaultValue={`${cloneTarget.name}-copy`}
+          confirmLabel={t`克隆`}
+          busy={busy}
+          onSubmit={(n) => void handleClone(cloneTarget.id, n)}
+          onClose={() => setCloneTarget(null)}
+        />
+      )}
+
+      {deleteTarget && (
+        <ConfirmDialog
+          title={t`删除配置集`}
+          message={t`该配置集的全部版本历史将被删除，且无法恢复；已指派的机器会失去指派，但磁盘上的文件不会被动。确定删除？`}
+          confirmLabel={t`删除`}
+          danger
+          busy={busy}
+          onConfirm={() => void handleDelete(deleteTarget)}
+          onClose={() => setDeleteTarget(null)}
+        />
+      )}
     </div>
   )
 }

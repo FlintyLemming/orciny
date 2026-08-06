@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { FindingList, type FindingAction } from '@/components/FindingList'
+import { PromptDialog } from '@/components/PromptDialog'
 import {
   startImport,
   importFindings,
@@ -41,6 +42,7 @@ export function ImportWizard({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [waiting, setWaiting] = useState(false)
+  const [extractTarget, setExtractTarget] = useState<Finding | null>(null)
 
   const loadDraft = useCallback(async (id: string) => {
     const rec = await pb.collection(COLLECTION_CONFIG_SETS).getOne<ConfigSetRecord>(id)
@@ -104,22 +106,28 @@ export function ImportWizard({
     }
   }
 
+  async function extractFinding(f: Finding, name: string) {
+    if (!setId) return
+    const key = `${f.path}:${f.location}`
+    setBusy(true)
+    setError('')
+    try {
+      await extractCredential(setId, f.path, f.location, name)
+      setHandled((h) => new Set(h).add(key))
+      setExtractTarget(null)
+      await loadDraft(setId)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function onFindingAction(action: FindingAction, f: Finding) {
     if (!setId) return
     const key = `${f.path}:${f.location}`
     if (action === 'extract') {
-      const name = window.prompt(t`凭据名称`, f.suggested || f.key.toLowerCase())
-      if (!name) return
-      setBusy(true)
-      try {
-        await extractCredential(setId, f.path, f.location, name)
-        setHandled((h) => new Set(h).add(key))
-        await loadDraft(setId)
-      } catch (e) {
-        setError(e instanceof Error ? e.message : String(e))
-      } finally {
-        setBusy(false)
-      }
+      setExtractTarget(f)
       return
     }
     if (action === 'keep') {
@@ -313,6 +321,18 @@ export function ImportWizard({
             </button>
           </div>
         </section>
+      )}
+
+      {extractTarget && (
+        <PromptDialog
+          title={t`抽取为凭据`}
+          label={t`凭据名称`}
+          defaultValue={extractTarget.suggested || extractTarget.key.toLowerCase()}
+          confirmLabel={t`抽取为凭据`}
+          busy={busy}
+          onSubmit={(name) => void extractFinding(extractTarget, name)}
+          onClose={() => setExtractTarget(null)}
+        />
       )}
     </div>
   )

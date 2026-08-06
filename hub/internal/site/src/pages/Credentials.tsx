@@ -10,6 +10,7 @@ import {
   reloadCredentials,
 } from '@/stores/credentials'
 import { createCredential, rotateCredential, deleteCredential, ApiError } from '@/lib/api'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 
 const MIN_LEN = 8
 
@@ -25,6 +26,7 @@ export function Credentials() {
   const [note, setNote] = useState('')
   const [rotateId, setRotateId] = useState<string | null>(null)
   const [rotateValue, setRotateValue] = useState('')
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [refsHint, setRefsHint] = useState('')
@@ -72,8 +74,7 @@ export function Credentials() {
     }
   }
 
-  async function handleDelete(id: string, credName: string) {
-    if (!window.confirm(t`确定删除凭据 ${credName}？`)) return
+  async function handleDelete(id: string) {
     setBusy(true)
     setErr('')
     setRefsHint('')
@@ -226,7 +227,7 @@ export function Credentials() {
               type="button"
               title={t`删除`}
               disabled={busy}
-              onClick={() => void handleDelete(c.id, c.name)}
+              onClick={() => setPendingDelete({ id: c.id, name: c.name })}
               className="rounded p-1.5 text-rose-600 hover:bg-wash"
             >
               <Trash2 size={14} />
@@ -234,6 +235,22 @@ export function Credentials() {
           </li>
         ))}
       </ul>
+
+      {pendingDelete && (
+        <ConfirmDialog
+          title={t`删除凭据`}
+          message={t`确定删除凭据 ${pendingDelete.name}？`}
+          confirmLabel={t`删除`}
+          danger
+          busy={busy}
+          onConfirm={() => {
+            const id = pendingDelete.id
+            setPendingDelete(null)
+            void handleDelete(id)
+          }}
+          onClose={() => setPendingDelete(null)}
+        />
+      )}
     </div>
   )
 }

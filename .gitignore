@@ -16,5 +16,9 @@ node_modules/
 hub/internal/site/dist/*
 !hub/internal/site/dist/index.html
 
+# lingui compile 的产物。运行时直接 import .po（见 src/i18n/index.ts），
+# 这些 .js 没人用，入库只会和 .po 打架。
+hub/internal/site/src/locales/*.js
+
 # git worktrees
 .worktrees/

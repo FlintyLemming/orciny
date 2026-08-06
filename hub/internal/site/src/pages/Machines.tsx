@@ -8,12 +8,14 @@ import {
 import { StatusDot } from '@/components/StatusDot'
 import { navigate } from '@/router'
 import { AddMachineDialog } from '@/components/AddMachineDialog'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 
 export function Machines() {
   const { t } = useLingui()
   const machines = useStore($machines)
   const loading = useStore($machinesLoading)
   const [adding, setAdding] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null)
 
   useEffect(() => subscribeMachines(), [])
 
@@ -99,11 +101,7 @@ export function Machines() {
                   <button
                     type="button"
                     aria-label={t`删除机器`}
-                    onClick={() => {
-                      if (confirm(t`删除后该机器的 agent 会停止重试，需要重新 enroll。确定删除？`)) {
-                        void deleteMachine(m.id)
-                      }
-                    }}
+                    onClick={() => setPendingDelete({ id: m.id, name: m.name || m.hostname })}
                     className="rounded p-1 text-crit hover:bg-wash"
                   >
                     <Trash2 size={14} aria-hidden />
@@ -116,6 +114,21 @@ export function Machines() {
       )}
 
       {adding && <AddMachineDialog onClose={() => setAdding(false)} />}
+
+      {pendingDelete && (
+        <ConfirmDialog
+          title={t`删除机器`}
+          message={t`删除后该机器的 agent 会停止重试，需要重新 enroll。确定删除？`}
+          confirmLabel={t`删除`}
+          danger
+          onConfirm={() => {
+            const id = pendingDelete.id
+            setPendingDelete(null)
+            void deleteMachine(id)
+          }}
+          onClose={() => setPendingDelete(null)}
+        />
+      )}
     </div>
   )
 }

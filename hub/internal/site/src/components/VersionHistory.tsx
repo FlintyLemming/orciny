@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Trans } from '@lingui/react/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import type { RevisionRecord } from '@/types/collections'
 import { diffConfigSet, rollbackConfigSet } from '@/lib/api'
 import { DiffView } from '@/components/DiffView'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import type { FileChange } from '@/lib/diffView'
 
 export function VersionHistory({
@@ -14,12 +15,14 @@ export function VersionHistory({
   revisions: RevisionRecord[]
   onRolledBack: () => void
 }) {
+  const { t } = useLingui()
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [changes, setChanges] = useState<FileChange[]>([])
   const [diffs, setDiffs] = useState<Record<string, string>>({})
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [pendingRollback, setPendingRollback] = useState<RevisionRecord | null>(null)
 
   async function runDiff() {
     if (!from || !to) return
@@ -37,16 +40,11 @@ export function VersionHistory({
   }
 
   async function handleRollback(rev: RevisionRecord) {
-    const nextSeq = (revisions[0]?.seq ?? 0) + 1
-    const ok = window.confirm(
-      // 会生成新版本，历史保留
-      `回滚到 v${rev.seq} 会生成新版本 v${nextSeq}，历史保留。确定？`,
-    )
-    if (!ok) return
     setBusy(true)
     setError('')
     try {
       await rollbackConfigSet(setId, rev.id)
+      setPendingRollback(null)
       onRolledBack()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -74,7 +72,7 @@ export function VersionHistory({
             <button
               type="button"
               disabled={busy}
-              onClick={() => void handleRollback(r)}
+              onClick={() => setPendingRollback(r)}
               className="text-xs text-accent hover:underline disabled:opacity-40"
             >
               <Trans>回滚</Trans>
@@ -123,6 +121,17 @@ export function VersionHistory({
       {error && <p className="text-sm text-rose-600">{error}</p>}
       {(changes.length > 0 || Object.keys(diffs).length > 0) && (
         <DiffView changes={changes} diffs={diffs} />
+      )}
+
+      {pendingRollback && (
+        <ConfirmDialog
+          title={t`回滚`}
+          message={t`回滚到 v${pendingRollback.seq} 会生成新版本 v${(revisions[0]?.seq ?? 0) + 1}，历史保留。确定？`}
+          confirmLabel={t`回滚`}
+          busy={busy}
+          onConfirm={() => void handleRollback(pendingRollback)}
+          onClose={() => setPendingRollback(null)}
+        />
       )}
     </div>
   )

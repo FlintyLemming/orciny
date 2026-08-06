@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
-import { Trans } from '@lingui/react/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import type { Finding } from '@/types/collections'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 
 export type FindingAction = 'extract' | 'keep' | 'exclude'
 
@@ -20,6 +21,7 @@ export function FindingList({
     })
   }, [findings])
 
+  const { t } = useLingui()
   const [confirmKeep, setConfirmKeep] = useState<Finding | null>(null)
 
   return (
@@ -63,34 +65,14 @@ export function FindingList({
       </ul>
 
       {confirmKeep && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog">
-          <div className="w-full max-w-sm rounded-lg border border-line bg-surface p-5 shadow-xl">
-            <p className="mb-3 text-sm">
-              <Trans>
-                该值将进入不可变的版本历史。确定保留明文？
-              </Trans>
-            </p>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setConfirmKeep(null)}
-                className="rounded px-3 py-1.5 text-sm text-ink2 hover:bg-wash"
-              >
-                <Trans>取消</Trans>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onAction('keep', confirmKeep)
-                  setConfirmKeep(null)
-                }}
-                className="rounded bg-accent px-3 py-1.5 text-sm text-white"
-              >
-                <Trans>确认</Trans>
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          message={t`该值将进入不可变的版本历史。确定保留明文？`}
+          onConfirm={() => {
+            onAction('keep', confirmKeep)
+            setConfirmKeep(null)
+          }}
+          onClose={() => setConfirmKeep(null)}
+        />
       )}
     </>
   )

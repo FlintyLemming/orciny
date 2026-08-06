@@ -118,6 +118,10 @@ msgstr "Remove {selected} from the draft?"
 msgid "以下条目变量还原不完整（restore_partial）。请逐条查看 diff 并勾选确认后再收编。"
 msgstr "These items have incomplete variable restore (restore_partial). Review each diff and check to confirm before adopting."
 
+#: src/components/AddFileDialog.tsx
+msgid "例如 .claude/CLAUDE.md"
+msgstr "e.g. .claude/CLAUDE.md"
+
 #: src/components/PublishDialog.tsx
 msgid "例如：同步 CLAUDE.md 更新"
 msgstr "e.g. sync CLAUDE.md updates"
@@ -270,6 +274,7 @@ msgstr "Publish config set"
 msgid "发现 {conflictCount} 处两边改法不同的冲突行，请选定一侧后再收编。"
 msgstr "Found {conflictCount} conflicting lines changed differently on both sides. Pick one side before adopting."
 
+#: src/components/AddFileDialog.tsx
 #: src/components/AssignDialog.tsx
 #: src/components/DegradedBanner.tsx
 #: src/components/FindingList.tsx
@@ -528,6 +533,10 @@ msgstr "Review before adopt"
 msgid "文件"
 msgstr "Files"
 
+#: src/components/AddFileDialog.tsx
+msgid "文件路径"
+msgstr "File path"
+
 #: src/pages/Credentials.tsx
 msgid "新值（至少 {MIN_LEN} 字符）"
 msgstr "New value (at least {MIN_LEN} characters)"
@@ -668,10 +677,19 @@ msgstr "Light"
 msgid "深色"
 msgstr "Dark"
 
+#: src/components/AddFileDialog.tsx
 #: src/components/VariablesEditor.tsx
 #: src/pages/ConfigSetDetail.tsx
 msgid "添加"
 msgstr "Add"
+
+#: src/components/AddFileDialog.tsx
+msgid "添加中…"
+msgstr "Adding…"
+
+#: src/components/AddFileDialog.tsx
+msgid "添加文件"
+msgstr "Add file"
 
 #: src/components/AddMachineDialog.tsx
 #: src/pages/Machines.tsx
@@ -729,8 +747,8 @@ msgid "登录中…"
 msgstr "Signing in…"
 
 #: src/pages/ConfigSetDetail.tsx
-msgid "相对 HOME 的路径，例如 .claude/CLAUDE.md"
-msgstr "Path relative to HOME, e.g. .claude/CLAUDE.md"
+#~ msgid "相对 HOME 的路径，例如 .claude/CLAUDE.md"
+#~ msgstr "Path relative to HOME, e.g. .claude/CLAUDE.md"
 
 #: src/components/AssignDialog.tsx
 msgid "确定"
@@ -797,6 +815,10 @@ msgstr "OS"
 msgid "编辑器"
 msgstr "Editor"
 
+#: src/components/AddFileDialog.tsx
+msgid "草稿里已有该路径"
+msgstr "This path is already in the draft"
+
 #: src/components/DegradedBanner.tsx
 msgid "解除降级"
 msgstr "Clear degradation"
@@ -843,6 +865,10 @@ msgstr "All revision history for this config set will be permanently deleted; as
 msgid "详情"
 msgstr "Details"
 
+#: src/components/AddFileDialog.tsx
+msgid "请使用相对 HOME 的路径，不能以 / 开头或包含 .."
+msgstr "Use a path relative to HOME; no leading / or .. segments"
+
 #: src/lib/inbox.ts
 msgid "请先选择要收编的漂移条目"
 msgstr "Select drift items to adopt first"
@@ -850,6 +876,10 @@ msgstr "Select drift items to adopt first"
 #: src/pages/Inbox.tsx
 msgid "请取消其中一侧的选择后，再对保留侧执行收编。系统不会静默合并两边的改动。"
 msgstr "Deselect one side, then adopt the remaining side. The system will not silently merge both changes."
+
+#: src/components/AddFileDialog.tsx
+msgid "请输入路径"
+msgstr "Enter a path"
 
 #: src/components/ThemeToggle.tsx
 msgid "跟随系统"
@@ -859,6 +889,10 @@ msgstr "System"
 #: src/lib/inbox.ts
 msgid "路径 {0} 存在跨机器冲突，请先做三方对比"
 msgstr "Path {0} conflicts across machines; run a three-way compare first"
+
+#: src/components/AddFileDialog.tsx
+msgid "路径相对于 HOME，例如 .claude/settings.json"
+msgstr "Path is relative to HOME, e.g. .claude/settings.json"
 
 #: src/pages/Credentials.tsx
 msgid "轮换"

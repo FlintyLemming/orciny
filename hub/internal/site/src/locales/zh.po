@@ -118,6 +118,10 @@ msgstr "从草稿中移除 {selected}？"
 msgid "以下条目变量还原不完整（restore_partial）。请逐条查看 diff 并勾选确认后再收编。"
 msgstr "以下条目变量还原不完整（restore_partial）。请逐条查看 diff 并勾选确认后再收编。"
 
+#: src/components/AddFileDialog.tsx
+msgid "例如 .claude/CLAUDE.md"
+msgstr "例如 .claude/CLAUDE.md"
+
 #: src/components/PublishDialog.tsx
 msgid "例如：同步 CLAUDE.md 更新"
 msgstr "例如：同步 CLAUDE.md 更新"
@@ -270,6 +274,7 @@ msgstr "发布配置集"
 msgid "发现 {conflictCount} 处两边改法不同的冲突行，请选定一侧后再收编。"
 msgstr "发现 {conflictCount} 处两边改法不同的冲突行，请选定一侧后再收编。"
 
+#: src/components/AddFileDialog.tsx
 #: src/components/AssignDialog.tsx
 #: src/components/DegradedBanner.tsx
 #: src/components/FindingList.tsx
@@ -528,6 +533,10 @@ msgstr "收编前复核"
 msgid "文件"
 msgstr "文件"
 
+#: src/components/AddFileDialog.tsx
+msgid "文件路径"
+msgstr "文件路径"
+
 #: src/pages/Credentials.tsx
 msgid "新值（至少 {MIN_LEN} 字符）"
 msgstr "新值（至少 {MIN_LEN} 字符）"
@@ -668,10 +677,19 @@ msgstr "浅色"
 msgid "深色"
 msgstr "深色"
 
+#: src/components/AddFileDialog.tsx
 #: src/components/VariablesEditor.tsx
 #: src/pages/ConfigSetDetail.tsx
 msgid "添加"
 msgstr "添加"
+
+#: src/components/AddFileDialog.tsx
+msgid "添加中…"
+msgstr "添加中…"
+
+#: src/components/AddFileDialog.tsx
+msgid "添加文件"
+msgstr "添加文件"
 
 #: src/components/AddMachineDialog.tsx
 #: src/pages/Machines.tsx
@@ -729,8 +747,8 @@ msgid "登录中…"
 msgstr "登录中…"
 
 #: src/pages/ConfigSetDetail.tsx
-msgid "相对 HOME 的路径，例如 .claude/CLAUDE.md"
-msgstr "相对 HOME 的路径，例如 .claude/CLAUDE.md"
+#~ msgid "相对 HOME 的路径，例如 .claude/CLAUDE.md"
+#~ msgstr "相对 HOME 的路径，例如 .claude/CLAUDE.md"
 
 #: src/components/AssignDialog.tsx
 msgid "确定"
@@ -797,6 +815,10 @@ msgstr "系统"
 msgid "编辑器"
 msgstr "编辑器"
 
+#: src/components/AddFileDialog.tsx
+msgid "草稿里已有该路径"
+msgstr "草稿里已有该路径"
+
 #: src/components/DegradedBanner.tsx
 msgid "解除降级"
 msgstr "解除降级"
@@ -843,6 +865,10 @@ msgstr "该配置集的全部版本历史将被删除，且无法恢复；已指
 msgid "详情"
 msgstr "详情"
 
+#: src/components/AddFileDialog.tsx
+msgid "请使用相对 HOME 的路径，不能以 / 开头或包含 .."
+msgstr "请使用相对 HOME 的路径，不能以 / 开头或包含 .."
+
 #: src/lib/inbox.ts
 msgid "请先选择要收编的漂移条目"
 msgstr "请先选择要收编的漂移条目"
@@ -850,6 +876,10 @@ msgstr "请先选择要收编的漂移条目"
 #: src/pages/Inbox.tsx
 msgid "请取消其中一侧的选择后，再对保留侧执行收编。系统不会静默合并两边的改动。"
 msgstr "请取消其中一侧的选择后，再对保留侧执行收编。系统不会静默合并两边的改动。"
+
+#: src/components/AddFileDialog.tsx
+msgid "请输入路径"
+msgstr "请输入路径"
 
 #: src/components/ThemeToggle.tsx
 msgid "跟随系统"
@@ -859,6 +889,10 @@ msgstr "跟随系统"
 #: src/lib/inbox.ts
 msgid "路径 {0} 存在跨机器冲突，请先做三方对比"
 msgstr "路径 {0} 存在跨机器冲突，请先做三方对比"
+
+#: src/components/AddFileDialog.tsx
+msgid "路径相对于 HOME，例如 .claude/settings.json"
+msgstr "路径相对于 HOME，例如 .claude/settings.json"
 
 #: src/pages/Credentials.tsx
 msgid "轮换"
