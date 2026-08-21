@@ -209,3 +209,81 @@ func TestDriftEventsOpenPathIsUnique(t *testing.T) {
 	require.NoError(t, app.Save(first))
 	require.NoError(t, app.Save(mk("open")), "旧的已收编，新的 open 应当可以建")
 }
+
+func TestProvidersCollectionExists(t *testing.T) {
+	app := newApp(t)
+	c, err := app.FindCollectionByNameOrId("providers")
+	require.NoError(t, err)
+	require.Nil(t, c.ListRule, "providers 的 list rule 必须是 nil（仅 superuser）")
+	require.Nil(t, c.ViewRule)
+	require.Nil(t, c.CreateRule)
+	require.Nil(t, c.UpdateRule)
+	require.Nil(t, c.DeleteRule)
+
+	for _, f := range []string{
+		"name", "preset", "base_url", "auth_field", "credential",
+		"models", "defaults", "note", "created", "updated",
+	} {
+		require.NotNil(t, c.Fields.GetByName(f), "字段 %s 必须存在", f)
+	}
+
+	sel, ok := c.Fields.GetByName("auth_field").(*core.SelectField)
+	require.True(t, ok)
+	require.Equal(t, []string{"ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY"}, sel.Values)
+
+	rel, ok := c.Fields.GetByName("credential").(*core.RelationField)
+	require.True(t, ok)
+	require.True(t, rel.Required, "credential 必填")
+	require.False(t, rel.CascadeDelete, "删凭据不得连带删掉服务配置")
+}
+
+func TestProviderNameIsUnique(t *testing.T) {
+	app := newApp(t)
+	credID := seedCredential(t, app, "zhipu_key")
+
+	c, err := app.FindCollectionByNameOrId("providers")
+	require.NoError(t, err)
+	mk := func() *core.Record {
+		r := core.NewRecord(c)
+		r.Set("name", "智谱 GLM · 个人")
+		r.Set("base_url", "https://open.bigmodel.cn/api/anthropic")
+		r.Set("auth_field", "ANTHROPIC_AUTH_TOKEN")
+		r.Set("credential", credID)
+		return r
+	}
+	require.NoError(t, app.Save(mk()))
+	require.Error(t, app.Save(mk()), "同名服务配置必须被唯一索引拒绝")
+}
+
+func TestBindingFieldsExist(t *testing.T) {
+	app := newApp(t)
+
+	revs, err := app.FindCollectionByNameOrId("revisions")
+	require.NoError(t, err)
+	require.NotNil(t, revs.Fields.GetByName("binding"))
+
+	sets, err := app.FindCollectionByNameOrId("config_sets")
+	require.NoError(t, err)
+	require.NotNil(t, sets.Fields.GetByName("draft_binding"))
+	hp, ok := sets.Fields.GetByName("head_provider").(*core.RelationField)
+	require.True(t, ok, "head_provider 必须是 relation，前端要 expand 它")
+	require.False(t, hp.CascadeDelete)
+
+	drifts, err := app.FindCollectionByNameOrId("drift_events")
+	require.NoError(t, err)
+	require.NotNil(t, drifts.Fields.GetByName("binding_drift"))
+	require.NotNil(t, drifts.Fields.GetByName("binding_url"))
+}
+
+// seedCredential 建一条最小可用的凭据记录，返回 id。
+func seedCredential(t *testing.T, app core.App, name string) string {
+	t.Helper()
+	c, err := app.FindCollectionByNameOrId("credentials")
+	require.NoError(t, err)
+	r := core.NewRecord(c)
+	r.Set("name", name)
+	r.Set("cipher_value", "x")
+	r.Set("last4", "1234")
+	require.NoError(t, app.Save(r))
+	return r.Id
+}
