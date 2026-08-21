@@ -81,6 +81,12 @@ type ConfigSnapshot struct {
 	Variables   map[string]string `cbor:"7,keyasint,omitempty"`
 	IgnorePaths []string          `cbor:"8,keyasint,omitempty"`
 	Mode        uint8             `cbor:"9,keyasint,omitempty"`
+	// Provider 是服务绑定注入的六个内置名 → 真实值（M1.5 spec §3.4）。
+	// 只含本 Revision 实际引用到的键（refs.provider_keys 裁剪，spec §5.1）——
+	// 少一个键少一处泄露面，auth_token 尤其。
+	//
+	// omitempty + 新 keyasint 键：旧 agent 解码时静默忽略，wire 层兼容。
+	Provider map[string]string `cbor:"10,keyasint,omitempty"`
 }
 
 type FileEntry struct {

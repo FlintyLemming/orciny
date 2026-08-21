@@ -116,3 +116,68 @@ func TestSizeLimits(t *testing.T) {
 	require.Equal(t, 256*1024, protocol.MaxBatchSize)
 	require.Equal(t, 1024*1024, protocol.MaxPayload)
 }
+
+func TestConfigSnapshotCarriesProvider(t *testing.T) {
+	in := protocol.ConfigSnapshot{
+		ConfigSetID: "cs1", RevisionID: "r1", Seq: 3, Checksum: "abc",
+		Provider: map[string]string{
+			"base_url":   "https://open.bigmodel.cn/api/anthropic",
+			"auth_token": "sk-zhipu-1234567890",
+			"model":      "glm-5.1",
+		},
+	}
+	b, err := protocol.Encode(protocol.KindConfigSnapshot, nil, in)
+	require.NoError(t, err)
+
+	env, err := protocol.Decode(b)
+	require.NoError(t, err)
+	out, err := protocol.DecodePayload[protocol.ConfigSnapshot](env)
+	require.NoError(t, err)
+	require.Equal(t, in.Provider, out.Provider)
+}
+
+// legacySnapshot 是 M1 的形状，逐字符照抄 0..9，故意不含 10。
+type legacySnapshot struct {
+	ConfigSetID string               `cbor:"0,keyasint"`
+	RevisionID  string               `cbor:"1,keyasint"`
+	Seq         uint32               `cbor:"2,keyasint"`
+	Manifest    []byte               `cbor:"3,keyasint"`
+	Files       []protocol.FileEntry `cbor:"4,keyasint"`
+	Checksum    string               `cbor:"5,keyasint"`
+	Credentials map[string]string    `cbor:"6,keyasint,omitempty"`
+	Variables   map[string]string    `cbor:"7,keyasint,omitempty"`
+	IgnorePaths []string             `cbor:"8,keyasint,omitempty"`
+	Mode        uint8                `cbor:"9,keyasint,omitempty"`
+}
+
+// 旧 agent 的 ConfigSnapshot 没有字段 10。wire 层必须兼容：
+// 收到新字段静默忽略，而不是解码报错（spec §3.4）。
+func TestOldSnapshotShapeIgnoresProviderField(t *testing.T) {
+	b, err := protocol.Encode(protocol.KindConfigSnapshot, nil, protocol.ConfigSnapshot{
+		ConfigSetID: "cs1", RevisionID: "r1", Checksum: "abc",
+		Credentials: map[string]string{"k": "v"},
+		Provider:    map[string]string{"base_url": "https://example.test"},
+	})
+	require.NoError(t, err)
+
+	env, err := protocol.Decode(b)
+	require.NoError(t, err)
+	old, err := protocol.DecodePayload[legacySnapshot](env)
+	require.NoError(t, err, "旧形状必须能解出来")
+	require.Equal(t, "cs1", old.ConfigSetID)
+	require.Equal(t, map[string]string{"k": "v"}, old.Credentials)
+}
+
+// 反向：新 agent 收到旧 hub 的快照，Provider 为 nil 而不是报错。
+func TestNewSnapshotShapeAcceptsMissingProvider(t *testing.T) {
+	b, err := protocol.Encode(protocol.KindConfigSnapshot, nil, legacySnapshot{
+		ConfigSetID: "cs1", RevisionID: "r1", Checksum: "abc",
+	})
+	require.NoError(t, err)
+
+	env, err := protocol.Decode(b)
+	require.NoError(t, err)
+	snap, err := protocol.DecodePayload[protocol.ConfigSnapshot](env)
+	require.NoError(t, err)
+	require.Nil(t, snap.Provider)
+}
