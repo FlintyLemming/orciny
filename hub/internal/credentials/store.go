@@ -34,8 +34,9 @@ func NewStore(app core.App, key []byte, ev *events.Writer) *Store {
 
 // refsField 是 revisions.refs 与 config_sets.draft_refs 的形状。
 type refsField struct {
-	Creds []string `json:"creds"`
-	Vars  []string `json:"vars"`
+	Creds        []string `json:"creds"`
+	Vars         []string `json:"vars"`
+	ProviderKeys []string `json:"provider_keys"`
 }
 
 // VerifyAll 在启动时逐条解密自检。
@@ -123,12 +124,15 @@ func (s *Store) Delete(name string) error {
 	if err != nil {
 		return err
 	}
-	sets, _, err := s.ReferencedBy(name)
+	sets, _, providerIDs, err := s.ReferencedBy(name)
 	if err != nil {
 		return err
 	}
 	if len(sets) > 0 {
 		return fmt.Errorf("%w: 被 %d 个配置集的当前版本或草稿引用", ErrInUse, len(sets))
+	}
+	if len(providerIDs) > 0 {
+		return fmt.Errorf("%w: 被 %d 个 AI 服务配置引用", ErrInUse, len(providerIDs))
 	}
 	if err := s.app.Delete(r); err != nil {
 		return fmt.Errorf("credentials: 删除 %s: %w", name, err)
@@ -165,14 +169,19 @@ func (s *Store) Values(names []string) (map[string]string, error) {
 	return out, nil
 }
 
-// ReferencedBy 返回引用该凭据的配置集 id（head revision 或 draft）
-// 与历史 revision id。查的是 refs 字段而不是全库扫 blob 内容（spec §6.5）。
-func (s *Store) ReferencedBy(name string) ([]string, []string, error) {
+// ReferencedBy 返回引用该凭据的配置集 id（head revision 或 draft）、
+// 历史 revision id，以及**引用它的 AI 服务配置 id**（M1.5 spec §5.3）。
+//
+// 前两者查的是 refs 字段而不是全库扫 blob 内容（spec §6.5）；
+// Provider 引用凭据的方式是 relation 字段，不在 refs 里，因此单独扫一遍——
+// 不扫的话一条正在被 Provider 使用的凭据可以被删掉，
+// 然后全机队在下次重注入时拿到空值。
+func (s *Store) ReferencedBy(name string) ([]string, []string, []string, error) {
 	var setIDs, revIDs []string
 
 	sets, err := s.app.FindAllRecords("config_sets")
 	if err != nil {
-		return nil, nil, fmt.Errorf("credentials: 扫描配置集: %w", err)
+		return nil, nil, nil, fmt.Errorf("credentials: 扫描配置集: %w", err)
 	}
 	headIDs := map[string]string{} // revision id → config set id
 	for _, set := range sets {
@@ -188,7 +197,7 @@ func (s *Store) ReferencedBy(name string) ([]string, []string, error) {
 
 	revs, err := s.app.FindAllRecords("revisions")
 	if err != nil {
-		return nil, nil, fmt.Errorf("credentials: 扫描版本: %w", err)
+		return nil, nil, nil, fmt.Errorf("credentials: 扫描版本: %w", err)
 	}
 	for _, rev := range revs {
 		var refs refsField
@@ -204,7 +213,31 @@ func (s *Store) ReferencedBy(name string) ([]string, []string, error) {
 		}
 		revIDs = append(revIDs, rev.Id)
 	}
-	return setIDs, revIDs, nil
+
+	cred, err := s.find(name)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	provs, err := s.app.FindRecordsByFilter("providers",
+		"credential = {:c}", "name", 0, 0, map[string]any{"c": cred.Id})
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("credentials: 扫描服务配置: %w", err)
+	}
+	providerIDs := make([]string, 0, len(provs))
+	for _, p := range provs {
+		providerIDs = append(providerIDs, p.Id)
+	}
+	return setIDs, revIDs, providerIDs, nil
+}
+
+// ValueByID 按记录 id 取值。providers.credential 是 relation 字段，
+// 存的是 id 而不是名字，因此下发时走这条而不是 Value(name)。
+func (s *Store) ValueByID(id string) (string, error) {
+	r, err := s.app.FindRecordById("credentials", id)
+	if err != nil || r == nil {
+		return "", fmt.Errorf("%w: id %s", ErrNotFound, id)
+	}
+	return Decrypt(s.key, r.GetString("cipher_value"))
 }
 
 func (s *Store) find(name string) (*core.Record, error) {

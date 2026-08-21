@@ -80,7 +80,8 @@ func (s *Service) NotifyMachine(machineID, reason string) error {
 // 复用 ConfigNotify 且**不带 RevisionID**：agent 拉回来发现 revision 相同
 // 但 secrets 变了，只重渲染受影响的文件。不产生新 Revision（产品 §4.5）。
 func (s *Service) NotifyCredential(name string) error {
-	setIDs, _, err := s.d.Creds.ReferencedBy(name)
+	// providerIDs 在子计划 04 的 NotifyProvider 里消费，这里只接住签名。
+	setIDs, _, _, err := s.d.Creds.ReferencedBy(name)
 	if err != nil {
 		return err
 	}

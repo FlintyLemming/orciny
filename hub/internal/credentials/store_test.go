@@ -86,7 +86,7 @@ func TestDeleteIsBlockedWhileReferenced(t *testing.T) {
 
 	require.ErrorIs(t, s.Delete("in_use"), credentials.ErrInUse)
 
-	setIDs, _, err := s.ReferencedBy("in_use")
+	setIDs, _, _, err := s.ReferencedBy("in_use")
 	require.NoError(t, err)
 	require.Equal(t, []string{set.Id}, setIDs)
 
@@ -127,7 +127,7 @@ func TestDeleteAllowedWhenOnlyOldRevisionReferences(t *testing.T) {
 	set.Set("head", head.Id)
 	require.NoError(t, app.Save(set))
 
-	_, revIDs, err := s.ReferencedBy("old_only")
+	_, revIDs, _, err := s.ReferencedBy("old_only")
 	require.NoError(t, err)
 	require.Equal(t, []string{old.Id}, revIDs, "历史引用要报出来")
 	require.NoError(t, s.Delete("old_only"), "但不阻止删除")
@@ -161,4 +161,66 @@ func TestEventsAreWritten(t *testing.T) {
 	require.Subset(t, kinds, []string{
 		events.KindCredentialCreated, events.KindCredentialRotated, events.KindCredentialDeleted,
 	})
+}
+
+// 被 Provider 引用的凭据不可删除（spec §5.3）。
+// 不拦住的话：删凭据 → 下次重注入 → 全机队拿到空值 → Claude Code 全体 401。
+func TestDeleteRefusesWhenReferencedByProvider(t *testing.T) {
+	app, s := newStore(t)
+	_, err := s.Create("zhipu_key", "sk-zhipu-abcdefghij", "")
+	require.NoError(t, err)
+
+	cred, err := app.FindFirstRecordByData("credentials", "name", "zhipu_key")
+	require.NoError(t, err)
+
+	c, err := app.FindCollectionByNameOrId("providers")
+	require.NoError(t, err)
+	p := core.NewRecord(c)
+	p.Set("name", "智谱 GLM · 个人")
+	p.Set("base_url", "https://open.bigmodel.cn/api/anthropic")
+	p.Set("auth_field", "ANTHROPIC_AUTH_TOKEN")
+	p.Set("credential", cred.Id)
+	require.NoError(t, app.Save(p))
+
+	err = s.Delete("zhipu_key")
+	require.ErrorIs(t, err, credentials.ErrInUse)
+	require.Contains(t, err.Error(), "服务配置", "错误信息要说清是被谁引用的")
+}
+
+func TestReferencedByReportsProviders(t *testing.T) {
+	app, s := newStore(t)
+	_, err := s.Create("zhipu_key", "sk-zhipu-abcdefghij", "")
+	require.NoError(t, err)
+	cred, err := app.FindFirstRecordByData("credentials", "name", "zhipu_key")
+	require.NoError(t, err)
+
+	c, err := app.FindCollectionByNameOrId("providers")
+	require.NoError(t, err)
+	p := core.NewRecord(c)
+	p.Set("name", "智谱 GLM · 个人")
+	p.Set("base_url", "https://open.bigmodel.cn/api/anthropic")
+	p.Set("auth_field", "ANTHROPIC_AUTH_TOKEN")
+	p.Set("credential", cred.Id)
+	require.NoError(t, app.Save(p))
+
+	setIDs, revIDs, providerIDs, err := s.ReferencedBy("zhipu_key")
+	require.NoError(t, err)
+	require.Empty(t, setIDs)
+	require.Empty(t, revIDs)
+	require.Equal(t, []string{p.Id}, providerIDs)
+}
+
+func TestValueByID(t *testing.T) {
+	app, s := newStore(t)
+	_, err := s.Create("zhipu_key", "sk-zhipu-abcdefghij", "")
+	require.NoError(t, err)
+	cred, err := app.FindFirstRecordByData("credentials", "name", "zhipu_key")
+	require.NoError(t, err)
+
+	v, err := s.ValueByID(cred.Id)
+	require.NoError(t, err)
+	require.Equal(t, "sk-zhipu-abcdefghij", v)
+
+	_, err = s.ValueByID("不存在的 id")
+	require.ErrorIs(t, err, credentials.ErrNotFound)
 }
