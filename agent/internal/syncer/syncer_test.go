@@ -240,3 +240,39 @@ func writeManaged(t *testing.T, r *rig, rel, content string) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(p), 0o755))
 	require.NoError(t, os.WriteFile(p, []byte(content), 0o644))
 }
+
+// 快照带来的 provider 值必须落进 secrets.json，否则渲染取不到值、
+// 整份 apply 失败（M1 spec §6.1）。
+func TestSnapshotProviderLandsInSecrets(t *testing.T) {
+	r := newRig(t)
+	snap, blobs := snapshotOf(t, map[string]string{
+		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}",` +
+			`"ANTHROPIC_MODEL":"{{provider.model}}"}}`,
+	})
+	snap.Provider = map[string]string{
+		"base_url": "https://open.bigmodel.cn/api/anthropic",
+		"model":    "glm-5.1",
+	}
+
+	r.s.Handle(envelope(t, protocol.KindConfigSnapshot, snap))
+	for h, content := range blobs {
+		r.s.Handle(envelope(t, protocol.KindBlobData, protocol.BlobData{Hash: h, Content: content}))
+	}
+
+	acks := r.out.of(protocol.KindApplyAck)
+	require.Len(t, acks, 1)
+	ack, ok := acks[0].(protocol.ApplyAck)
+	require.True(t, ok)
+	require.True(t, ack.OK, "apply 必须成功：%s", ack.Error)
+
+	sec, err := secrets.Load(r.dir)
+	require.NoError(t, err)
+	require.Equal(t, snap.Provider, sec.Provider)
+
+	got, err := os.ReadFile(filepath.Join(r.home, ".claude", "settings.json"))
+	require.NoError(t, err)
+	require.Contains(t, string(got), "https://open.bigmodel.cn/api/anthropic")
+	require.Contains(t, string(got), "glm-5.1")
+	// 渲染绝不能把字面占位符落给 Claude Code。
+	require.NotContains(t, string(got), "{{provider.")
+}

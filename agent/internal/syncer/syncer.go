@@ -409,8 +409,9 @@ func (s *Syncer) saveSecrets(snap protocol.ConfigSnapshot) error {
 		name = hostname
 	}
 	f := &secrets.File{
-		Creds: snap.Credentials,
-		Vars:  snap.Variables,
+		Creds:    snap.Credentials,
+		Vars:     snap.Variables,
+		Provider: snap.Provider,
 		Machine: map[string]string{
 			"name":     name,
 			"hostname": hostname,
@@ -423,6 +424,9 @@ func (s *Syncer) saveSecrets(snap protocol.ConfigSnapshot) error {
 	}
 	if f.Vars == nil {
 		f.Vars = map[string]string{}
+	}
+	if f.Provider == nil {
+		f.Provider = map[string]string{}
 	}
 	if err := secrets.Save(s.d.Dir, f); err != nil {
 		return err

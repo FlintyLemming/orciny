@@ -326,3 +326,31 @@ func TestScanTruncatesOversizeFile(t *testing.T) {
 	require.True(t, items[0].Truncated)
 	require.Empty(t, items[0].Content)
 }
+
+// 对账把 provider 值一并喂进还原：否则磁盘上的真实 base_url 会原样上报，
+// 而基线里是占位符，每次扫描都报一条假漂移。
+func TestScanRestoresProviderValues(t *testing.T) {
+	fx := newFixture(t)
+	fx.sec.Provider = map[string]string{
+		"base_url":   "https://open.bigmodel.cn/api/anthropic",
+		"auth_token": "sk-zhipu-abcdefghij",
+	}
+	// 基线是渲染前的占位符形态；rig 的 baseline 会用同一份 sec 还原得到它。
+	fx.baseline(t, map[string]string{
+		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"https://open.bigmodel.cn/api/anthropic",` +
+			`"ANTHROPIC_AUTH_TOKEN":"sk-zhipu-abcdefghij","X":"1"}}`,
+	})
+	// 用户手改了 X，其余照旧。
+	fx.write(t, ".claude/settings.json",
+		`{"env":{"ANTHROPIC_BASE_URL":"https://open.bigmodel.cn/api/anthropic",`+
+			`"ANTHROPIC_AUTH_TOKEN":"sk-zhipu-abcdefghij","X":"2"}}`)
+
+	items, err := fx.w.Scan(true)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	require.Equal(t, ".claude/settings.json", items[0].Path)
+	require.Contains(t, string(items[0].Content), "{{provider.base_url}}")
+	require.Contains(t, string(items[0].Content), "{{provider.auth_token}}")
+	require.NotContains(t, string(items[0].Content), "sk-zhipu")
+	require.False(t, items[0].Truncated)
+}
