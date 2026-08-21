@@ -14,6 +14,7 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/drift"
 	"github.com/FlintyLemming/orciny/hub/internal/importer"
 	"github.com/FlintyLemming/orciny/hub/internal/machines"
+	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/hub/internal/revisions"
 	"github.com/FlintyLemming/orciny/internal/manifest"
 	"github.com/FlintyLemming/orciny/protocol"
@@ -38,6 +39,14 @@ type Admin interface {
 	RestoreDrift(eventIDs []string) error
 	IgnoreDrift(eventIDs []string, global bool) error
 	ClearDegraded(machineID string) error
+
+	// —— M1.5 服务绑定 ——
+	CreateProvider(in providers.Input) (string, error)
+	UpdateProvider(id string, in providers.Input) error
+	DeleteProvider(id string) error
+	SetBinding(setID string, b *providers.Binding) error
+	FixAuthField(setID string) error
+	ProviderPresets() []providers.Preset
 }
 
 // ---------- config sets ----------
@@ -531,11 +540,13 @@ func mapErr(e *core.RequestEvent, err error) error {
 	switch {
 	case err == nil:
 		return nil
-	case errors.Is(err, credentials.ErrInUse):
+	case errors.Is(err, credentials.ErrInUse), errors.Is(err, providers.ErrInUse):
 		return e.JSON(http.StatusConflict, map[string]any{
 			"message": err.Error(),
 			"data":    map[string]any{},
 		})
+	case errors.Is(err, providers.ErrBadAuthField), errors.Is(err, providers.ErrBadBaseURL):
+		return e.BadRequestError(err.Error(), nil)
 	case errors.Is(err, drift.ErrConflict):
 		// 跨机器同路径冲突：409 + 冲突路径（错误串里带 path）。
 		return e.JSON(http.StatusConflict, map[string]any{
@@ -553,6 +564,7 @@ func mapErr(e *core.RequestEvent, err error) error {
 		errors.Is(err, credentials.ErrBadName):
 		return e.BadRequestError(err.Error(), nil)
 	case errors.Is(err, credentials.ErrNotFound),
+		errors.Is(err, providers.ErrNotFound),
 		errors.Is(err, blobs.ErrNotFound),
 		errors.Is(err, configsets.ErrNoAssignment):
 		return e.NotFoundError(err.Error(), nil)
