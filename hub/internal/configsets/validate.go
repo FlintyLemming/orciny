@@ -7,12 +7,23 @@ import (
 	"github.com/FlintyLemming/orciny/protocol"
 )
 
-// Problem 是一条发布期校验失败。UI 逐条展示并阻止发布。
+// Problem 是一条发布期校验失败。UI 逐条展示；Warning 为真的只展示不阻断。
 type Problem struct {
-	Path   string `json:"path"`
-	Kind   string `json:"kind"`
-	Detail string `json:"detail"`
+	Path    string `json:"path"`
+	Kind    string `json:"kind"`
+	Detail  string `json:"detail"`
+	Warning bool   `json:"warning,omitempty"`
+	Fix     *Fix   `json:"fix,omitempty"`
 }
+
+// Fix 描述一处「一键修复」。目前只有 auth_field 键名换绑用它。
+type Fix struct {
+	Kind string `json:"kind"`
+	From string `json:"from"`
+	To   string `json:"to"`
+}
+
+const FixReplaceEnvKey = "replace_env_key"
 
 // 校验类别
 const (
@@ -21,7 +32,18 @@ const (
 	ProblemUndefinedRef   = "undefined_ref"
 	ProblemBadPath        = "bad_path"
 	ProblemMissingBlob    = "missing_blob"
+
+	// M1.5：服务绑定（spec §7）
+	ProblemBindingMissing    = "binding_missing"
+	ProblemBindingUnused     = "binding_unused"
+	ProblemAuthFieldMismatch = "auth_field_mismatch"
 )
+
+// SettingsPath 是 settings.json 的受管相对路径。manifest 的根是 HOME。
+const SettingsPath = ".claude/settings.json"
+
+// tokenAuthToken 是承载 API key 的那个占位符的字面形态。
+const tokenAuthToken = "{{provider.auth_token}}"
 
 // Validate 检查草稿能不能发布。known 是当前存在的凭据与变量，
 // 键形如 "cred.foo" / "var.bar"；machine.* 是内置值，永远算已定义。
@@ -77,5 +99,10 @@ func (s *Service) Validate(setID string, known map[string]bool) ([]Problem, erro
 			}
 		}
 	}
-	return problems, nil
+
+	bp, err := s.validateBinding(setID, files)
+	if err != nil {
+		return nil, err
+	}
+	return append(problems, bp...), nil
 }
