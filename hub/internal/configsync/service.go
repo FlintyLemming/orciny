@@ -16,6 +16,7 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/configsets"
 	"github.com/FlintyLemming/orciny/hub/internal/credentials"
 	"github.com/FlintyLemming/orciny/hub/internal/events"
+	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/hub/internal/revisions"
 	"github.com/FlintyLemming/orciny/protocol"
 )
@@ -36,14 +37,16 @@ type DriftHandler interface {
 }
 
 type Deps struct {
-	App    core.App
-	Blobs  *blobs.Store
-	Sets   *configsets.Service
-	Revs   *revisions.Service
-	Creds  *credentials.Store
-	Events *events.Writer
-	Sender Sender
-	Logger *slog.Logger
+	App   core.App
+	Blobs *blobs.Store
+	Sets  *configsets.Service
+	Revs  *revisions.Service
+	Creds *credentials.Store
+	// Providers 供组装快照时查绑定指向的服务配置。
+	Providers *providers.Store
+	Events    *events.Writer
+	Sender    Sender
+	Logger    *slog.Logger
 	// Importer 处理采集结果。configsync 只做转交——把它做成接口而不是
 	// 直接依赖 importer 包，是因为 importer 也要 Sender，直接互相 import 会成环。
 	Importer interface {
@@ -124,6 +127,11 @@ func (s *Service) Snapshot(machineID string) (protocol.ConfigSnapshot, error) {
 		}
 	}
 
+	provider, err := s.providerValues(machineID, head, refs)
+	if err != nil {
+		return snap, err
+	}
+
 	ignore, err := s.ignorePaths(machineID)
 	if err != nil {
 		return snap, err
@@ -143,6 +151,7 @@ func (s *Service) Snapshot(machineID string) (protocol.ConfigSnapshot, error) {
 		Checksum:    head.GetString("checksum"),
 		Credentials: creds,
 		Variables:   vars,
+		Provider:    provider,
 		IgnorePaths: ignore,
 		Mode:        mode,
 	}, nil
@@ -199,6 +208,12 @@ func (s *Service) Pull(machineID string, p protocol.ConfigPull) {
 	if err != nil {
 		if errors.Is(err, configsets.ErrNoAssignment) {
 			s.log.Debug("机器未指派配置集，忽略拉取", "machine", machineID)
+			return
+		}
+		// 绑定相关的失败要能归因：写进 assignment，UI 在机器行与配置集页
+		// 都显示得出来（spec §10）。其余失败仍然只记日志。
+		if isBindingFault(err) {
+			s.failAssignment(machineID, err)
 			return
 		}
 		s.log.Warn("组装快照失败", "machine", machineID, "error", err)

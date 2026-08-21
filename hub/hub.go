@@ -25,6 +25,7 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/identity"
 	"github.com/FlintyLemming/orciny/hub/internal/importer"
 	"github.com/FlintyLemming/orciny/hub/internal/machines"
+	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/hub/internal/revisions"
 	"github.com/FlintyLemming/orciny/hub/internal/routes"
 	"github.com/FlintyLemming/orciny/hub/internal/ws"
@@ -49,6 +50,7 @@ type Hub struct {
 	blobs    *blobs.Store
 	sets     *configsets.Service
 	revs     *revisions.Service
+	provs    *providers.Store
 	importer *importer.Service
 	sync     *configsync.Service
 	drift    *drift.Service
@@ -115,6 +117,7 @@ func Attach(app core.App, cfg Config) (*Hub, error) {
 		}
 
 		h.blobs = blobs.New(e.App)
+		h.provs = providers.NewStore(e.App, h.events)
 		h.sets = configsets.NewService(e.App, h.blobs, h.events)
 		h.revs = revisions.NewService(e.App, h.blobs, h.events)
 		// 先建 importer（它要 Sender = h.machines），再建 configsync（它要 Importer）。
@@ -122,7 +125,7 @@ func Attach(app core.App, cfg Config) (*Hub, error) {
 		h.importer = importer.NewService(e.App, h.blobs, h.sets, h.creds, h.events, h.machines)
 		h.sync = configsync.NewService(configsync.Deps{
 			App: e.App, Blobs: h.blobs, Sets: h.sets, Revs: h.revs,
-			Creds: h.creds, Events: h.events, Sender: h.machines,
+			Creds: h.creds, Providers: h.provs, Events: h.events, Sender: h.machines,
 			Importer: h.importer, Logger: e.App.Logger(),
 		})
 		// drift 需要 configsync（发 DriftCommand），configsync 需要 drift（转交上报）：
