@@ -20,8 +20,22 @@ import {
 } from '@/lib/inbox'
 import { DriftCard } from '@/components/DriftCard'
 import { ThreeWayCompare } from '@/components/ThreeWayCompare'
-import { adoptDrift, getBlob, ignoreDrift, restoreDrift } from '@/lib/api'
-import type { DriftEventRecord } from '@/types/collections'
+import {
+  adoptDrift,
+  createProviderFromDrift,
+  getBlob,
+  ignoreDrift,
+  listProviderPresets,
+  matchBindingDrift,
+  rebindDrift,
+  restoreDrift,
+} from '@/lib/api'
+import { reloadProviders } from '@/stores/providers'
+import type {
+  BindingMatchResult,
+  DriftEventRecord,
+  ProviderPreset,
+} from '@/types/collections'
 
 const FILTERS: { key: DriftFilter; label: React.ReactNode }[] = [
   { key: 'open', label: <Trans>未处理</Trans> },
@@ -55,6 +69,97 @@ export function Inbox() {
 
   useEffect(() => subscribeDrifts(), [])
   useEffect(() => subscribeMachines(), [])
+
+  // 绑定漂移的反查结果。一般只有一两条，进页面时一次性取回来。
+  const [matches, setMatches] = useState<Record<string, BindingMatchResult>>({})
+  const [presets, setPresets] = useState<ProviderPreset[]>([])
+  const bindingIDs = useMemo(
+    () =>
+      drifts
+        .filter((d) => d.binding_drift && d.state === 'open')
+        .map((d) => d.id)
+        .sort()
+        .join(','),
+    [drifts],
+  )
+  useEffect(() => {
+    if (!bindingIDs) {
+      setMatches({})
+      return
+    }
+    let cancelled = false
+    void Promise.all(
+      bindingIDs.split(',').map((id) => matchBindingDrift(id).then((m) => [id, m] as const)),
+    )
+      .then((pairs) => {
+        if (!cancelled) setMatches(Object.fromEntries(pairs))
+      })
+      .catch(() => {
+        // 反查失败就退回第三档兜底文案，不打断收件箱。
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [bindingIDs])
+  useEffect(() => {
+    void listProviderPresets()
+      .then(setPresets)
+      .catch(() => setPresets([]))
+  }, [])
+
+  /** 第一档：改绑定并发布新版本。全机队跟着走。 */
+  async function handleRebind(eventID: string, providerID: string) {
+    setBusy(true)
+    setActionErr('')
+    try {
+      await rebindDrift(eventID, providerID)
+    } catch (e) {
+      setActionErr(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /**
+   * 第二档：用预设新建服务配置（顺手把机器上手写的 key 抽成凭据），
+   * 建成后立刻回到第一档的动作——这就是 spec §6.3 说的「建成后回到上一行」。
+   */
+  async function handleCreateProvider(
+    eventID: string,
+    presetID: string,
+    keyLocation: string,
+  ) {
+    const preset = presets.find((p) => p.id === presetID)
+    if (!preset || !keyLocation) {
+      setActionErr(t`缺少预设或 key 位置，无法自动新建，请到「AI 服务」页手工新建`)
+      return
+    }
+    setBusy(true)
+    setActionErr('')
+    try {
+      const { id } = await createProviderFromDrift({
+        name: preset.name,
+        preset: preset.id,
+        base_url: preset.base_url,
+        auth_field: preset.auth_field,
+        credential: '',
+        models: preset.models,
+        defaults: preset.defaults,
+        note: t`从收件箱的绑定漂移创建`,
+        from_drift: {
+          event: eventID,
+          location: keyLocation,
+          name: `${preset.id}_key`,
+        },
+      })
+      await reloadProviders()
+      await rebindDrift(eventID, id)
+    } catch (e) {
+      setActionErr(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const machineName = useMemo(() => {
     const m = new Map<string, string>()
@@ -240,6 +345,11 @@ export function Inbox() {
                       onToggle={() => toggle(e.id)}
                       machineLabel={machineName.get(e.machine)}
                       setLabel={rec?.expand?.config_set?.name}
+                      bindingMatch={matches[e.id]}
+                      onRebind={(providerID) => void handleRebind(e.id, providerID)}
+                      onCreateProvider={(presetID, loc) =>
+                        void handleCreateProvider(e.id, presetID, loc)
+                      }
                     />
                   </li>
                 )

@@ -297,3 +297,21 @@ export const COLLECTION_DRIFT_EVENTS = 'drift_events'
 export const COLLECTION_IGNORE_RULES = 'ignore_rules'
 export const COLLECTION_BLOBS = 'blobs'
 export const COLLECTION_PROVIDERS = 'providers'
+
+export interface ProviderMatch {
+  kind: 'provider' | 'preset' | 'none'
+  /** false = 只有 host 对得上，措辞降级为「可能是」（M1.5 spec §6.4） */
+  exact: boolean
+  provider_id?: string
+  provider_name?: string
+  preset_id?: string
+  preset_name?: string
+}
+
+export interface BindingMatchResult {
+  url: string
+  match: ProviderMatch
+  /** 机器上手写的那把 key 在漂移内容里的位置 */
+  key_location?: string
+  key_masked?: string
+}

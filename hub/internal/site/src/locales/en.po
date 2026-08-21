@@ -130,6 +130,10 @@ msgstr "Survey only"
 msgid "从在线机器采集 ~/.claude 配置，生成草稿配置集。"
 msgstr "Collect ~/.claude from an online machine into a draft config set."
 
+#: src/pages/Inbox.tsx
+msgid "从收件箱的绑定漂移创建"
+msgstr "Created from a binding drift in the inbox"
+
 #: src/pages/MachineDetail.tsx
 msgid "从本机导入"
 msgstr "Import from this machine"
@@ -365,6 +369,10 @@ msgstr "Clear selection"
 #: src/pages/MachineDetail.tsx
 msgid "另有 {0} 条，请到收件箱处理"
 msgstr "{0} more — handle them in the inbox"
+
+#: src/components/BindingDriftActions.tsx
+msgid "可能是「{presetName}」。新建服务配置？"
+msgstr "This may be \"{presetName}\". Create a service config?"
 
 #: src/components/ProviderDialog.tsx
 #: src/pages/Machines.tsx
@@ -633,6 +641,10 @@ msgstr "Adopting would flatten {BASE_URL_TOKEN} into a hard-coded address and br
 msgid "收编前复核"
 msgstr "Review before adopt"
 
+#: src/components/BindingDriftActions.tsx
+msgid "改成它"
+msgstr "Switch to it"
+
 #: src/pages/ConfigSetDetail.tsx
 msgid "文件"
 msgstr "Files"
@@ -663,6 +675,10 @@ msgstr "New AI service"
 msgid "新建凭据"
 msgstr "New credential"
 
+#: src/components/BindingDriftActions.tsx
+msgid "新建服务配置"
+msgstr "Create service config"
+
 #: src/pages/ConfigSets.tsx
 msgid "新配置集名称"
 msgstr "New config set name"
@@ -688,7 +704,7 @@ msgstr "No open drift."
 msgid "无法写入剪贴板，请手动复制上面的命令。"
 msgstr "Couldn't write to the clipboard — please copy the command above manually."
 
-#: src/components/DriftCard.tsx
+#: src/components/BindingDriftActions.tsx
 msgid "无法识别这个 base_url 属于哪个平台。可以「恢复」把它拉回基线，或者「忽略」。"
 msgstr "Cannot tell which platform this base_url belongs to. You can Restore it to the baseline, or Ignore it."
 
@@ -753,6 +769,11 @@ msgstr "A config apply failed on this machine, and automatic rollback also faile
 #: src/pages/Machines.tsx
 msgid "机器"
 msgstr "Machines"
+
+#. placeholder {0}: match.key_masked
+#: src/components/BindingDriftActions.tsx
+msgid "机器上那把 key（{0}）会被抽成凭据。"
+msgstr "The key on that machine ({0}) will be extracted into a credential."
 
 #: src/pages/MachineDetail.tsx
 msgid "机器变量"
@@ -988,6 +1009,10 @@ msgstr "Edit AI service"
 msgid "编辑器"
 msgstr "Editor"
 
+#: src/pages/Inbox.tsx
+msgid "缺少预设或 key 位置，无法自动新建，请到「AI 服务」页手工新建"
+msgstr "Missing preset or key location; cannot create automatically. Please create it on the AI Services page."
+
 #: src/components/ProviderDialog.tsx
 msgid "自定义"
 msgstr "Custom"
@@ -1021,6 +1046,10 @@ msgstr "Authentication failed"
 #: src/pages/Settings.tsx
 msgid "设置"
 msgstr "Settings"
+
+#: src/components/BindingDriftActions.tsx
+msgid "识别为「{presetName}」。新建服务配置？"
+msgstr "Identified as \"{presetName}\". Create a service config?"
 
 #. placeholder {0}: formatCountdown(remaining)
 #: src/components/AddMachineDialog.tsx
@@ -1116,10 +1145,18 @@ msgstr "No machines yet. Click \"Add machine\" to get a one-line install command
 msgid "还没有配置集。从一台机器导入，或点右上角新建。"
 msgstr "No config sets yet. Import from a machine, or create one at the top right."
 
+#: src/components/BindingDriftActions.tsx
+msgid "这台机器改用了「{name}」。把配置集的绑定改成它？"
+msgstr "This machine switched to \"{name}\". Change the config set binding to it?"
+
 #. placeholder {0}: event.binding_url
 #: src/components/DriftCard.tsx
 msgid "这台机器改用了别的 API 地址：<0>{0}</0>"
 msgstr "This machine switched to a different API address: <0>{0}</0>"
+
+#: src/components/BindingDriftActions.tsx
+msgid "这台机器用的地址可能是「{name}」。把配置集的绑定改成它？"
+msgstr "The address this machine uses may be \"{name}\". Change the config set binding to it?"
 
 #: src/components/Shell.tsx
 msgid "退出"

@@ -70,9 +70,56 @@ describe('DriftCard 绑定漂移', () => {
       ),
     )
     expect(screen.getByRole('checkbox')).toBeDisabled()
+    // 地址那一行三档都要显示
     expect(screen.getByText(/https:\/\/api\.moonshot\.cn\/anthropic/)).toBeInTheDocument()
-    // 第三档兜底文案
+  })
+
+  it('第三档（反查都不命中）显示兜底文案', () => {
+    render(
+      wrap(
+        <DriftCard
+          event={ev({
+            path: '.claude/settings.json',
+            binding_drift: true,
+            binding_url: 'https://某中转.test/v1',
+          })}
+          bindingMatch={{
+            url: 'https://某中转.test/v1',
+            match: { kind: 'none', exact: false },
+          }}
+          selected={false}
+          onToggle={() => {}}
+        />,
+      ),
+    )
     expect(screen.getByText(/无法识别/)).toBeInTheDocument()
+  })
+
+  it('第一档（命中已有 Provider）给「改成它」', () => {
+    render(
+      wrap(
+        <DriftCard
+          event={ev({
+            path: '.claude/settings.json',
+            binding_drift: true,
+            binding_url: 'https://api.moonshot.cn/anthropic',
+          })}
+          bindingMatch={{
+            url: 'https://api.moonshot.cn/anthropic',
+            match: {
+              kind: 'provider',
+              exact: true,
+              provider_id: 'p1',
+              provider_name: 'Kimi 官方',
+            },
+          }}
+          selected={false}
+          onToggle={() => {}}
+          onRebind={() => {}}
+        />,
+      ),
+    )
+    expect(screen.getByRole('button', { name: /改成它/ })).toBeInTheDocument()
   })
 
   it('普通漂移的勾选框照常可用', () => {

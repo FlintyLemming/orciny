@@ -9,6 +9,7 @@ import { pb } from '@/lib/pb'
 import type {
   AuthField,
   Binding,
+  BindingMatchResult,
   FileEntry,
   Finding,
   ModelSlots,
@@ -243,6 +244,20 @@ export function setBinding(setId: string, binding: Binding | null) {
 
 export function fixAuthField(setId: string) {
   return postJSON(`/api/orciny/config-sets/${setId}/fix-auth-field`)
+}
+
+export function matchBindingDrift(eventId: string) {
+  return getJSON<BindingMatchResult>(`/api/orciny/drift/${eventId}/binding-match`)
+}
+
+export function rebindDrift(eventId: string, provider: string) {
+  return postJSON<{ revision: string }>(`/api/orciny/drift/${eventId}/rebind`, { provider })
+}
+
+export function createProviderFromDrift(
+  body: ProviderBody & { from_drift: { event: string; location: string; name: string } },
+) {
+  return postJSON<{ id: string }>('/api/orciny/providers', body)
 }
 
 /** 把 PB 草稿条目规范化成小写键（兼容旧数据的 Path/Hash 大写）。 */

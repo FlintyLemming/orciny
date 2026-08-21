@@ -130,6 +130,10 @@ msgstr "仅对账（survey）"
 msgid "从在线机器采集 ~/.claude 配置，生成草稿配置集。"
 msgstr "从在线机器采集 ~/.claude 配置，生成草稿配置集。"
 
+#: src/pages/Inbox.tsx
+msgid "从收件箱的绑定漂移创建"
+msgstr "从收件箱的绑定漂移创建"
+
 #: src/pages/MachineDetail.tsx
 msgid "从本机导入"
 msgstr "从本机导入"
@@ -365,6 +369,10 @@ msgstr "取消选择"
 #: src/pages/MachineDetail.tsx
 msgid "另有 {0} 条，请到收件箱处理"
 msgstr "另有 {0} 条，请到收件箱处理"
+
+#: src/components/BindingDriftActions.tsx
+msgid "可能是「{presetName}」。新建服务配置？"
+msgstr "可能是「{presetName}」。新建服务配置？"
 
 #: src/components/ProviderDialog.tsx
 #: src/pages/Machines.tsx
@@ -633,6 +641,10 @@ msgstr "收编会把 {BASE_URL_TOKEN} 拍平成硬编码地址，服务绑定会
 msgid "收编前复核"
 msgstr "收编前复核"
 
+#: src/components/BindingDriftActions.tsx
+msgid "改成它"
+msgstr "改成它"
+
 #: src/pages/ConfigSetDetail.tsx
 msgid "文件"
 msgstr "文件"
@@ -663,6 +675,10 @@ msgstr "新建 AI 服务"
 msgid "新建凭据"
 msgstr "新建凭据"
 
+#: src/components/BindingDriftActions.tsx
+msgid "新建服务配置"
+msgstr "新建服务配置"
+
 #: src/pages/ConfigSets.tsx
 msgid "新配置集名称"
 msgstr "新配置集名称"
@@ -688,7 +704,7 @@ msgstr "无未处理漂移。"
 msgid "无法写入剪贴板，请手动复制上面的命令。"
 msgstr "无法写入剪贴板，请手动复制上面的命令。"
 
-#: src/components/DriftCard.tsx
+#: src/components/BindingDriftActions.tsx
 msgid "无法识别这个 base_url 属于哪个平台。可以「恢复」把它拉回基线，或者「忽略」。"
 msgstr "无法识别这个 base_url 属于哪个平台。可以「恢复」把它拉回基线，或者「忽略」。"
 
@@ -753,6 +769,11 @@ msgstr "本机的一次配置应用失败，且自动回滚也未成功。为避
 #: src/pages/Machines.tsx
 msgid "机器"
 msgstr "机器"
+
+#. placeholder {0}: match.key_masked
+#: src/components/BindingDriftActions.tsx
+msgid "机器上那把 key（{0}）会被抽成凭据。"
+msgstr "机器上那把 key（{0}）会被抽成凭据。"
 
 #: src/pages/MachineDetail.tsx
 msgid "机器变量"
@@ -988,6 +1009,10 @@ msgstr "编辑 AI 服务"
 msgid "编辑器"
 msgstr "编辑器"
 
+#: src/pages/Inbox.tsx
+msgid "缺少预设或 key 位置，无法自动新建，请到「AI 服务」页手工新建"
+msgstr "缺少预设或 key 位置，无法自动新建，请到「AI 服务」页手工新建"
+
 #: src/components/ProviderDialog.tsx
 msgid "自定义"
 msgstr "自定义"
@@ -1021,6 +1046,10 @@ msgstr "认证失败"
 #: src/pages/Settings.tsx
 msgid "设置"
 msgstr "设置"
+
+#: src/components/BindingDriftActions.tsx
+msgid "识别为「{presetName}」。新建服务配置？"
+msgstr "识别为「{presetName}」。新建服务配置？"
 
 #. placeholder {0}: formatCountdown(remaining)
 #: src/components/AddMachineDialog.tsx
@@ -1116,10 +1145,18 @@ msgstr "还没有机器。点「添加机器」拿到一行安装命令。"
 msgid "还没有配置集。从一台机器导入，或点右上角新建。"
 msgstr "还没有配置集。从一台机器导入，或点右上角新建。"
 
+#: src/components/BindingDriftActions.tsx
+msgid "这台机器改用了「{name}」。把配置集的绑定改成它？"
+msgstr "这台机器改用了「{name}」。把配置集的绑定改成它？"
+
 #. placeholder {0}: event.binding_url
 #: src/components/DriftCard.tsx
 msgid "这台机器改用了别的 API 地址：<0>{0}</0>"
 msgstr "这台机器改用了别的 API 地址：<0>{0}</0>"
+
+#: src/components/BindingDriftActions.tsx
+msgid "这台机器用的地址可能是「{name}」。把配置集的绑定改成它？"
+msgstr "这台机器用的地址可能是「{name}」。把配置集的绑定改成它？"
 
 #: src/components/Shell.tsx
 msgid "退出"

@@ -1,5 +1,7 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { parseUnifiedDiff, type DriftEvent } from '@/lib/inbox'
+import { BindingDriftActions } from '@/components/BindingDriftActions'
+import type { BindingMatchResult } from '@/types/collections'
 
 /** 占位符的字面形态。不能直接写进 t`` —— ICU 会把 { 当插值符。 */
 const BASE_URL_TOKEN = '{{provider.base_url}}'
@@ -16,12 +18,19 @@ export function DriftCard({
   onToggle,
   machineLabel,
   setLabel,
+  bindingMatch,
+  onRebind,
+  onCreateProvider,
 }: {
   event: DriftEvent
   selected: boolean
   onToggle: () => void
   machineLabel?: string
   setLabel?: string
+  /** 绑定漂移的反查结果；undefined = 还没回来，卡片只显示地址那一行 */
+  bindingMatch?: BindingMatchResult
+  onRebind?: (providerId: string) => void
+  onCreateProvider?: (presetId: string, keyLocation: string) => void
 }) {
   const { t } = useLingui()
   // truncated 不能收编：内容没上来，勾选也没用。
@@ -91,11 +100,11 @@ export function DriftCard({
               <span className="font-mono">{event.binding_url}</span>
             </Trans>
           </p>
-          <p className="mt-1 text-ink3">
-            <Trans>
-              无法识别这个 base_url 属于哪个平台。可以「恢复」把它拉回基线，或者「忽略」。
-            </Trans>
-          </p>
+          <BindingDriftActions
+            match={bindingMatch}
+            onRebind={(id) => onRebind?.(id)}
+            onCreateProvider={(presetId, loc) => onCreateProvider?.(presetId, loc)}
+          />
         </div>
       )}
 
