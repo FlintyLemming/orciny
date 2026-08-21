@@ -147,7 +147,7 @@ func seedManagedBaselineWith(
 		require.NoError(t, os.WriteFile(p, []byte(disk), 0o644))
 
 		// blob 存还原后的占位符形态（与 apply 落盘前一致）。
-		res := render.Restore([]byte(disk), creds, vars)
+		res := render.Restore([]byte(disk), render.Values{Creds: creds, Vars: vars})
 		require.True(t, res.Safe, "seed 的基线必须能安全还原")
 		blob, err := cache.Put(res.Content)
 		require.NoError(t, err)

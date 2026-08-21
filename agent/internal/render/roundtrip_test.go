@@ -44,7 +44,7 @@ func TestRenderRestoreRoundTripProperty(t *testing.T) {
 		}
 		disk := sb.String()
 
-		res := render.Restore([]byte(disk), creds, vars)
+		res := render.Restore([]byte(disk), render.Values{Creds: creds, Vars: vars})
 		if !res.Safe {
 			continue // 判定为不安全的内容不会被上报，往返律对它不适用
 		}
@@ -61,10 +61,55 @@ func TestRoundTripHoldsWithPartialRestore(t *testing.T) {
 	sec := &secrets.File{Creds: creds, Vars: vars, Machine: map[string]string{}}
 
 	disk := `{"K":"sk-value-12345678","tier":"1"}`
-	res := render.Restore([]byte(disk), creds, vars)
+	res := render.Restore([]byte(disk), render.Values{Creds: creds, Vars: vars})
 	require.True(t, res.Safe)
 
 	back, err := render.Render(res.Content, sec.Lookup)
 	require.NoError(t, err)
 	require.Equal(t, disk, string(back))
+}
+
+// 往返律扩展到含 provider 值的情形（spec §11）。
+func TestRoundTripWithProviderValues(t *testing.T) {
+	rng := rand.New(rand.NewPCG(13, 17))
+
+	provider := map[string]string{
+		"base_url":     "https://open.bigmodel.cn/api/anthropic",
+		"auth_token":   "sk-zhipu-abcdefghijklmn",
+		"model":        "glm-5.1",
+		"model_opus":   "glm-4.7",
+		"model_sonnet": "glm-4.6-air",
+		"model_haiku":  "glm-4.5-flash",
+	}
+	vals := render.Values{
+		Creds:    map[string]string{"anthropic": "sk-ant-abcdefghij"},
+		Vars:     map[string]string{"ws": "production"},
+		Provider: provider,
+	}
+	sec := &secrets.File{
+		Creds: vals.Creds, Vars: vals.Vars,
+		Machine: map[string]string{}, Provider: provider,
+	}
+
+	alphabet := []string{"普通文字", "\n", "{", "}", "{{", "}}", " ", `"`, ":", ","}
+	for _, v := range provider {
+		alphabet = append(alphabet, v)
+	}
+	alphabet = append(alphabet, "sk-ant-abcdefghij", "production")
+
+	for range 500 {
+		var sb strings.Builder
+		for range rng.IntN(24) {
+			sb.WriteString(alphabet[rng.IntN(len(alphabet))])
+		}
+		disk := sb.String()
+
+		res := render.Restore([]byte(disk), vals)
+		if !res.Safe {
+			continue // 判定为不安全的内容不会被上报，往返律对它不适用
+		}
+		back, err := render.Render(res.Content, sec.Lookup)
+		require.NoError(t, err, "输入 %q 还原后无法重新渲染", disk)
+		require.Equal(t, disk, string(back), "往返不一致：%q", disk)
+	}
 }

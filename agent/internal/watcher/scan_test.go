@@ -82,7 +82,9 @@ func render0(t *testing.T, disk string, sec *secrets.File) []byte {
 }
 
 func renderRestore(disk string, sec *secrets.File) render.RestoreResult {
-	return render.Restore([]byte(disk), sec.Creds, sec.Vars)
+	return render.Restore([]byte(disk), render.Values{
+		Creds: sec.Creds, Vars: sec.Vars, Provider: sec.Provider,
+	})
 }
 
 // rebuild 用给定的上报函数重建 watcher，其余配置不变。

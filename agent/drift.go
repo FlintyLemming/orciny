@@ -137,7 +137,9 @@ func printDrift(out io.Writer, dir string, items []protocol.DriftItem) error {
 		cur := it.Content
 		if len(cur) == 0 && home != "" && it.Kind != protocol.DriftDeleted {
 			if raw, err := os.ReadFile(filepath.Join(home, filepath.FromSlash(it.Path))); err == nil {
-				res := render.Restore(raw, sec.Creds, sec.Vars)
+				res := render.Restore(raw, render.Values{
+					Creds: sec.Creds, Vars: sec.Vars, Provider: sec.Provider,
+				})
 				if res.Safe {
 					cur = res.Content
 				}

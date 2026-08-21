@@ -241,8 +241,7 @@ func (w *Watcher) Scan(full bool) ([]protocol.DriftItem, error) {
 				base = b
 			}
 		}
-		creds, vars := mapsOf(sec)
-		res := render.RestoreWithBase(content, base, creds, vars)
+		res := render.RestoreWithBase(content, base, valuesOf(sec))
 		it.RestorePartial = res.Partial
 		if !res.Safe {
 			it.Truncated = true
@@ -338,11 +337,13 @@ func ignored(patterns []string, rel string) bool {
 	return false
 }
 
-func mapsOf(sec *secrets.File) (creds, vars map[string]string) {
+// valuesOf 把凭据缓存整理成还原用的值集合。
+// provider 的分档由 render.Values 内部完成（M1.5 spec §4.2），这里不做判断。
+func valuesOf(sec *secrets.File) render.Values {
 	if sec == nil {
-		return nil, nil
+		return render.Values{}
 	}
-	return sec.Creds, sec.Vars
+	return render.Values{Creds: sec.Creds, Vars: sec.Vars, Provider: sec.Provider}
 }
 
 func cloneState(st *state.State) *state.State {
@@ -367,9 +368,10 @@ func cloneState(st *state.State) *state.State {
 
 func cloneSecrets(sec *secrets.File) *secrets.File {
 	out := &secrets.File{
-		Creds:   copyMap(sec.Creds),
-		Vars:    copyMap(sec.Vars),
-		Machine: copyMap(sec.Machine),
+		Creds:    copyMap(sec.Creds),
+		Vars:     copyMap(sec.Vars),
+		Machine:  copyMap(sec.Machine),
+		Provider: copyMap(sec.Provider),
 	}
 	return out
 }

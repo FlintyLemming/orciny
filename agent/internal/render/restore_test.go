@@ -13,8 +13,7 @@ import (
 func TestRestoreReplacesCredential(t *testing.T) {
 	got := render.Restore(
 		[]byte(`{"env":{"K":"sk-ant-realvalue"}}`),
-		map[string]string{"anthropic_key": "sk-ant-realvalue"},
-		nil,
+		render.Values{Creds: map[string]string{"anthropic_key": "sk-ant-realvalue"}},
 	)
 	require.True(t, got.Safe)
 	require.False(t, got.Partial)
@@ -25,11 +24,10 @@ func TestRestoreReplacesCredential(t *testing.T) {
 func TestRestoreReplacesLongestFirst(t *testing.T) {
 	got := render.Restore(
 		[]byte(`{"long":"sk-abcdefgh-suffix","short":"sk-abcdefgh"}`),
-		map[string]string{
+		render.Values{Creds: map[string]string{
 			"short_key": "sk-abcdefgh",
 			"long_key":  "sk-abcdefgh-suffix",
-		},
-		nil,
+		}},
 	)
 	require.True(t, got.Safe)
 	require.Equal(t,
@@ -41,8 +39,7 @@ func TestRestoreReplacesLongestFirst(t *testing.T) {
 func TestRestoreReplacesEveryOccurrence(t *testing.T) {
 	got := render.Restore(
 		[]byte("key=sk-value-1234\n再说一遍 sk-value-1234\n"),
-		map[string]string{"k": "sk-value-1234"},
-		nil,
+		render.Values{Creds: map[string]string{"k": "sk-value-1234"}},
 	)
 	require.True(t, got.Safe)
 	require.Equal(t, 2, strings.Count(string(got.Content), "{{cred.k}}"))
@@ -51,7 +48,7 @@ func TestRestoreReplacesEveryOccurrence(t *testing.T) {
 
 // 磁盘上字面的 {{ 必须转义，否则往返律破掉。
 func TestRestoreEscapesLiteralBraces(t *testing.T) {
-	got := render.Restore([]byte("模板写法是 {{cred.x}} 这样"), nil, nil)
+	got := render.Restore([]byte("模板写法是 {{cred.x}} 这样"), render.Values{})
 	require.True(t, got.Safe)
 	require.Equal(t, "模板写法是 {{{{cred.x}} 这样", string(got.Content))
 
@@ -66,8 +63,7 @@ func TestRestoreEscapesLiteralBraces(t *testing.T) {
 func TestRestoreSkipsShortVariables(t *testing.T) {
 	got := render.Restore(
 		[]byte(`{"branch":"main","tier":"1"}`),
-		nil,
-		map[string]string{"branch": "main", "tier": "1"},
+		render.Values{Vars: map[string]string{"branch": "main", "tier": "1"}},
 	)
 	require.Contains(t, string(got.Content), "{{var.branch}}")
 	require.Contains(t, string(got.Content), `"1"`, "太短的变量值不替")
@@ -79,7 +75,7 @@ func TestRestoreSkipsShortVariables(t *testing.T) {
 func TestRestoreMarksPartialOnVariableCountMismatch(t *testing.T) {
 	base := []byte(`{"a":"{{var.ws}}"}`)                    // 渲染时出现 1 次
 	cur := []byte(`{"a":"main","b":"main-ish","c":"main"}`) // 现在出现 3 次（含 main-ish 中的 main）
-	got := render.RestoreWithBase(cur, base, nil, map[string]string{"ws": "main"})
+	got := render.RestoreWithBase(cur, base, render.Values{Vars: map[string]string{"ws": "main"}})
 	require.True(t, got.Partial)
 	require.True(t, got.Safe)
 }
@@ -87,7 +83,7 @@ func TestRestoreMarksPartialOnVariableCountMismatch(t *testing.T) {
 func TestRestoreNoPartialWhenCountMatches(t *testing.T) {
 	base := []byte(`{"a":"{{var.ws}}"}`)
 	cur := []byte(`{"a":"main"}`)
-	got := render.RestoreWithBase(cur, base, nil, map[string]string{"ws": "main"})
+	got := render.RestoreWithBase(cur, base, render.Values{Vars: map[string]string{"ws": "main"}})
 	require.False(t, got.Partial)
 	require.Equal(t, `{"a":"{{var.ws}}"}`, string(got.Content))
 }
@@ -96,8 +92,10 @@ func TestRestoreNoPartialWhenCountMatches(t *testing.T) {
 func TestRestoreIgnoresAbsentValues(t *testing.T) {
 	got := render.Restore(
 		[]byte("普通内容"),
-		map[string]string{"k": "sk-not-here-1234"},
-		map[string]string{"ws": "nowhere"},
+		render.Values{
+			Creds: map[string]string{"k": "sk-not-here-1234"},
+			Vars:  map[string]string{"ws": "nowhere"},
+		},
 	)
 	require.True(t, got.Safe)
 	require.False(t, got.Partial)
@@ -105,7 +103,63 @@ func TestRestoreIgnoresAbsentValues(t *testing.T) {
 }
 
 func TestRestoreOfEmptyContent(t *testing.T) {
-	got := render.Restore(nil, map[string]string{"k": "sk-value-1234"}, nil)
+	got := render.Restore(nil, render.Values{Creds: map[string]string{"k": "sk-value-1234"}})
 	require.True(t, got.Safe)
 	require.Empty(t, got.Content)
+}
+
+func TestRestoreAuthTokenGoesToCredentialTier(t *testing.T) {
+	v := render.Values{
+		Provider: map[string]string{"auth_token": "sk-zhipu-abcdefghij"},
+	}
+	res := render.Restore([]byte(`{"env":{"ANTHROPIC_AUTH_TOKEN":"sk-zhipu-abcdefghij"}}`), v)
+	require.True(t, res.Safe)
+	require.Equal(t, `{"env":{"ANTHROPIC_AUTH_TOKEN":"{{provider.auth_token}}"}}`,
+		string(res.Content))
+	require.NotContains(t, string(res.Content), "sk-zhipu")
+}
+
+// auth_token 是秘密：替不回去就必须判定不安全，调用方只报路径（spec §4.2）。
+func TestRestoreUnsafeWhenAuthTokenSurvives(t *testing.T) {
+	v := render.Values{
+		Provider: map[string]string{"auth_token": "sk-zhipu-abcdefghij"},
+	}
+	// 值被人为切碎成两段，替换替不干净，最后一道闸要拦住它。
+	disk := `{"a":"sk-zhipu-abcdefghij","b":"sk-zhipu-abcdefghij{{"}`
+	res := render.Restore([]byte(disk), v)
+	if res.Safe {
+		require.NotContains(t, string(res.Content), "sk-zhipu-abcdefghij")
+	}
+}
+
+func TestRestoreBaseURLGoesToVarTier(t *testing.T) {
+	v := render.Values{
+		Provider: map[string]string{"base_url": "https://open.bigmodel.cn/api/anthropic"},
+	}
+	res := render.Restore(
+		[]byte(`{"env":{"ANTHROPIC_BASE_URL":"https://open.bigmodel.cn/api/anthropic"}}`), v)
+	require.True(t, res.Safe)
+	require.Contains(t, string(res.Content), "{{provider.base_url}}")
+}
+
+// 短模型 id 触发 RestorePartial 让人复核——这正是 MinVarLen 想要的行为。
+func TestRestoreShortModelIDIsPartial(t *testing.T) {
+	v := render.Values{Provider: map[string]string{"model": "k2"}}
+	res := render.Restore([]byte(`{"env":{"ANTHROPIC_MODEL":"k2"}}`), v)
+	require.True(t, res.Partial)
+	require.Contains(t, string(res.Content), `"k2"`, "太短，放弃还原但不阻断")
+}
+
+// 四槽同值：按值去重，只留一个 token；计数对不上因此标记 Partial。
+func TestRestoreDedupesIdenticalModelSlots(t *testing.T) {
+	v := render.Values{Provider: map[string]string{
+		"model": "glm-5.1", "model_opus": "glm-5.1",
+		"model_sonnet": "glm-5.1", "model_haiku": "glm-5.1",
+	}}
+	disk := `{"env":{"ANTHROPIC_MODEL":"glm-5.1","ANTHROPIC_DEFAULT_OPUS_MODEL":"glm-5.1"}}`
+	res := render.Restore([]byte(disk), v)
+	require.True(t, res.Safe)
+	require.Equal(t, 2, strings.Count(string(res.Content), "{{provider.model}}"))
+	require.NotContains(t, string(res.Content), "{{provider.model_opus}}")
+	require.True(t, res.Partial, "出现次数与基线对不上，必须让人复核")
 }

@@ -34,7 +34,7 @@ func TestSecurityRestoredContentNeverContainsCredentialValues(t *testing.T) {
 	}
 
 	for _, body := range bodies {
-		got := render.Restore([]byte(body), creds, nil)
+		got := render.Restore([]byte(body), render.Values{Creds: creds})
 		require.True(t, got.Safe, "内容 %q 未能安全脱敏", body)
 		for name, v := range creds {
 			require.NotContains(t, string(got.Content), v,
@@ -50,7 +50,7 @@ func TestSecurityUnsafeRestoreIsReported(t *testing.T) {
 		"a": "SECRET",
 		"b": "X", // 长度 1：hub 侧拦得住，但历史数据里可能存在
 	}
-	got := render.Restore([]byte("值是 SECRET，另一个是 X"), creds, nil)
+	got := render.Restore([]byte("值是 SECRET，另一个是 X"), render.Values{Creds: creds})
 	if !got.Safe {
 		require.NotContains(t, string(got.Content), "SECRET",
 			"判定为不安全时也不该把内容交出去——调用方会丢弃它")
@@ -67,10 +67,12 @@ func TestSecurityUnsafeRestoreIsReported(t *testing.T) {
 // 极端输入不能让还原崩掉或死循环。
 func TestSecurityRestoreHandlesPathologicalInput(t *testing.T) {
 	creds := map[string]string{"k": "{{cred.k}}"} // 值本身长得像占位符
-	got := render.Restore([]byte("{{cred.k}}"), creds, nil)
+	got := render.Restore([]byte("{{cred.k}}"), render.Values{Creds: creds})
 	require.NotNil(t, got.Content)
 
-	empty := render.Restore([]byte("x"), map[string]string{"e": ""}, map[string]string{"v": ""})
+	empty := render.Restore([]byte("x"), render.Values{
+		Creds: map[string]string{"e": ""}, Vars: map[string]string{"v": ""},
+	})
 	require.True(t, empty.Safe, "空值不该被当成「到处都能搜到」")
 	require.Equal(t, "x", string(empty.Content))
 }
