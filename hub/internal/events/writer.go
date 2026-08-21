@@ -40,6 +40,13 @@ const (
 	KindCredentialDeleted = "credential.deleted"
 
 	KindImportCompleted = "import.completed"
+
+	// M1.5 服务绑定（spec §2）。改 Provider 内部不产生新 Revision，
+	// 因此这几条事件是唯一的审计痕迹。
+	KindProviderCreated = "provider.created"
+	KindProviderUpdated = "provider.updated"
+	KindProviderDeleted = "provider.deleted"
+	KindBindingChanged  = "binding.changed"
 )
 
 // Writer 往 events collection 写记录。
