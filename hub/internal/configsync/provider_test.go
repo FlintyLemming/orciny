@@ -323,3 +323,43 @@ func TestNotifyCredentialReachesProviderBoundMachines(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "sk-zhipu-newvalue123", snap.Provider["auth_token"])
 }
+
+// git describe 注入的版本形如 v0.2.0-38-g3161fd4：语义上是「v0.2.0 之后
+// 第 38 个提交」，但按 semver 带 pre-release 的版本小于同号正式版。
+// 不丢掉 pre-release 就会把每一个非 tag 构建都判成过老。
+func TestSnapshotAcceptsGitDescribeVersion(t *testing.T) {
+	for _, ver := range []string{"v0.2.0-38-g3161fd4", "0.2.0", "v0.2.0", "v0.3.0-1-gabcdef"} {
+		t.Run(ver, func(t *testing.T) {
+			r := newRig(t)
+			m := r.machine(t, "fp-ver-"+ver)
+			r.setAgentVersion(t, m, ver)
+			provID := r.seedProvider(t, "智谱 GLM · 个人",
+				"https://open.bigmodel.cn/api/anthropic", "sk-zhipu-abcdefghij")
+			setID := r.seedSetWithBinding(t, map[string]string{
+				".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}"}}`,
+			}, &providers.Binding{Provider: provID})
+			_, err := r.sets.Assign(m, setID, "apply")
+			require.NoError(t, err)
+
+			_, err = r.svc.Snapshot(m)
+			require.NoError(t, err, "%s 应当被接受", ver)
+		})
+	}
+}
+
+// 真正过老的仍然要被拦住，包括它的 pre-release 形态。
+func TestSnapshotStillRefusesOldPrereleaseVersion(t *testing.T) {
+	r := newRig(t)
+	m := r.machine(t, "fp-ver-old")
+	r.setAgentVersion(t, m, "v0.1.0-5-gdeadbee")
+	provID := r.seedProvider(t, "智谱 GLM · 个人",
+		"https://open.bigmodel.cn/api/anthropic", "sk-zhipu-abcdefghij")
+	setID := r.seedSetWithBinding(t, map[string]string{
+		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}"}}`,
+	}, &providers.Binding{Provider: provID})
+	_, err := r.sets.Assign(m, setID, "apply")
+	require.NoError(t, err)
+
+	_, err = r.svc.Snapshot(m)
+	require.ErrorIs(t, err, configsync.ErrAgentTooOld)
+}

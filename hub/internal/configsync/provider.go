@@ -107,6 +107,13 @@ func (s *Service) checkAgentVersion(machineID string) error {
 		return fmt.Errorf("%w（版本号 %q 解析不出来），请升级到 v%s 或更高后重试",
 			ErrAgentTooOld, m.GetString("agent_version"), orciny.MinProviderAgentVersion)
 	}
+	// 比大小前丢掉 pre-release 与 build 元数据。
+	//
+	// goreleaser / Makefile 注入的是 git describe 的结果，形如
+	// v0.2.0-38-g3161fd4 ——它的语义是「v0.2.0 之后第 38 个提交」，功能上
+	// 只会比 v0.2.0 更新；但按 semver 的规矩带 pre-release 的版本**小于**
+	// 同号正式版，直接比会把每一个非 tag 构建都判成过老。
+	v.Pre, v.Build = nil, nil
 	if v.LT(orciny.MinProviderAgentVersion) {
 		return fmt.Errorf("%w（v%s < v%s），请升级 agent 后重试",
 			ErrAgentTooOld, v, orciny.MinProviderAgentVersion)
