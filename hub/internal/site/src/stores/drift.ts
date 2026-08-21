@@ -93,6 +93,8 @@ export function toDriftEvent(r: DriftEventRecord): DriftEvent {
     state: r.state,
     diff: r.diff ?? '',
     truncated: !!r.truncated,
+    binding_drift: !!r.binding_drift,
+    binding_url: r.binding_url ?? '',
     restore_partial: !!r.restore_partial,
     created: r.created,
   }

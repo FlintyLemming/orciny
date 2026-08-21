@@ -1,5 +1,8 @@
-import { Trans } from '@lingui/react/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import { parseUnifiedDiff, type DriftEvent } from '@/lib/inbox'
+
+/** 占位符的字面形态。不能直接写进 t`` —— ICU 会把 { 当插值符。 */
+const BASE_URL_TOKEN = '{{provider.base_url}}'
 
 const kindLabel: Record<DriftEvent['kind'], React.ReactNode> = {
   added: <Trans>新增</Trans>,
@@ -20,8 +23,10 @@ export function DriftCard({
   machineLabel?: string
   setLabel?: string
 }) {
-  // truncated 不能收编：内容没上来，勾选也没用
-  const locked = event.truncated
+  const { t } = useLingui()
+  // truncated 不能收编：内容没上来，勾选也没用。
+  // binding_drift 不能收编：会把占位符拍平成硬编码，绑定当场失效（M1.5 spec §6.2）。
+  const locked = event.truncated || event.binding_drift
   const lines = parseUnifiedDiff(event.diff)
 
   return (
@@ -36,6 +41,13 @@ export function DriftCard({
           className="mt-1"
           checked={selected}
           disabled={locked}
+          title={
+            event.binding_drift
+              ? // 占位符字面量走插值传进去：ICU MessageFormat 会把 { 当成
+                // 插值起始符，直接写在文案里会让 lingui compile 失败。
+                t`收编会把 ${BASE_URL_TOKEN} 拍平成硬编码地址，服务绑定会当场失效`
+              : undefined
+          }
           onChange={onToggle}
           aria-label={event.path}
         />
@@ -69,6 +81,22 @@ export function DriftCard({
         <p className="border-b border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-300">
           <Trans>该文件含未能安全脱敏的凭据，请在 Web 上手工处理</Trans>
         </p>
+      )}
+
+      {event.binding_drift && (
+        <div className="border-b border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+          <p>
+            <Trans>
+              这台机器改用了别的 API 地址：
+              <span className="font-mono">{event.binding_url}</span>
+            </Trans>
+          </p>
+          <p className="mt-1 text-ink3">
+            <Trans>
+              无法识别这个 base_url 属于哪个平台。可以「恢复」把它拉回基线，或者「忽略」。
+            </Trans>
+          </p>
+        </div>
       )}
 
       {lines.length > 0 ? (

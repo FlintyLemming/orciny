@@ -19,6 +19,10 @@ export interface DriftEvent {
   diff: string
   truncated: boolean
   restore_partial: boolean
+  /** 基线是 {{provider.*}} 占位符、机器上是字面值（M1.5 spec §6.1） */
+  binding_drift: boolean
+  /** 机器上那段字面 base_url，供反查用 */
+  binding_url: string
   created: string
 }
 
@@ -105,6 +109,13 @@ export function adoptBlockers(selected: DriftEvent[]): string[] {
 
   for (const e of selected.filter((x) => x.truncated)) {
     blockers.push(t`${e.path} 内容未能安全脱敏，无法自动收编`)
+  }
+
+  // 收编会把占位符拍平成硬编码地址，绑定当场失效（M1.5 spec §6.2）。
+  for (const e of selected.filter((x) => x.binding_drift)) {
+    blockers.push(
+      t`${e.path} 是服务绑定漂移：收编会把占位符拍平成硬编码地址，绑定会当场失效。请改用「改绑定」或「恢复」`,
+    )
   }
 
   return blockers

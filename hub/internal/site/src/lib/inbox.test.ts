@@ -12,6 +12,7 @@ function ev(over: Partial<DriftEvent>): DriftEvent {
   return {
     id: 'e1', machine: 'm1', config_set: 's1', path: 'a', kind: 'modified',
     state: 'open', diff: '', truncated: false, restore_partial: false,
+    binding_drift: false, binding_url: '',
     created: '2026-07-31T12:00:00Z',
     ...over,
   }
@@ -118,5 +119,16 @@ describe('parseUnifiedDiff', () => {
   it('去掉标记后保留原文', () => {
     const lines = parseUnifiedDiff('@@ -1 +1 @@\n+- 列表项\n')
     expect(lines.filter((l) => l.type === 'add')[0].text).toBe('- 列表项')
+  })
+})
+
+describe('绑定漂移', () => {
+  it('绑定漂移不能收编', () => {
+    const e = ev({ id: 'e1', path: '.claude/settings.json', binding_drift: true })
+    expect(adoptBlockers([e]).join(' ')).toContain('绑定')
+  })
+
+  it('普通漂移不受影响', () => {
+    expect(adoptBlockers([ev({ id: 'e1' })])).toEqual([])
   })
 })

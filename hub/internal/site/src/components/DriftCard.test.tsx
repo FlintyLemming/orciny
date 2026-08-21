@@ -16,6 +16,7 @@ function ev(over: Partial<DriftEvent>): DriftEvent {
   return {
     id: 'e1', machine: 'm1', config_set: 's1', path: 'a', kind: 'modified',
     state: 'open', diff: '', truncated: false, restore_partial: false,
+    binding_drift: false, binding_url: '',
     created: '2026-07-31T12:00:00Z',
     ...over,
   }
@@ -50,5 +51,32 @@ describe('DriftCard', () => {
     ))
     expect(screen.getByText('旧')).toBeInTheDocument()
     expect(screen.getByText('新')).toBeInTheDocument()
+  })
+})
+
+describe('DriftCard 绑定漂移', () => {
+  it('绑定漂移的收编勾选框置灰并说明原因', () => {
+    render(
+      wrap(
+        <DriftCard
+          event={ev({
+            path: '.claude/settings.json',
+            binding_drift: true,
+            binding_url: 'https://api.moonshot.cn/anthropic',
+          })}
+          selected={false}
+          onToggle={() => {}}
+        />,
+      ),
+    )
+    expect(screen.getByRole('checkbox')).toBeDisabled()
+    expect(screen.getByText(/https:\/\/api\.moonshot\.cn\/anthropic/)).toBeInTheDocument()
+    // 第三档兜底文案
+    expect(screen.getByText(/无法识别/)).toBeInTheDocument()
+  })
+
+  it('普通漂移的勾选框照常可用', () => {
+    render(wrap(<DriftCard event={ev({ path: 'CLAUDE.md' })} selected={false} onToggle={() => {}} />))
+    expect(screen.getByRole('checkbox')).toBeEnabled()
   })
 })

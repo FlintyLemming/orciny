@@ -237,6 +237,10 @@ export interface DriftEventRecord {
   diff: string
   restore_partial: boolean
   truncated: boolean
+  /** 基线是 {{provider.*}} 占位符、机器上是字面值（M1.5 spec §6.1） */
+  binding_drift: boolean
+  /** 机器上那段字面 base_url，供反查用 */
+  binding_url: string
   state: DriftState
   resolved_revision: string
   resolved_at: string

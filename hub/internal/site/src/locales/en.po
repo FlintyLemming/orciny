@@ -22,6 +22,11 @@ msgstr "(none)"
 msgid "{0} 内容未能安全脱敏，无法自动收编"
 msgstr "{0}: content could not be safely redacted; cannot adopt automatically"
 
+#. placeholder {0}: e.path
+#: src/lib/inbox.ts
+msgid "{0} 是服务绑定漂移：收编会把占位符拍平成硬编码地址，绑定会当场失效。请改用「改绑定」或「恢复」"
+msgstr "{0} is a service-binding drift: adopting would flatten the placeholder into a hard-coded address and break the binding. Use \"Rebind\" or \"Restore\" instead"
+
 #: src/components/ThreeWayCompare.tsx
 msgid "∅"
 msgstr "∅"
@@ -620,6 +625,10 @@ msgstr "Inbox"
 msgid "收编"
 msgstr "Adopt"
 
+#: src/components/DriftCard.tsx
+msgid "收编会把 {BASE_URL_TOKEN} 拍平成硬编码地址，服务绑定会当场失效"
+msgstr "Adopting would flatten {BASE_URL_TOKEN} into a hard-coded address and break the service binding"
+
 #: src/pages/Inbox.tsx
 msgid "收编前复核"
 msgstr "Review before adopt"
@@ -678,6 +687,10 @@ msgstr "No open drift."
 #: src/components/AddMachineDialog.tsx
 msgid "无法写入剪贴板，请手动复制上面的命令。"
 msgstr "Couldn't write to the clipboard — please copy the command above manually."
+
+#: src/components/DriftCard.tsx
+msgid "无法识别这个 base_url 属于哪个平台。可以「恢复」把它拉回基线，或者「忽略」。"
+msgstr "Cannot tell which platform this base_url belongs to. You can Restore it to the baseline, or Ignore it."
 
 #: src/pages/ConfigSets.tsx
 msgid "暂停下发"
@@ -1102,6 +1115,11 @@ msgstr "No machines yet. Click \"Add machine\" to get a one-line install command
 #: src/pages/ConfigSets.tsx
 msgid "还没有配置集。从一台机器导入，或点右上角新建。"
 msgstr "No config sets yet. Import from a machine, or create one at the top right."
+
+#. placeholder {0}: event.binding_url
+#: src/components/DriftCard.tsx
+msgid "这台机器改用了别的 API 地址：<0>{0}</0>"
+msgstr "This machine switched to a different API address: <0>{0}</0>"
 
 #: src/components/Shell.tsx
 msgid "退出"
