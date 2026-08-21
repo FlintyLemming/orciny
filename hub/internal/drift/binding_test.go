@@ -413,3 +413,105 @@ func TestExtractKeyRejectsShortValue(t *testing.T) {
 	_, err := r.svc.ExtractKey(eventID, "env.ANTHROPIC_AUTH_TOKEN", "kimi_key")
 	require.Error(t, err)
 }
+
+// ---------- Rebind ----------
+
+func TestRebindProducesNewRevisionAndKeepsBindingAlive(t *testing.T) {
+	r := newRig(t)
+	zhipu := r.seedProvider(t, "Zhipu", "https://open.bigmodel.cn/api/anthropic",
+		"sk-zhipu-abcdefghij")
+	kimi := r.seedProvider(t, "KimiOfficial", "https://api.moonshot.cn/anthropic",
+		"sk-kimi-abcdefghij")
+
+	setID := r.seedBoundSet(t, zhipu, map[string]string{
+		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}"}}`,
+	})
+	before, err := r.revs.Head(setID)
+	require.NoError(t, err)
+
+	eventID := r.seedBindingDriftIn(t, setID, ".claude/settings.json",
+		"https://api.moonshot.cn/anthropic", "")
+
+	rev, err := r.svc.Rebind(eventID, kimi)
+	require.NoError(t, err)
+	require.NotEqual(t, before.Id, rev.Id, "换绑定必须产生新 Revision")
+
+	got, err := r.revs.BindingOf(rev.Id)
+	require.NoError(t, err)
+	require.Equal(t, kimi, got.Provider)
+
+	set, err := r.app.FindRecordById("config_sets", setID)
+	require.NoError(t, err)
+	require.Equal(t, rev.Id, set.GetString("head"))
+	require.Equal(t, kimi, set.GetString("head_provider"))
+
+	// 草稿绑定也要跟着走，否则下一次发布会把绑定切回智谱。
+	draft, err := r.sets.DraftBinding(setID)
+	require.NoError(t, err)
+	require.Equal(t, kimi, draft.Provider)
+
+	// 文件内容不变——改的只是绑定。
+	files, err := r.revs.Files(rev.Id)
+	require.NoError(t, err)
+	oldFiles, err := r.revs.Files(before.Id)
+	require.NoError(t, err)
+	require.Equal(t, oldFiles, files)
+}
+
+// 新绑定的模型槽取新 Provider 的 defaults——换了家供应商，
+// 旧供应商的模型 id 在新 endpoint 上没有意义。
+func TestRebindTakesNewProviderDefaults(t *testing.T) {
+	r := newRig(t)
+	zhipu := r.seedProvider(t, "Zhipu", "https://open.bigmodel.cn/api/anthropic",
+		"sk-zhipu-abcdefghij")
+	kimi := r.seedProviderWithDefaults(t, "KimiOfficial",
+		"https://api.moonshot.cn/anthropic", "sk-kimi-abcdefghij",
+		providers.ModelSlots{
+			Main: "kimi-k2", Opus: "kimi-k2", Sonnet: "kimi-k2", Haiku: "kimi-k2",
+		})
+
+	setID := r.seedBoundSet(t, zhipu, map[string]string{
+		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}"}}`,
+	})
+	eventID := r.seedBindingDriftIn(t, setID, ".claude/settings.json",
+		"https://api.moonshot.cn/anthropic", "")
+
+	rev, err := r.svc.Rebind(eventID, kimi)
+	require.NoError(t, err)
+
+	got, err := r.revs.BindingOf(rev.Id)
+	require.NoError(t, err)
+	require.Equal(t, providers.ModelSlots{
+		Main: "kimi-k2", Opus: "kimi-k2", Sonnet: "kimi-k2", Haiku: "kimi-k2",
+	}, got.Models)
+}
+
+// 漂移不在这里被关掉——ApplyAck 的既有路径会把它标成 superseded。
+// 抢先标记等于撒谎：那时机器上还没变。
+func TestRebindLeavesDriftOpen(t *testing.T) {
+	r := newRig(t)
+	zhipu := r.seedProvider(t, "Zhipu", "https://open.bigmodel.cn/api/anthropic",
+		"sk-zhipu-abcdefghij")
+	kimi := r.seedProvider(t, "KimiOfficial", "https://api.moonshot.cn/anthropic",
+		"sk-kimi-abcdefghij")
+	setID := r.seedBoundSet(t, zhipu, map[string]string{
+		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}"}}`,
+	})
+	eventID := r.seedBindingDriftIn(t, setID, ".claude/settings.json",
+		"https://api.moonshot.cn/anthropic", "")
+
+	_, err := r.svc.Rebind(eventID, kimi)
+	require.NoError(t, err)
+
+	rec, err := r.app.FindRecordById("drift_events", eventID)
+	require.NoError(t, err)
+	require.Equal(t, "open", rec.GetString("state"))
+}
+
+func TestRebindRefusesNonBindingDrift(t *testing.T) {
+	r := newRig(t)
+	eventID := r.seedNormalDrift(t, "CLAUDE.md")
+	_, err := r.svc.Rebind(eventID, "p1")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "不是绑定漂移")
+}

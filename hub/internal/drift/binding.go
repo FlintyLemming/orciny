@@ -8,8 +8,10 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/tidwall/gjson"
 
+	"github.com/FlintyLemming/orciny/hub/internal/events"
 	"github.com/FlintyLemming/orciny/hub/internal/importer"
 	"github.com/FlintyLemming/orciny/hub/internal/providers"
+	"github.com/FlintyLemming/orciny/protocol"
 )
 
 // baseURLToken 是基线里 base_url 那一处的字面形态。
@@ -159,4 +161,67 @@ func (s *Service) driftContent(rec *core.Record) ([]byte, error) {
 		return nil, fmt.Errorf("drift: 读取现状内容: %w", err)
 	}
 	return s.d.Blobs.Get(b.GetString("hash"))
+}
+
+// Rebind 把漂移所属配置集的绑定改成指定 Provider，并发布一条新 Revision
+// （M1.5 spec §2.2 / §6.3 第一档）。
+//
+// 发布的是 **head 的清单**而不是草稿：改绑定不该顺手把用户草稿里没做完的
+// 编辑一起推上去。草稿绑定同步改掉，否则下一次发布会把绑定又切回去。
+//
+// **不在这里关掉这条漂移**：新 Revision 下发 → agent apply → ApplyAck →
+// resolveDriftOnApply 会把它标成 superseded（M1 spec §7.7 的既有路径）。
+// 抢先标记等于撒谎——那时机器上还没变。
+func (s *Service) Rebind(eventID, providerID string) (*core.Record, error) {
+	rec, err := s.d.App.FindRecordById("drift_events", eventID)
+	if err != nil {
+		return nil, fmt.Errorf("drift: 漂移 %s 不存在: %w", eventID, err)
+	}
+	if !rec.GetBool("binding_drift") {
+		return nil, fmt.Errorf("drift: %s 不是绑定漂移", rec.GetString("path"))
+	}
+	setID := rec.GetString("config_set")
+	if setID == "" {
+		return nil, fmt.Errorf("drift: %s 不属于任何配置集", rec.GetString("path"))
+	}
+
+	prov, err := s.d.Providers.Get(providerID)
+	if err != nil {
+		return nil, err
+	}
+	// 模型槽取新 Provider 的 defaults：换了家供应商，旧供应商的模型 id
+	// 在新 endpoint 上没有意义。
+	var defaults providers.ModelSlots
+	_ = prov.UnmarshalJSONField("defaults", &defaults)
+	binding := &providers.Binding{Provider: providerID, Models: defaults}
+
+	head, err := s.d.Revs.Head(setID)
+	if err != nil {
+		return nil, err
+	}
+	files, err := s.d.Revs.Files(head.Id)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.d.Sets.SetDraftBinding(setID, binding); err != nil {
+		return nil, err
+	}
+	rev, err := s.d.Revs.PublishFiles(setID, files, binding,
+		"从收件箱改绑到「"+prov.GetString("name")+"」", "publish")
+	if err != nil {
+		return nil, err
+	}
+	if err := s.d.Events.Write(events.KindBindingChanged, rec.GetString("machine"),
+		map[string]any{
+			"config_set": setID, "provider": providerID,
+			"revision": rev.Id, "from_drift": eventID,
+		}); err != nil {
+		s.log.Warn("写 binding.changed 事件失败", "error", err)
+	}
+	if s.d.Sync != nil {
+		if err := s.d.Sync.NotifyConfigSet(setID, rev.Id, protocol.ReasonPublished); err != nil {
+			return nil, err
+		}
+	}
+	return rev, nil
 }
