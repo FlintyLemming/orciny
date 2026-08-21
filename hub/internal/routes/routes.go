@@ -89,6 +89,8 @@ func Register(e *core.ServeEvent, d Deps) error {
 	g.DELETE("/providers/{id}", d.deleteProvider).Bind(su)
 	g.PUT("/config-sets/{id}/binding", d.setBinding).Bind(su)
 	g.POST("/config-sets/{id}/fix-auth-field", d.fixAuthField).Bind(su)
+	g.GET("/drift/{id}/binding-match", d.bindingMatch).Bind(su)
+	g.POST("/drift/{id}/rebind", d.rebindDrift).Bind(su)
 	g.POST("/drift/adopt", d.adoptDrift).Bind(su)
 	g.POST("/drift/restore", d.restoreDrift).Bind(su)
 	g.POST("/drift/ignore", d.ignoreDrift).Bind(su)

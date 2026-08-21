@@ -18,6 +18,14 @@ type providerBody struct {
 	Models     []string             `json:"models"`
 	Defaults   providers.ModelSlots `json:"defaults"`
 	Note       string               `json:"note"`
+
+	// FromDrift 非空时，先把漂移内容里的 key 抽成凭据再建（M1.5 spec §6.3
+	// 第二档）。此时 Credential 字段被忽略。
+	FromDrift *struct {
+		Event    string `json:"event"`
+		Location string `json:"location"`
+		Name     string `json:"name"`
+	} `json:"from_drift"`
 }
 
 func (b providerBody) input() providers.Input {
@@ -43,11 +51,47 @@ func (d Deps) createProvider(e *core.RequestEvent) error {
 	if err := e.BindBody(&req); err != nil {
 		return e.BadRequestError("请求体格式错误", nil)
 	}
+	if req.FromDrift != nil {
+		id, err := d.Admin.CreateProviderFromDrift(
+			req.FromDrift.Event, req.FromDrift.Location, req.FromDrift.Name, req.input())
+		if err != nil {
+			return mapErr(e, err)
+		}
+		return e.JSON(http.StatusOK, map[string]any{"id": id})
+	}
 	id, err := d.Admin.CreateProvider(req.input())
 	if err != nil {
 		return mapErr(e, err)
 	}
 	return e.JSON(http.StatusOK, map[string]any{"id": id})
+}
+
+func (d Deps) bindingMatch(e *core.RequestEvent) error {
+	if d.Admin == nil {
+		return e.InternalServerError("管理服务未就绪", nil)
+	}
+	m, err := d.Admin.MatchBindingDrift(e.Request.PathValue("id"))
+	if err != nil {
+		return mapErr(e, err)
+	}
+	return e.JSON(http.StatusOK, m)
+}
+
+func (d Deps) rebindDrift(e *core.RequestEvent) error {
+	if d.Admin == nil {
+		return e.InternalServerError("管理服务未就绪", nil)
+	}
+	var req struct {
+		Provider string `json:"provider"`
+	}
+	if err := e.BindBody(&req); err != nil || req.Provider == "" {
+		return e.BadRequestError("需要 provider", nil)
+	}
+	revID, err := d.Admin.RebindFromDrift(e.Request.PathValue("id"), req.Provider)
+	if err != nil {
+		return mapErr(e, err)
+	}
+	return e.JSON(http.StatusOK, map[string]any{"revision": revID})
 }
 
 func (d Deps) updateProvider(e *core.RequestEvent) error {

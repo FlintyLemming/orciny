@@ -1,6 +1,7 @@
 package hub
 
 import (
+	"github.com/FlintyLemming/orciny/hub/internal/drift"
 	"github.com/FlintyLemming/orciny/hub/internal/providers"
 )
 
@@ -60,4 +61,35 @@ func (h *Hub) FixAuthField(setID string) error {
 // ProviderPresets 返回内置预设表。编译期常量，只读（spec §2.3）。
 func (h *Hub) ProviderPresets() []providers.Preset {
 	return providers.Presets()
+}
+
+// MatchBindingDrift 对一条绑定漂移做反查三档（M1.5 spec §6.3）。
+func (h *Hub) MatchBindingDrift(eventID string) (drift.BindingMatch, error) {
+	return h.drift.MatchBinding(eventID)
+}
+
+// RebindFromDrift 把漂移所属配置集的绑定改成指定 Provider 并发布新版本，
+// 返回新 revision id。
+func (h *Hub) RebindFromDrift(eventID, providerID string) (string, error) {
+	rev, err := h.drift.Rebind(eventID, providerID)
+	if err != nil {
+		return "", err
+	}
+	return rev.Id, nil
+}
+
+// CreateProviderFromDrift 先把漂移内容里 location 处的值抽成名为 credName
+// 的凭据，再用它建服务配置（M1.5 spec §6.3 第二档）。in.Credential 由本方法填。
+//
+// 两步之间失败时凭据会留下来——这是有意的：让用户在凭据页看得见它，
+// 好过悄悄回滚掉一把他刚在机器上生成的 key。
+func (h *Hub) CreateProviderFromDrift(
+	eventID, location, credName string, in providers.Input,
+) (string, error) {
+	credID, err := h.drift.ExtractKey(eventID, location, credName)
+	if err != nil {
+		return "", err
+	}
+	in.Credential = credID
+	return h.CreateProvider(in)
 }

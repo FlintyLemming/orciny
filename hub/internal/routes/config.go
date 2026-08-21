@@ -47,6 +47,9 @@ type Admin interface {
 	SetBinding(setID string, b *providers.Binding) error
 	FixAuthField(setID string) error
 	ProviderPresets() []providers.Preset
+	MatchBindingDrift(eventID string) (drift.BindingMatch, error)
+	RebindFromDrift(eventID, providerID string) (string, error)
+	CreateProviderFromDrift(eventID, location, credName string, in providers.Input) (string, error)
 }
 
 // ---------- config sets ----------

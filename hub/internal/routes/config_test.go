@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/FlintyLemming/orciny/hub/internal/credentials"
+	"github.com/FlintyLemming/orciny/hub/internal/drift"
 	"github.com/FlintyLemming/orciny/hub/internal/importer"
 	_ "github.com/FlintyLemming/orciny/hub/internal/migrations"
 	"github.com/FlintyLemming/orciny/hub/internal/providers"
@@ -28,6 +29,13 @@ type fakeAdmin struct {
 	providerDeleteErr error
 	lastBinding       *providers.Binding
 	bindingCalls      int
+
+	// —— M1.5 绑定漂移反查 ——
+	plainCreateCalled bool
+	fromDriftEvent    string
+	fromDriftLocation string
+	fromDriftName     string
+	fromDriftInput    providers.Input
 }
 
 type assignCall struct {
@@ -60,9 +68,12 @@ func (f *fakeAdmin) RestoreDrift([]string) error      { return nil }
 func (f *fakeAdmin) IgnoreDrift([]string, bool) error { return nil }
 func (f *fakeAdmin) ClearDegraded(string) error       { return nil }
 
-func (f *fakeAdmin) CreateProvider(providers.Input) (string, error) { return "p1", nil }
-func (f *fakeAdmin) UpdateProvider(string, providers.Input) error   { return nil }
-func (f *fakeAdmin) DeleteProvider(string) error                    { return f.providerDeleteErr }
+func (f *fakeAdmin) CreateProvider(providers.Input) (string, error) {
+	f.plainCreateCalled = true
+	return "p1", nil
+}
+func (f *fakeAdmin) UpdateProvider(string, providers.Input) error { return nil }
+func (f *fakeAdmin) DeleteProvider(string) error                  { return f.providerDeleteErr }
 func (f *fakeAdmin) SetBinding(_ string, b *providers.Binding) error {
 	f.bindingCalls++
 	f.lastBinding = b
@@ -70,6 +81,20 @@ func (f *fakeAdmin) SetBinding(_ string, b *providers.Binding) error {
 }
 func (f *fakeAdmin) FixAuthField(string) error           { return nil }
 func (f *fakeAdmin) ProviderPresets() []providers.Preset { return providers.Presets() }
+
+func (f *fakeAdmin) MatchBindingDrift(string) (drift.BindingMatch, error) {
+	return drift.BindingMatch{URL: "https://api.moonshot.cn/anthropic"}, nil
+}
+func (f *fakeAdmin) RebindFromDrift(string, string) (string, error) { return "rev-rebind", nil }
+func (f *fakeAdmin) CreateProviderFromDrift(
+	eventID, location, credName string, in providers.Input,
+) (string, error) {
+	f.fromDriftEvent = eventID
+	f.fromDriftLocation = location
+	f.fromDriftName = credName
+	f.fromDriftInput = in
+	return "p-from-drift", nil
+}
 
 func newRouterServer(t *testing.T, d routes.Deps) *httptest.Server {
 	t.Helper()

@@ -93,3 +93,54 @@ func TestFixAuthFieldReturnsNoContent(t *testing.T) {
 	rec := doSuperuser(t, srv, "POST", "/api/orciny/config-sets/s1/fix-auth-field", "")
 	require.Equal(t, http.StatusNoContent, rec.Code)
 }
+
+func TestBindingDriftRoutesRequireSuperuser(t *testing.T) {
+	srv := newRouterServer(t, routes.Deps{Admin: &fakeAdmin{}})
+	for _, c := range []struct{ method, path, body string }{
+		{"GET", "/api/orciny/drift/e1/binding-match", ""},
+		{"POST", "/api/orciny/drift/e1/rebind", `{"provider":"p1"}`},
+	} {
+		req := httptest.NewRequest(c.method, c.path, strings.NewReader(c.body))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		srv.Config.Handler.ServeHTTP(rec, req)
+		require.Equal(t, http.StatusUnauthorized, rec.Code, "%s %s", c.method, c.path)
+	}
+}
+
+// 建服务配置时带 from_drift → 先抽 key 成凭据，再用它建。
+func TestCreateProviderWithFromDrift(t *testing.T) {
+	admin := &fakeAdmin{}
+	srv := newRouterServer(t, routes.Deps{Admin: admin})
+	body := `{"name":"Kimi 官方","preset":"kimi",` +
+		`"base_url":"https://api.moonshot.cn/anthropic",` +
+		`"auth_field":"ANTHROPIC_AUTH_TOKEN",` +
+		`"from_drift":{"event":"e1","location":"env.ANTHROPIC_AUTH_TOKEN","name":"kimi_key"}}`
+
+	rec := doSuperuser(t, srv, "POST", "/api/orciny/providers", body)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	require.Equal(t, "e1", admin.fromDriftEvent)
+	require.Equal(t, "env.ANTHROPIC_AUTH_TOKEN", admin.fromDriftLocation)
+	require.Equal(t, "kimi_key", admin.fromDriftName)
+	require.Equal(t, "Kimi 官方", admin.fromDriftInput.Name)
+	require.False(t, admin.plainCreateCalled, "带 from_drift 时不走普通的 CreateProvider")
+}
+
+func TestRebindRequiresProvider(t *testing.T) {
+	srv := newRouterServer(t, routes.Deps{Admin: &fakeAdmin{}})
+	rec := doSuperuser(t, srv, "POST", "/api/orciny/drift/e1/rebind", `{}`)
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestBindingMatchReturnsURL(t *testing.T) {
+	srv := newRouterServer(t, routes.Deps{Admin: &fakeAdmin{}})
+	rec := doSuperuser(t, srv, "GET", "/api/orciny/drift/e1/binding-match", "")
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var got struct {
+		URL string `json:"url"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
+	require.Equal(t, "https://api.moonshot.cn/anthropic", got.URL)
+}
