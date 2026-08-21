@@ -6,7 +6,15 @@
  */
 
 import { pb } from '@/lib/pb'
-import type { FileEntry, Finding, ValidateProblem } from '@/types/collections'
+import type {
+  AuthField,
+  Binding,
+  FileEntry,
+  Finding,
+  ModelSlots,
+  ProviderPreset,
+  ValidateProblem,
+} from '@/types/collections'
 import type { FileChange } from '@/lib/diffView'
 import type { Manifest } from '@/types/collections'
 
@@ -194,6 +202,47 @@ export function ignoreDrift(events: string[], global = false) {
 
 export function clearDegraded(machineId: string) {
   return postJSON(`/api/orciny/machines/${machineId}/clear-degraded`)
+}
+
+// ---------- M1.5 AI 服务配置与绑定 ----------
+
+export interface ProviderBody {
+  name: string
+  preset: string
+  base_url: string
+  auth_field: AuthField
+  credential: string
+  models: string[]
+  defaults: ModelSlots
+  note: string
+}
+
+export function listProviderPresets() {
+  return getJSON<ProviderPreset[]>('/api/orciny/provider-presets')
+}
+
+export function createProvider(body: ProviderBody) {
+  return postJSON<{ id: string }>('/api/orciny/providers', body)
+}
+
+export function updateProvider(id: string, body: ProviderBody) {
+  return putJSON(`/api/orciny/providers/${id}`, body)
+}
+
+export function deleteProvider(id: string) {
+  return deleteJSON(`/api/orciny/providers/${id}`)
+}
+
+/** provider 传空串即解绑——与「设置」同一个端点。 */
+export function setBinding(setId: string, binding: Binding | null) {
+  return putJSON(
+    `/api/orciny/config-sets/${setId}/binding`,
+    binding ?? { provider: '', models: { main: '', opus: '', sonnet: '', haiku: '' } },
+  )
+}
+
+export function fixAuthField(setId: string) {
+  return postJSON(`/api/orciny/config-sets/${setId}/fix-auth-field`)
 }
 
 /** 把 PB 草稿条目规范化成小写键（兼容旧数据的 Path/Hash 大写）。 */

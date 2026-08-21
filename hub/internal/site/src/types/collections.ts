@@ -79,6 +79,60 @@ export interface Manifest {
   exclude?: string[]
 }
 
+export type AuthField = 'ANTHROPIC_AUTH_TOKEN' | 'ANTHROPIC_API_KEY'
+
+export interface ModelSlots {
+  main: string
+  opus: string
+  sonnet: string
+  haiku: string
+}
+
+/** 配置集的服务绑定。单数，不是数组（M1.5 spec §2.2）。 */
+export interface Binding {
+  provider: string
+  models: ModelSlots
+}
+
+export interface ProviderRecord {
+  id: string
+  name: string
+  preset: string
+  base_url: string
+  auth_field: AuthField
+  /** credentials 记录 id；key 本身永不下发到前端 */
+  credential: string
+  models: string[] | null
+  defaults: ModelSlots | null
+  note: string
+  created: string
+  updated: string
+  expand?: { credential?: CredentialRecord }
+}
+
+/** 内置预设。编译进 hub 二进制，只读（M1.5 spec §2.3）。 */
+export interface ProviderPreset {
+  id: string
+  name: string
+  base_url: string
+  auth_field: AuthField
+  models: string[]
+  defaults: ModelSlots
+  website_url?: string
+  api_key_url?: string
+  icon?: string
+  icon_color?: string
+  collector_type?: string
+  collector_mode?: string
+}
+
+/** refs / draft_refs 的形状，与 Go 侧 configsets.Refs 一致。 */
+export interface RefsField {
+  creds: string[]
+  vars: string[]
+  provider_keys: string[]
+}
+
 export interface ConfigSetRecord {
   id: string
   name: string
@@ -87,11 +141,15 @@ export interface ConfigSetRecord {
   paused: boolean
   head: string
   draft: FileEntry[] | null
-  draft_refs: { creds: string[]; vars: string[] } | null
+  draft_refs: RefsField | null
+  /** null = 未绑定 */
+  draft_binding: Binding | null
+  /** 冗余字段，唯一写入点在发布路径（M1.5 spec §2.2） */
+  head_provider: string
   created: string
   updated: string
-  /** expand=head 时带上 */
-  expand?: { head?: RevisionRecord }
+  /** expand=head,head_provider 时带上 */
+  expand?: { head?: RevisionRecord; head_provider?: ProviderRecord }
 }
 
 export interface RevisionRecord {
@@ -101,7 +159,9 @@ export interface RevisionRecord {
   files: FileEntry[] | null
   manifest: Manifest | null
   checksum: string
-  refs: { creds: string[]; vars: string[] } | null
+  refs: RefsField | null
+  /** 冻结的绑定；null = 无绑定 */
+  binding: Binding | null
   note: string
   source: 'publish' | 'adopt' | 'rollback' | 'import'
   created: string
@@ -206,10 +266,20 @@ export interface Finding {
   rule: string
 }
 
+export interface ValidateProblemFix {
+  kind: 'replace_env_key'
+  from: string
+  to: string
+}
+
 export interface ValidateProblem {
   path: string
   kind: string
   detail: string
+  /** 真 = 展示但不阻断发布（M1.5 spec §7 第 2 条） */
+  warning?: boolean
+  /** 非空 = 给「一键修复」 */
+  fix?: ValidateProblemFix
 }
 
 export const COLLECTION_MACHINES = 'machines'
@@ -222,3 +292,4 @@ export const COLLECTION_VARIABLES = 'variables'
 export const COLLECTION_DRIFT_EVENTS = 'drift_events'
 export const COLLECTION_IGNORE_RULES = 'ignore_rules'
 export const COLLECTION_BLOBS = 'blobs'
+export const COLLECTION_PROVIDERS = 'providers'

@@ -7,7 +7,7 @@
  * 例子来保证（转义、非法名、machine 白名单）。
  */
 
-export type RefKind = 'cred' | 'var' | 'machine'
+export type RefKind = 'cred' | 'var' | 'machine' | 'provider'
 
 export interface Ref {
   kind: RefKind
@@ -21,6 +21,16 @@ export interface ParseResult {
 
 /** {{machine.*}} 允许的全部名字，与 Go 侧 protocol.MachineKeys 一致。 */
 export const MACHINE_KEYS = ['name', 'hostname', 'os', 'arch'] as const
+
+/** {{provider.*}} 允许的全部名字，与 Go 侧 protocol.ProviderKeys 逐字符一致。 */
+export const PROVIDER_KEYS = [
+  'base_url',
+  'auth_token',
+  'model',
+  'model_opus',
+  'model_sonnet',
+  'model_haiku',
+] as const
 
 const NAME_RE = /^[A-Za-z0-9_-]+$/
 
@@ -61,6 +71,12 @@ export function parsePlaceholders(text: string): ParseResult {
       } else {
         errors.push(`machine.${name} 不是内置名（只有 ${MACHINE_KEYS.join(' / ')}）`)
       }
+    } else if (prefix === 'provider') {
+      if ((PROVIDER_KEYS as readonly string[]).includes(name)) {
+        push(refs, seen, { kind: 'provider', name })
+      } else {
+        errors.push(`provider.${name} 不是内置名（只有 ${PROVIDER_KEYS.join(' / ')}）`)
+      }
     } else {
       errors.push(`未知前缀 ${prefix}`)
     }
@@ -76,15 +92,26 @@ function push(refs: Ref[], seen: Set<string>, r: Ref) {
   refs.push(r)
 }
 
-/** known 的元素形如 "cred.foo" / "var.bar"。machine.* 永远算已定义。 */
+/**
+ * known 的元素形如 "cred.foo" / "var.bar"。
+ *
+ * machine.* 是内置值；provider.* 的「已定义」由三条绑定校验判定
+ * （M1.5 spec §7），不走未定义引用这条路——否则每个绑了服务的配置集
+ * 都会在编辑器里挂满假告警。
+ */
 export function undefinedRefs(text: string, known: Set<string>): Ref[] {
   return parsePlaceholders(text).refs.filter(
-    (r) => r.kind !== 'machine' && !known.has(`${r.kind}.${r.name}`),
+    (r) =>
+      r.kind !== 'machine' && r.kind !== 'provider' && !known.has(`${r.kind}.${r.name}`),
   )
 }
 
-/** 补全候选：已有的凭据与变量，加上内置的 machine.*。 */
+/** 补全候选：已有的凭据与变量，加上内置的 machine.* 与 provider.*。 */
 export function completions(prefix: string, known: string[]): string[] {
-  const all = [...known, ...MACHINE_KEYS.map((k) => `machine.${k}`)]
+  const all = [
+    ...known,
+    ...MACHINE_KEYS.map((k) => `machine.${k}`),
+    ...PROVIDER_KEYS.map((k) => `provider.${k}`),
+  ]
   return all.filter((c) => c.startsWith(prefix)).sort()
 }
