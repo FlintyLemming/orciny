@@ -25,6 +25,14 @@ var (
 	// ErrNeedsReview：含未完全还原的变量，diff 里会显示 main vs
 	// {{var.workspace}}，用户看得懂，但必须先看一眼（spec §6.4）。
 	ErrNeedsReview = errors.New("drift: 含未完全还原的变量，需先人工确认")
+
+	// ErrBindingDrift：绑定漂移不能收编（M1.5 spec §6.2）。
+	//
+	// 默认收编语义是「把机器现状写进配置集」，作用在绑定漂移上会把占位符
+	// 拍平成硬编码字面值——绑定当场死掉，而且是静悄悄地死：下一次改
+	// Provider 时这个配置集不再跟着走，没有任何提示。
+	ErrBindingDrift = errors.New(
+		"drift: 绑定漂移不能收编——收编会把占位符拍平成硬编码字面值，绑定会当场失效")
 )
 
 // Adopt 把选中的漂移合进一个新 Revision（spec §8.3）。
@@ -62,6 +70,11 @@ func (s *Service) AdoptReviewed(eventIDs, reviewed []string) (*core.Record, erro
 		if rec.GetBool("truncated") {
 			return nil, fmt.Errorf("drift: %s 未能安全脱敏，无法收编；"+
 				"请在 Web 上手工处理该文件", rec.GetString("path"))
+		}
+		// 必须在任何写入之前，与冲突检查同一批——要么整批成，要么什么都不动。
+		if rec.GetBool("binding_drift") {
+			return nil, fmt.Errorf("%w：%s。请改用卡片上的「改绑定」，"+
+				"或者「恢复」把它拉回基线", ErrBindingDrift, rec.GetString("path"))
 		}
 		if rec.GetBool("restore_partial") && !reviewedSet[id] {
 			return nil, fmt.Errorf("%w: %s", ErrNeedsReview, rec.GetString("path"))

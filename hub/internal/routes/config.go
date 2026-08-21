@@ -553,6 +553,11 @@ func mapErr(e *core.RequestEvent, err error) error {
 			"message": err.Error(),
 			"data":    map[string]any{"reason": "conflict"},
 		})
+	case errors.Is(err, drift.ErrBindingDrift):
+		return e.JSON(http.StatusConflict, map[string]any{
+			"message": err.Error(),
+			"data":    map[string]any{"reason": "binding_drift"},
+		})
 	case errors.Is(err, drift.ErrNeedsReview):
 		return e.JSON(http.StatusConflict, map[string]any{
 			"message": err.Error(),

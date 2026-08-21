@@ -179,3 +179,72 @@ func TestHandleReportDoesNotMarkTruncated(t *testing.T) {
 	require.False(t, rec.GetBool("binding_drift"))
 	require.Empty(t, rec.GetString("binding_url"))
 }
+
+// ---------- 收编禁用 ----------
+
+// reportBindingDrift 造一条 binding_drift = true 的 open 漂移，返回 event id。
+func (r *rig) reportBindingDrift(t *testing.T, path, url string) string {
+	t.Helper()
+	r.report(t, protocol.DriftItem{
+		Path: path, Kind: protocol.DriftModified,
+		Content: []byte(`{"env":{"ANTHROPIC_BASE_URL":"` + url + `"}}`),
+		Mode:    0o600,
+	})
+	rec := r.driftAt(t, path)
+	require.True(t, rec.GetBool("binding_drift"), "%s 应当被标记为绑定漂移", path)
+	return rec.Id
+}
+
+func TestAdoptRefusesBindingDrift(t *testing.T) {
+	r := newRig(t)
+	r.assignWith(t, map[string]string{
+		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}"}}`,
+	})
+	id := r.reportBindingDrift(t, ".claude/settings.json", "https://api.moonshot.cn/anthropic")
+
+	_, err := r.svc.Adopt([]string{id})
+	require.ErrorIs(t, err, drift.ErrBindingDrift)
+	require.Contains(t, err.Error(), ".claude/settings.json")
+
+	rec, err := r.app.FindRecordById("drift_events", id)
+	require.NoError(t, err)
+	require.Equal(t, "open", rec.GetString("state"), "拒绝之后什么都不该被改")
+}
+
+// 恢复与忽略不受影响——它们不会破坏绑定。
+func TestRestoreAndIgnoreAllowBindingDrift(t *testing.T) {
+	r := newRig(t)
+	r.assignWith(t, map[string]string{
+		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}"}}`,
+		".claude/other.json":    `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}"}}`,
+	})
+	a := r.reportBindingDrift(t, ".claude/settings.json", "https://a.test/v1")
+	b := r.reportBindingDrift(t, ".claude/other.json", "https://b.test/v1")
+
+	require.NoError(t, r.svc.Restore([]string{a}))
+	require.NoError(t, r.svc.Ignore([]string{b}, false))
+}
+
+// 一批里混进一条绑定漂移 → 整批拒绝。
+// 冲突检查已经是「要么整批成，要么什么都不动」，这条沿用同一立场。
+func TestAdoptRefusesMixedBatchWithBindingDrift(t *testing.T) {
+	r := newRig(t)
+	r.assignWith(t, map[string]string{
+		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}"}}`,
+		"CLAUDE.md":             "原文",
+	})
+	r.report(t, protocol.DriftItem{
+		Path: "CLAUDE.md", Kind: protocol.DriftModified,
+		Content: []byte("改过的原文"), Mode: 0o644,
+	})
+	normal := r.driftAt(t, "CLAUDE.md").Id
+	bound := r.reportBindingDrift(t, ".claude/settings.json",
+		"https://api.moonshot.cn/anthropic")
+
+	_, err := r.svc.Adopt([]string{normal, bound})
+	require.ErrorIs(t, err, drift.ErrBindingDrift)
+
+	rec, err := r.app.FindRecordById("drift_events", normal)
+	require.NoError(t, err)
+	require.Equal(t, "open", rec.GetString("state"), "整批拒绝，普通那条也不动")
+}
