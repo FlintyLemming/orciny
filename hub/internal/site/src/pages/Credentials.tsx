@@ -10,6 +10,7 @@ import {
   reloadCredentials,
 } from '@/stores/credentials'
 import { createCredential, rotateCredential, deleteCredential, ApiError } from '@/lib/api'
+import { $providers, subscribeProviders } from '@/stores/providers'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 
 const MIN_LEN = 8
@@ -19,6 +20,7 @@ export function Credentials() {
   const list = useStore($credentials)
   const loading = useStore($credentialsLoading)
   const error = useStore($credentialsError)
+  const providers = useStore($providers)
 
   const [showCreate, setShowCreate] = useState(false)
   const [name, setName] = useState('')
@@ -32,6 +34,7 @@ export function Credentials() {
   const [refsHint, setRefsHint] = useState('')
 
   useEffect(() => subscribeCredentials(), [])
+  useEffect(() => subscribeProviders(), [])
 
   async function handleCreate() {
     if (value.length < MIN_LEN) {
@@ -207,10 +210,21 @@ export function Credentials() {
             <Trans>还没有凭据。</Trans>
           </li>
         )}
-        {list.map((c) => (
+        {list.map((c) => {
+          // 被 AI 服务配置引用的凭据删不掉（M1.5 spec §5.3）——先告诉用户，
+          // 别等他点了删除再报错。
+          const usedBy = providers.filter((p) => p.credential === c.id)
+          return (
           <li key={c.id} className="flex items-center gap-3 px-4 py-3">
             <div className="flex-1">
-              <div className="font-medium">{c.name}</div>
+              <div className="flex items-center gap-2">
+                <span className="font-medium">{c.name}</span>
+                {usedBy.length > 0 && (
+                  <span className="rounded bg-wash px-1.5 py-0.5 text-[10px] text-ink3">
+                    <Trans>被 {usedBy.length} 个 AI 服务配置引用</Trans>
+                  </span>
+                )}
+              </div>
               <div className="font-mono text-xs text-ink3">…{c.last4}</div>
               {c.note && <div className="text-xs text-ink3">{c.note}</div>}
             </div>
@@ -233,7 +247,8 @@ export function Credentials() {
               <Trash2 size={14} />
             </button>
           </li>
-        ))}
+          )
+        })}
       </ul>
 
       {pendingDelete && (
