@@ -127,3 +127,51 @@ func TestParseRenderRoundTripProperty(t *testing.T) {
 		require.Equal(t, raw, string(out), "往返不一致：%q", raw)
 	}
 }
+
+func TestParseProviderRefs(t *testing.T) {
+	segs, err := protocol.Parse([]byte(
+		`{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}",` +
+			`"ANTHROPIC_AUTH_TOKEN":"{{provider.auth_token}}",` +
+			`"ANTHROPIC_MODEL":"{{provider.model}}"}}`))
+	require.NoError(t, err)
+
+	var got []string
+	for _, s := range segs {
+		if s.Ref != nil {
+			require.Equal(t, protocol.RefProvider, s.Ref.Kind)
+			got = append(got, s.Ref.String())
+		}
+	}
+	require.Equal(t, []string{
+		"provider.base_url", "provider.auth_token", "provider.model",
+	}, got)
+}
+
+// 与 machine.* 的既有测试对称：白名单外的名字必须被拒。
+func TestParseRejectsUnknownProviderKey(t *testing.T) {
+	_, err := protocol.Parse([]byte(`{{provider.temperature}}`))
+	require.ErrorIs(t, err, protocol.ErrBadPlaceholder)
+	require.Contains(t, err.Error(), "provider.temperature")
+}
+
+func TestProviderKeysAreExactlySix(t *testing.T) {
+	require.Equal(t, []string{
+		"base_url", "auth_token", "model", "model_opus", "model_sonnet", "model_haiku",
+	}, protocol.ProviderKeys)
+}
+
+func TestRefKindStringCoversProvider(t *testing.T) {
+	require.Equal(t, "provider", protocol.RefProvider.String())
+}
+
+// Refs 提取要把 provider 一并去重排序吐出来——发布期靠它填 provider_keys。
+func TestRefsIncludesProvider(t *testing.T) {
+	refs, err := protocol.Refs([]byte(
+		`{{provider.model}}{{cred.k}}{{provider.model}}{{provider.base_url}}`))
+	require.NoError(t, err)
+	var got []string
+	for _, r := range refs {
+		got = append(got, r.String())
+	}
+	require.Equal(t, []string{"cred.k", "provider.base_url", "provider.model"}, got)
+}

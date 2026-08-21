@@ -21,9 +21,10 @@ var ErrBadPlaceholder = errors.New("protocol: 占位符语法错误")
 type RefKind uint8
 
 const (
-	RefCred    RefKind = 1
-	RefVar     RefKind = 2
-	RefMachine RefKind = 3
+	RefCred     RefKind = 1
+	RefVar      RefKind = 2
+	RefMachine  RefKind = 3
+	RefProvider RefKind = 4
 )
 
 func (k RefKind) String() string {
@@ -34,6 +35,8 @@ func (k RefKind) String() string {
 		return "var"
 	case RefMachine:
 		return "machine"
+	case RefProvider:
+		return "provider"
 	default:
 		return fmt.Sprintf("unknown(%d)", uint8(k))
 	}
@@ -42,6 +45,15 @@ func (k RefKind) String() string {
 // MachineKeys 是 {{machine.*}} 允许的全部名字。
 // 收在这里是因为它属于「词法词汇表」：两侧必须认同同一组内置名。
 var MachineKeys = []string{"name", "hostname", "os", "arch"}
+
+// ProviderKeys 是 {{provider.*}} 允许的全部名字（M1.5 spec §3.1）。
+//
+// Ref.Name 是**字段名，不是 Provider 名**：绑定在配置集里唯一，不需要指名。
+// 与 MachineKeys 同理，它属于「词法词汇表」——两侧必须认同同一组内置名。
+// 顺序即 UI 展示顺序，不要重排。
+var ProviderKeys = []string{
+	"base_url", "auth_token", "model", "model_opus", "model_sonnet", "model_haiku",
+}
 
 type Ref struct {
 	Kind RefKind
@@ -130,6 +142,14 @@ func parseRef(body string) (Ref, error) {
 			}
 		}
 		return Ref{}, fmt.Errorf("%w: machine.%s 不是内置名（只有 %v）", ErrBadPlaceholder, name, MachineKeys)
+	case "provider":
+		for _, k := range ProviderKeys {
+			if k == name {
+				return Ref{Kind: RefProvider, Name: name}, nil
+			}
+		}
+		return Ref{}, fmt.Errorf("%w: provider.%s 不是内置名（只有 %v）",
+			ErrBadPlaceholder, name, ProviderKeys)
 	default:
 		return Ref{}, fmt.Errorf("%w: 未知前缀 %q", ErrBadPlaceholder, prefix)
 	}
