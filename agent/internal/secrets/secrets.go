@@ -26,6 +26,9 @@ type File struct {
 	Creds   map[string]string `json:"creds"`
 	Vars    map[string]string `json:"vars"`
 	Machine map[string]string `json:"machine"`
+	// Provider 是服务绑定注入的六个内置名（M1.5 spec §3.1）。
+	// auth_token 是秘密，因此本文件仍然一律 0600。
+	Provider map[string]string `json:"provider"`
 }
 
 func Path(dir string) string { return filepath.Join(dir, FileName) }
@@ -34,7 +37,10 @@ func Path(dir string) string { return filepath.Join(dir, FileName) }
 func Load(dir string) (*File, error) {
 	b, err := os.ReadFile(Path(dir))
 	if os.IsNotExist(err) {
-		return &File{Creds: map[string]string{}, Vars: map[string]string{}, Machine: map[string]string{}}, nil
+		return &File{
+			Creds: map[string]string{}, Vars: map[string]string{},
+			Machine: map[string]string{}, Provider: map[string]string{},
+		}, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("secrets: 读取: %w", err)
@@ -51,6 +57,9 @@ func Load(dir string) (*File, error) {
 	}
 	if f.Machine == nil {
 		f.Machine = map[string]string{}
+	}
+	if f.Provider == nil {
+		f.Provider = map[string]string{}
 	}
 	return &f, nil
 }
@@ -78,6 +87,9 @@ func (f *File) Lookup(r protocol.Ref) (string, bool) {
 	case protocol.RefMachine:
 		v, ok := f.Machine[r.Name]
 		return v, ok
+	case protocol.RefProvider:
+		v, ok := f.Provider[r.Name]
+		return v, ok
 	default:
 		return "", false
 	}
@@ -89,7 +101,8 @@ func (f *File) Equal(o *File) bool {
 	if f == nil || o == nil {
 		return f == nil && o == nil
 	}
-	return sameMap(f.Creds, o.Creds) && sameMap(f.Vars, o.Vars) && sameMap(f.Machine, o.Machine)
+	return sameMap(f.Creds, o.Creds) && sameMap(f.Vars, o.Vars) &&
+		sameMap(f.Machine, o.Machine) && sameMap(f.Provider, o.Provider)
 }
 
 func sameMap(a, b map[string]string) bool {
