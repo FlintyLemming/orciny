@@ -80,8 +80,7 @@ func (s *Service) NotifyMachine(machineID, reason string) error {
 // 复用 ConfigNotify 且**不带 RevisionID**：agent 拉回来发现 revision 相同
 // 但 secrets 变了，只重渲染受影响的文件。不产生新 Revision（产品 §4.5）。
 func (s *Service) NotifyCredential(name string) error {
-	// providerIDs 在子计划 04 的 NotifyProvider 里消费，这里只接住签名。
-	setIDs, _, _, err := s.d.Creds.ReferencedBy(name)
+	setIDs, _, providerIDs, err := s.d.Creds.ReferencedBy(name)
 	if err != nil {
 		return err
 	}
@@ -96,6 +95,47 @@ func (s *Service) NotifyCredential(name string) error {
 		}
 		for _, id := range machineIDs {
 			s.send(id, protocol.ConfigNotify{ConfigSetID: setID, Reason: protocol.ReasonRotated})
+		}
+	}
+
+	// Provider 引用凭据的方式是 relation 字段，不在 refs 里（M1.5 spec §5.3）。
+	// 漏掉这一段，轮换 key 之后全机队还在用旧 key。
+	for _, pid := range providerIDs {
+		if err := s.NotifyProvider(pid); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// NotifyProvider 在改了 Provider 之后重注入全机队（M1.5 spec §5.2）。
+//
+// **不产生新 Revision**：走 ConfigNotify 且不带 RevisionID（= 仅 secrets 变更，
+// M1 已有的语义）。agent 拉回来发现 revision 相同但 provider 值变了，
+// 只重渲染受影响的文件；rendered hash 跟着更新，因此**不产生漂移**
+// （spec §4.3——这条是 M1 设计正确性的红利，一行新代码都不需要）。
+//
+// 反查靠 config_sets.head_provider 这个冗余字段收敛成一次索引查询，
+// 而不是 JSON 字段扫描 + 三次 join（spec §2.2）。
+func (s *Service) NotifyProvider(providerID string) error {
+	sets, err := s.d.App.FindRecordsByFilter("config_sets",
+		"head_provider = {:p}", "", 0, 0, map[string]any{"p": providerID})
+	if err != nil {
+		return fmt.Errorf("configsync: 查询绑定了服务配置 %s 的配置集: %w", providerID, err)
+	}
+	for _, set := range sets {
+		if set.GetBool("paused") {
+			s.log.Info("配置集已暂停下发，跳过重注入", "config_set", set.Id)
+			continue
+		}
+		machineIDs, err := s.d.Sets.AssignedMachines(set.Id)
+		if err != nil {
+			return err
+		}
+		for _, id := range machineIDs {
+			s.send(id, protocol.ConfigNotify{
+				ConfigSetID: set.Id, Reason: protocol.ReasonRotated,
+			})
 		}
 	}
 	return nil

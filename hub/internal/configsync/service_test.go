@@ -8,12 +8,14 @@ import (
 	"github.com/pocketbase/pocketbase/tests"
 	"github.com/stretchr/testify/require"
 
+	"github.com/FlintyLemming/orciny"
 	"github.com/FlintyLemming/orciny/hub/internal/blobs"
 	"github.com/FlintyLemming/orciny/hub/internal/configsets"
 	"github.com/FlintyLemming/orciny/hub/internal/configsync"
 	"github.com/FlintyLemming/orciny/hub/internal/credentials"
 	"github.com/FlintyLemming/orciny/hub/internal/events"
 	_ "github.com/FlintyLemming/orciny/hub/internal/migrations"
+	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/hub/internal/revisions"
 	"github.com/FlintyLemming/orciny/protocol"
 )
@@ -55,6 +57,7 @@ type rig struct {
 	sets   *configsets.Service
 	revs   *revisions.Service
 	creds  *credentials.Store
+	provs  *providers.Store
 	sender *fakeSender
 	svc    *configsync.Service
 }
@@ -75,11 +78,12 @@ func newRig(t *testing.T) *rig {
 		sets:   configsets.NewService(app, b, ev),
 		revs:   revisions.NewService(app, b, ev),
 		creds:  credentials.NewStore(app, key, ev),
+		provs:  providers.NewStore(app, ev),
 		sender: &fakeSender{online: map[string]bool{}},
 	}
 	r.svc = configsync.NewService(configsync.Deps{
 		App: app, Blobs: b, Sets: r.sets, Revs: r.revs, Creds: r.creds,
-		Events: ev, Sender: r.sender,
+		Providers: r.provs, Events: ev, Sender: r.sender,
 	})
 	return r
 }
@@ -92,6 +96,8 @@ func (r *rig) machine(t *testing.T, fp string) string {
 	rec.Set("fingerprint", fp)
 	rec.Set("pub_key", "pk-"+fp)
 	rec.Set("status", "online")
+	// 真实握手会写这个字段；不写的话 M1.5 的定向版本门槛无从判定。
+	rec.Set("agent_version", orciny.Version)
 	require.NoError(t, r.app.Save(rec))
 	r.sender.online[rec.Id] = true
 	return rec.Id
