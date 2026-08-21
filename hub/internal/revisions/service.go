@@ -179,6 +179,7 @@ func (s *Service) nextSeq(setID string) (int, error) {
 func (s *Service) refsOf(files []protocol.FileEntry) (configsets.Refs, error) {
 	creds := map[string]bool{}
 	vars := map[string]bool{}
+	providerKeys := map[string]bool{}
 	for _, f := range files {
 		content, err := s.blobs.Get(f.Hash)
 		if err != nil {
@@ -194,10 +195,16 @@ func (s *Service) refsOf(files []protocol.FileEntry) (configsets.Refs, error) {
 				creds[ref.Name] = true
 			case protocol.RefVar:
 				vars[ref.Name] = true
+			case protocol.RefProvider:
+				providerKeys[ref.Name] = true
 			}
 		}
 	}
-	return configsets.Refs{Creds: sortedKeys(creds), Vars: sortedKeys(vars)}, nil
+	return configsets.Refs{
+		Creds:        sortedKeys(creds),
+		Vars:         sortedKeys(vars),
+		ProviderKeys: sortedKeys(providerKeys),
+	}, nil
 }
 
 func sortedKeys(m map[string]bool) []string {

@@ -37,38 +37,43 @@ func (s *Service) Validate(setID string, known map[string]bool) ([]Problem, erro
 	var problems []Problem
 	for _, f := range files {
 		if err := manifest.SafeRelPath(f.Path); err != nil {
-			problems = append(problems, Problem{f.Path, ProblemBadPath, err.Error()})
+			problems = append(problems, Problem{Path: f.Path, Kind: ProblemBadPath,
+				Detail: err.Error()})
 			continue
 		}
 		if manifest.IsAlwaysExcluded(f.Path) {
-			problems = append(problems, Problem{f.Path, ProblemAlwaysExcluded,
-				"该路径属于恒排除清单，不可纳管"})
+			problems = append(problems, Problem{Path: f.Path, Kind: ProblemAlwaysExcluded,
+				Detail: "该路径属于恒排除清单，不可纳管"})
 			continue
 		}
 		if f.Size > protocol.MaxFileSize {
-			problems = append(problems, Problem{f.Path, ProblemTooLarge,
-				fmt.Sprintf("%d 字节，超过单文件上限 512 KiB", f.Size)})
+			problems = append(problems, Problem{Path: f.Path, Kind: ProblemTooLarge,
+				Detail: fmt.Sprintf("%d 字节，超过单文件上限 512 KiB", f.Size)})
 			continue
 		}
 
 		content, err := s.blobs.Get(f.Hash)
 		if err != nil {
-			problems = append(problems, Problem{f.Path, ProblemMissingBlob,
-				"内容不在库里：" + f.Hash})
+			problems = append(problems, Problem{Path: f.Path, Kind: ProblemMissingBlob,
+				Detail: "内容不在库里：" + f.Hash})
 			continue
 		}
 		refs, err := protocol.Refs(content)
 		if err != nil {
-			problems = append(problems, Problem{f.Path, ProblemUndefinedRef, err.Error()})
+			problems = append(problems, Problem{Path: f.Path, Kind: ProblemUndefinedRef,
+				Detail: err.Error()})
 			continue
 		}
 		for _, ref := range refs {
-			if ref.Kind == protocol.RefMachine {
+			// machine.* 是内置值；provider.* 的「已定义」由三条绑定校验
+			// 判定（M1.5 spec §7），不走这条路——否则每个绑了服务的配置集
+			// 都会报一堆假的未定义引用。
+			if ref.Kind == protocol.RefMachine || ref.Kind == protocol.RefProvider {
 				continue
 			}
 			if !known[ref.String()] {
-				problems = append(problems, Problem{f.Path, ProblemUndefinedRef,
-					"未定义的引用 " + ref.String()})
+				problems = append(problems, Problem{Path: f.Path, Kind: ProblemUndefinedRef,
+					Detail: "未定义的引用 " + ref.String()})
 			}
 		}
 	}

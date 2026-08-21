@@ -29,9 +29,14 @@ func NewService(app core.App, b *blobs.Store, ev *events.Writer) *Service {
 }
 
 // Refs 是 config_sets.draft_refs 与 revisions.refs 的形状。
+//
+// ProviderKeys 记的是**哪几个 {{provider.*}} 内置名被引用**（形如
+// ["auth_token","base_url"]），不是绑定指向哪条 Provider——后者在
+// head_provider / binding 里。下发时靠它裁剪，不读 blob 内容（M1.5 spec §2.2）。
 type Refs struct {
-	Creds []string `json:"creds"`
-	Vars  []string `json:"vars"`
+	Creds        []string `json:"creds"`
+	Vars         []string `json:"vars"`
+	ProviderKeys []string `json:"provider_keys"`
 }
 
 func (s *Service) Create(name, note string) (*core.Record, error) {
@@ -48,7 +53,7 @@ func (s *Service) Create(name, note string) (*core.Record, error) {
 	r.Set("note", note)
 	r.Set("manifest", json.RawMessage(mj))
 	r.Set("draft", []protocol.FileEntry{})
-	r.Set("draft_refs", Refs{Creds: []string{}, Vars: []string{}})
+	r.Set("draft_refs", Refs{Creds: []string{}, Vars: []string{}, ProviderKeys: []string{}})
 	if err := s.app.Save(r); err != nil {
 		return nil, fmt.Errorf("configsets: 创建 %s: %w", name, err)
 	}
@@ -170,6 +175,7 @@ func (s *Service) saveDraft(r *core.Record, files []protocol.FileEntry) error {
 func (s *Service) collectRefs(files []protocol.FileEntry) (Refs, error) {
 	creds := map[string]bool{}
 	vars := map[string]bool{}
+	providerKeys := map[string]bool{}
 	for _, f := range files {
 		content, err := s.blobs.Get(f.Hash)
 		if err != nil {
@@ -185,11 +191,17 @@ func (s *Service) collectRefs(files []protocol.FileEntry) (Refs, error) {
 				creds[ref.Name] = true
 			case protocol.RefVar:
 				vars[ref.Name] = true
+			case protocol.RefProvider:
+				providerKeys[ref.Name] = true
 			}
 			// machine.* 是内置值，不进引用集合。
 		}
 	}
-	return Refs{Creds: sortedKeys(creds), Vars: sortedKeys(vars)}, nil
+	return Refs{
+		Creds:        sortedKeys(creds),
+		Vars:         sortedKeys(vars),
+		ProviderKeys: sortedKeys(providerKeys),
+	}, nil
 }
 
 func (s *Service) Manifest(setID string) (manifest.Manifest, error) {

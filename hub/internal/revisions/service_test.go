@@ -166,3 +166,22 @@ func TestDiffDetectsModeChange(t *testing.T) {
 	require.Len(t, got, 1)
 	require.Equal(t, "modified", got[0].Kind)
 }
+
+func TestPublishFreezesProviderKeys(t *testing.T) {
+	_, cs, rs := newBoth(t)
+	set, err := cs.Create("主力配置", "")
+	require.NoError(t, err)
+	_, err = cs.SetDraftFile(set.Id, ".claude/settings.json", []byte(
+		`{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}",`+
+			`"ANTHROPIC_AUTH_TOKEN":"{{provider.auth_token}}",`+
+			`"ANTHROPIC_MODEL":"{{provider.model}}"}}`), 0o600, nil)
+	require.NoError(t, err)
+
+	rev, err := rs.Publish(set.Id, "v1", "publish")
+	require.NoError(t, err)
+
+	var refs configsets.Refs
+	require.NoError(t, rev.UnmarshalJSONField("refs", &refs))
+	require.Equal(t, []string{"auth_token", "base_url", "model"}, refs.ProviderKeys)
+	require.Empty(t, refs.Creds)
+}
