@@ -186,6 +186,16 @@ func (s *Service) upsert(machineID, setID string, it protocol.DriftItem, baseFil
 		rec.Set("diff", UnifiedDiff(it.Path, baseContent, curContent))
 	}
 
+	// 绑定漂移的识别与反查素材（M1.5 spec §6.1 / §6.3）。
+	// 每次上报都重算：用户把那一行改回去之后标记必须跟着消失，
+	// 否则「收编」会一直被置灰。
+	bindingURL, isBindingDrift := "", false
+	if !it.Truncated && it.Kind != protocol.DriftDeleted {
+		bindingURL, isBindingDrift = DetectBindingDrift(baseContent, curContent)
+	}
+	rec.Set("binding_drift", isBindingDrift)
+	rec.Set("binding_url", bindingURL)
+
 	if err := s.d.App.Save(rec); err != nil {
 		return fmt.Errorf("drift: 保存 %s: %w", it.Path, err)
 	}
