@@ -9,6 +9,7 @@ import (
 	"github.com/pocketbase/pocketbase/tools/types"
 
 	"github.com/FlintyLemming/orciny/hub/internal/events"
+	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/protocol"
 )
 
@@ -131,8 +132,18 @@ func (s *Service) AdoptReviewed(eventIDs, reviewed []string) (*core.Record, erro
 	}
 	sort.Slice(merged, func(i, j int) bool { return merged[i].Path < merged[j].Path })
 
+	// 收编改的是文件，不是绑定：沿用 head 的绑定（M1.5 spec §2.2）。
+	// 不沿用的话，收编一次就等于顺手解绑，且没有任何提示。
+	var binding *providers.Binding
+	if head, err := s.d.Revs.Head(setID); err == nil {
+		binding, err = s.d.Revs.BindingOf(head.Id)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	note := adoptNote(s.d.App, machines, len(recs))
-	rev, err := s.d.Revs.PublishFiles(setID, merged, note, "adopt")
+	rev, err := s.d.Revs.PublishFiles(setID, merged, binding, note, "adopt")
 	if err != nil {
 		return nil, err
 	}

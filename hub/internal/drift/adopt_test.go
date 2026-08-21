@@ -3,10 +3,13 @@ package drift_test
 import (
 	"testing"
 
+	"github.com/pocketbase/pocketbase/core"
 	"github.com/stretchr/testify/require"
 
+	"github.com/FlintyLemming/orciny/hub/internal/configsets"
 	"github.com/FlintyLemming/orciny/hub/internal/drift"
 	"github.com/FlintyLemming/orciny/hub/internal/events"
+	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/protocol"
 )
 
@@ -198,4 +201,69 @@ func TestAdoptNotifiesAllAssignedMachinesIncludingSource(t *testing.T) {
 	}
 	require.Contains(t, notified, r.machineID, "来源机器不开特例——幂等保证它是空操作")
 	require.Contains(t, notified, other)
+}
+
+// seedProviderFor 建一条最小可用 Provider，返回记录 id。
+func seedProviderFor(t *testing.T, r *rig, name string) string {
+	t.Helper()
+	creds, err := r.app.FindCollectionByNameOrId("credentials")
+	require.NoError(t, err)
+	cred := core.NewRecord(creds)
+	cred.Set("name", "zhipu_key")
+	cred.Set("cipher_value", "x")
+	cred.Set("last4", "1234")
+	require.NoError(t, r.app.Save(cred))
+
+	c, err := r.app.FindCollectionByNameOrId("providers")
+	require.NoError(t, err)
+	p := core.NewRecord(c)
+	p.Set("name", name)
+	p.Set("base_url", "https://open.bigmodel.cn/api/anthropic")
+	p.Set("auth_field", providers.AuthToken)
+	p.Set("credential", cred.Id)
+	require.NoError(t, r.app.Save(p))
+	return p.Id
+}
+
+// 收编改的是文件，不是绑定：新 Revision 沿用 head 的绑定。
+// 不沿用的话，收编一次就等于顺手解绑，且没有任何提示。
+func TestAdoptKeepsHeadBinding(t *testing.T) {
+	r := newRig(t)
+	provID := seedProviderFor(t, r, "智谱 GLM · 个人")
+
+	set, err := r.sets.Create("主力", "")
+	require.NoError(t, err)
+	_, err = r.sets.SetDraftFile(set.Id, ".claude/CLAUDE.md", []byte("原始规矩\n"), 0o644, nil)
+	require.NoError(t, err)
+	require.NoError(t, r.sets.SetDraftBinding(set.Id, &providers.Binding{
+		Provider: provID,
+		Models: providers.ModelSlots{
+			Main: "glm-5.1", Opus: "glm-5.1", Sonnet: "glm-5.1", Haiku: "glm-5.1",
+		},
+	}))
+	rev1, err := r.revs.Publish(set.Id, "v1", "publish")
+	require.NoError(t, err)
+	_, err = r.sets.Assign(r.machineID, set.Id, configsets.ModeApply)
+	require.NoError(t, err)
+	r.setID = set.Id
+	r.revID = rev1.Id
+
+	wantBinding, err := r.revs.BindingOf(rev1.Id)
+	require.NoError(t, err)
+	require.NotNil(t, wantBinding)
+
+	r.report(t, protocol.DriftItem{
+		Path: ".claude/CLAUDE.md", Kind: protocol.DriftModified,
+		Content: []byte("# 改过的规矩\n"), Mode: 0o644,
+	})
+	rev, err := r.svc.Adopt([]string{r.openDrifts(t)[0].Id})
+	require.NoError(t, err)
+
+	got, err := r.revs.BindingOf(rev.Id)
+	require.NoError(t, err)
+	require.Equal(t, wantBinding, got, "收编不得顺手解绑")
+
+	reloaded, err := r.app.FindRecordById("config_sets", set.Id)
+	require.NoError(t, err)
+	require.Equal(t, provID, reloaded.GetString("head_provider"))
 }

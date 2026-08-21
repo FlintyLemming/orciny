@@ -14,6 +14,7 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/blobs"
 	"github.com/FlintyLemming/orciny/hub/internal/configsets"
 	"github.com/FlintyLemming/orciny/hub/internal/events"
+	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/protocol"
 )
 
@@ -34,11 +35,22 @@ func (s *Service) Publish(setID, note, source string) (*core.Record, error) {
 	if err != nil {
 		return nil, err
 	}
-	return s.PublishFiles(setID, files, note, source)
+	binding, err := s.sets.DraftBinding(setID)
+	if err != nil {
+		return nil, err
+	}
+	return s.PublishFiles(setID, files, binding, note, source)
 }
 
-// PublishFiles 用给定清单发布。收编（source=adopt）与回滚走这条。
-func (s *Service) PublishFiles(setID string, files []protocol.FileEntry, note, source string) (*core.Record, error) {
+// PublishFiles 用给定清单与绑定发布。收编（source=adopt）与回滚走这条。
+//
+// binding 显式传而不是在函数里读草稿：收编要沿用 head 的绑定、回滚要用
+// 旧版本的绑定，两者都不是草稿。绑定必须与文件在同一次写入里冻结——
+// 事后补写就会出现「有 head 但 head_provider 还没跟上」的中间态。
+func (s *Service) PublishFiles(
+	setID string, files []protocol.FileEntry,
+	binding *providers.Binding, note, source string,
+) (*core.Record, error) {
 	set, err := s.app.FindRecordById("config_sets", setID)
 	if err != nil {
 		return nil, fmt.Errorf("revisions: 配置集 %s 不存在: %w", setID, err)
@@ -81,6 +93,9 @@ func (s *Service) PublishFiles(setID string, files []protocol.FileEntry, note, s
 		r.Set("manifest", json.RawMessage(mj))
 		r.Set("checksum", protocol.Checksum(sorted))
 		r.Set("refs", refs)
+		if binding != nil {
+			r.Set("binding", binding)
+		}
 		r.Set("note", note)
 		r.Set("source", source)
 		if err := s.app.Save(r); err != nil {
@@ -94,6 +109,12 @@ func (s *Service) PublishFiles(setID string, files []protocol.FileEntry, note, s
 	}
 
 	set.Set("head", rev.Id)
+	// head_provider 是冗余字段，唯一写入点就是这里（M1.5 spec §2.2 / §13）。
+	if binding != nil {
+		set.Set("head_provider", binding.Provider)
+	} else {
+		set.Set("head_provider", "")
+	}
 	if err := s.app.Save(set); err != nil {
 		return nil, fmt.Errorf("revisions: 更新 head: %w", err)
 	}
@@ -119,13 +140,21 @@ func (s *Service) Rollback(setID, revisionID string) (*core.Record, error) {
 	if err != nil {
 		return nil, err
 	}
+	binding, err := s.BindingOf(revisionID)
+	if err != nil {
+		return nil, err
+	}
 
 	note := fmt.Sprintf("回滚自 v%d", old.GetInt("seq"))
-	rev, err := s.PublishFiles(setID, files, note, "rollback")
+	rev, err := s.PublishFiles(setID, files, binding, note, "rollback")
 	if err != nil {
 		return nil, err
 	}
 	if err := s.sets.SetDraft(setID, files); err != nil {
+		return nil, err
+	}
+	// 草稿绑定也要拉回旧版，否则用户下一次发布会把刚回滚掉的绑定又推上去。
+	if err := s.sets.SetDraftBinding(setID, binding); err != nil {
 		return nil, err
 	}
 	if err := s.ev.Write(events.KindConfigSetRolledBack, "", map[string]any{
@@ -134,6 +163,19 @@ func (s *Service) Rollback(setID, revisionID string) (*core.Record, error) {
 		s.app.Logger().Warn("写 configset.rolled_back 事件失败", "error", err)
 	}
 	return rev, nil
+}
+
+// BindingOf 读一条 Revision 冻结的绑定。未绑定返回 (nil, nil)。
+func (s *Service) BindingOf(revID string) (*providers.Binding, error) {
+	r, err := s.app.FindRecordById("revisions", revID)
+	if err != nil {
+		return nil, fmt.Errorf("revisions: 版本 %s 不存在: %w", revID, err)
+	}
+	var b providers.Binding
+	if err := r.UnmarshalJSONField("binding", &b); err != nil || b.Provider == "" {
+		return nil, nil
+	}
+	return &b, nil
 }
 
 func (s *Service) Files(revID string) ([]protocol.FileEntry, error) {

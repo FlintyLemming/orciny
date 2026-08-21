@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 	"github.com/stretchr/testify/require"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/configsets"
 	"github.com/FlintyLemming/orciny/hub/internal/events"
 	_ "github.com/FlintyLemming/orciny/hub/internal/migrations"
+	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/hub/internal/revisions"
 	"github.com/FlintyLemming/orciny/protocol"
 )
@@ -184,4 +186,122 @@ func TestPublishFreezesProviderKeys(t *testing.T) {
 	require.NoError(t, rev.UnmarshalJSONField("refs", &refs))
 	require.Equal(t, []string{"auth_token", "base_url", "model"}, refs.ProviderKeys)
 	require.Empty(t, refs.Creds)
+}
+
+// seedProvider 建一条最小可用 Provider（含一条凭据），返回记录 id。
+func seedProvider(t *testing.T, app core.App, name, credName string) string {
+	t.Helper()
+	creds, err := app.FindCollectionByNameOrId("credentials")
+	require.NoError(t, err)
+	cred := core.NewRecord(creds)
+	cred.Set("name", credName)
+	cred.Set("cipher_value", "x")
+	cred.Set("last4", "1234")
+	require.NoError(t, app.Save(cred))
+
+	c, err := app.FindCollectionByNameOrId("providers")
+	require.NoError(t, err)
+	p := core.NewRecord(c)
+	p.Set("name", name)
+	p.Set("base_url", "https://open.bigmodel.cn/api/anthropic")
+	p.Set("auth_field", providers.AuthToken)
+	p.Set("credential", cred.Id)
+	require.NoError(t, app.Save(p))
+	return p.Id
+}
+
+func fullSlots(id string) providers.ModelSlots {
+	return providers.ModelSlots{Main: id, Opus: id, Sonnet: id, Haiku: id}
+}
+
+func TestPublishFreezesBindingAndSyncsHeadProvider(t *testing.T) {
+	app, cs, rs := newBoth(t)
+	set, err := cs.Create("主力配置", "")
+	require.NoError(t, err)
+	_, err = cs.SetDraftFile(set.Id, ".claude/CLAUDE.md", []byte("内容"), 0o644, nil)
+	require.NoError(t, err)
+
+	provID := seedProvider(t, app, "智谱 GLM · 个人", "zhipu_key")
+	require.NoError(t, cs.SetDraftBinding(set.Id, &providers.Binding{
+		Provider: provID, Models: fullSlots("glm-5.1"),
+	}))
+
+	rev, err := rs.Publish(set.Id, "v1", "publish")
+	require.NoError(t, err)
+
+	got, err := rs.BindingOf(rev.Id)
+	require.NoError(t, err)
+	require.Equal(t, provID, got.Provider)
+	require.Equal(t, "glm-5.1", got.Models.Haiku)
+
+	reloaded, err := app.FindRecordById("config_sets", set.Id)
+	require.NoError(t, err)
+	require.Equal(t, provID, reloaded.GetString("head_provider"),
+		"head_provider 必须与 head 同写——重注入的反查链靠它")
+}
+
+func TestPublishWithoutBindingClearsHeadProvider(t *testing.T) {
+	app, cs, rs := newBoth(t)
+	set, err := cs.Create("主力配置", "")
+	require.NoError(t, err)
+	_, err = cs.SetDraftFile(set.Id, ".claude/CLAUDE.md", []byte("内容"), 0o644, nil)
+	require.NoError(t, err)
+
+	provID := seedProvider(t, app, "智谱 GLM · 个人", "zhipu_key")
+	require.NoError(t, cs.SetDraftBinding(set.Id, &providers.Binding{
+		Provider: provID, Models: fullSlots("glm-5.1"),
+	}))
+	_, err = rs.Publish(set.Id, "v1", "publish")
+	require.NoError(t, err)
+
+	require.NoError(t, cs.SetDraftBinding(set.Id, nil))
+	_, err = rs.Publish(set.Id, "v2", "publish")
+	require.NoError(t, err)
+
+	reloaded, err := app.FindRecordById("config_sets", set.Id)
+	require.NoError(t, err)
+	require.Empty(t, reloaded.GetString("head_provider"))
+}
+
+// 回滚回到旧版本时，绑定也要跟着回去——否则 v3 会用 v2 的绑定
+// 渲染 v1 的文件，谁也解释不了这个版本。
+func TestRollbackRestoresBinding(t *testing.T) {
+	app, cs, rs := newBoth(t)
+	set, err := cs.Create("主力配置", "")
+	require.NoError(t, err)
+	_, err = cs.SetDraftFile(set.Id, ".claude/CLAUDE.md", []byte("v1"), 0o644, nil)
+	require.NoError(t, err)
+
+	provA := seedProvider(t, app, "智谱 GLM · 个人", "zhipu_key")
+	provB := seedProvider(t, app, "Kimi · 个人", "kimi_key")
+
+	require.NoError(t, cs.SetDraftBinding(set.Id, &providers.Binding{
+		Provider: provA, Models: fullSlots("glm-5.1"),
+	}))
+	rev1, err := rs.Publish(set.Id, "v1", "publish")
+	require.NoError(t, err)
+
+	_, err = cs.SetDraftFile(set.Id, ".claude/CLAUDE.md", []byte("v2"), 0o644, nil)
+	require.NoError(t, err)
+	require.NoError(t, cs.SetDraftBinding(set.Id, &providers.Binding{
+		Provider: provB, Models: fullSlots("kimi-k2"),
+	}))
+	_, err = rs.Publish(set.Id, "v2", "publish")
+	require.NoError(t, err)
+
+	rev3, err := rs.Rollback(set.Id, rev1.Id)
+	require.NoError(t, err)
+
+	got, err := rs.BindingOf(rev3.Id)
+	require.NoError(t, err)
+	require.Equal(t, provA, got.Provider)
+
+	reloaded, err := app.FindRecordById("config_sets", set.Id)
+	require.NoError(t, err)
+	require.Equal(t, provA, reloaded.GetString("head_provider"))
+
+	// 草稿也要拉回去，否则用户下一次发布会把绑定又切回 B。
+	draft, err := cs.DraftBinding(set.Id)
+	require.NoError(t, err)
+	require.Equal(t, provA, draft.Provider)
 }
