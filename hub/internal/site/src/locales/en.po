@@ -13,6 +13,10 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+#: src/components/BindingBar.tsx
+msgid "（空）"
+msgstr "(none)"
+
 #. placeholder {0}: e.path
 #: src/lib/inbox.ts
 msgid "{0} 内容未能安全脱敏，无法自动收编"
@@ -47,6 +51,11 @@ msgstr "Agent update policy"
 msgid "agent 版本"
 msgstr "Agent version"
 
+#: src/components/Sidebar.tsx
+#: src/pages/Providers.tsx
+msgid "AI 服务"
+msgstr "AI Services"
+
 #: src/pages/MachineDetail.tsx
 msgid "apply 回执历史"
 msgstr "Apply history"
@@ -65,6 +74,12 @@ msgstr "Hub version"
 #: src/pages/ConfigSets.tsx
 msgid "v{0} · {1}"
 msgstr "v{0} · {1}"
+
+#. placeholder {0}: p.fix.from
+#. placeholder {1}: p.fix.to
+#: src/components/PublishDialog.tsx
+msgid "一键修复：把 {0} 改成 {1}"
+msgstr "Fix it: change {0} to {1}"
 
 #: src/pages/Inbox.tsx
 msgid "三方对比"
@@ -94,6 +109,10 @@ msgstr "Cannot adopt across config sets: selection spans multiple sets"
 msgid "主机名"
 msgstr "Hostname"
 
+#: src/components/BindingBar.tsx
+msgid "主模型"
+msgstr "Main model"
+
 #: src/pages/MachineDetail.tsx
 msgid "事件流"
 msgstr "Event stream"
@@ -111,8 +130,12 @@ msgid "从本机导入"
 msgstr "Import from this machine"
 
 #: src/pages/ConfigSetDetail.tsx
-msgid "从草稿中移除 {selected}？"
-msgstr "Remove {selected} from the draft?"
+msgid "从草稿中移除 {pendingDeletePath}？"
+msgstr "Remove {pendingDeletePath} from the draft?"
+
+#: src/pages/ConfigSetDetail.tsx
+#~ msgid "从草稿中移除 {selected}？"
+#~ msgstr "Remove {selected} from the draft?"
 
 #: src/pages/Inbox.tsx
 msgid "以下条目变量还原不完整（restore_partial）。请逐条查看 diff 并勾选确认后再收编。"
@@ -126,6 +149,10 @@ msgstr "e.g. .claude/CLAUDE.md"
 msgid "例如：同步 CLAUDE.md 更新"
 msgstr "e.g. sync CLAUDE.md updates"
 
+#: src/components/ProviderDialog.tsx
+msgid "保存"
+msgstr "Save"
+
 #: src/pages/ConfigSetDetail.tsx
 msgid "保存中…"
 msgstr "Saving…"
@@ -137,6 +164,10 @@ msgstr "Save to draft"
 #: src/components/VariablesEditor.tsx
 msgid "保存变量"
 msgstr "Save variables"
+
+#: src/components/ProviderDialog.tsx
+msgid "保存后会立即重注入到绑定了这个服务配置的 {boundSetCount} 个配置集所属的机器，不产生新版本。"
+msgstr "Saving re-injects immediately to the machines of the {boundSetCount} config set(s) bound to this service, without creating a new version."
 
 #: src/components/FindingList.tsx
 msgid "保留明文"
@@ -162,6 +193,10 @@ msgstr "Survey (look first)"
 msgid "克隆"
 msgstr "Clone"
 
+#: src/pages/ConfigSets.tsx
+msgid "克隆配置集"
+msgstr "Clone config set"
+
 #: src/pages/Inbox.tsx
 msgid "全局忽略"
 msgstr "Ignore globally"
@@ -175,6 +210,7 @@ msgid "公钥指纹"
 msgstr "Public key fingerprint"
 
 #: src/components/AddMachineDialog.tsx
+#: src/components/ProviderDialog.tsx
 #: src/pages/Inbox.tsx
 msgid "关闭"
 msgstr "Close"
@@ -184,14 +220,23 @@ msgstr "Close"
 msgid "最后心跳"
 msgstr "Last seen"
 
+#: src/components/ProviderDialog.tsx
 #: src/components/Sidebar.tsx
 #: src/pages/Credentials.tsx
 msgid "凭据"
 msgstr "Credentials"
 
+#: src/components/ProviderDialog.tsx
+msgid "凭据值"
+msgstr "Credential value"
+
 #: src/pages/Credentials.tsx
 msgid "凭据值至少 {MIN_LEN} 个字符"
 msgstr "Credential value must be at least {MIN_LEN} characters"
+
+#: src/components/ProviderDialog.tsx
+msgid "凭据名"
+msgstr "Credential name"
 
 #: src/pages/ImportWizard.tsx
 msgid "凭据名称"
@@ -221,8 +266,23 @@ msgstr "Create"
 #: src/components/DriftCard.tsx
 #: src/pages/ConfigSets.tsx
 #: src/pages/Credentials.tsx
+#: src/pages/Machines.tsx
+#: src/pages/Providers.tsx
 msgid "删除"
 msgstr "Delete"
+
+#. placeholder {0}: p.name
+#: src/pages/Providers.tsx
+msgid "删除 {0}"
+msgstr "Delete {0}"
+
+#: src/pages/Providers.tsx
+msgid "删除 AI 服务配置"
+msgstr "Delete AI service"
+
+#: src/pages/Credentials.tsx
+msgid "删除凭据"
+msgstr "Delete credential"
 
 #: src/pages/Machines.tsx
 msgid "删除后该机器的 agent 会停止重试，需要重新 enroll。确定删除？"
@@ -232,11 +292,16 @@ msgstr "Once deleted, this machine's agent stops retrying and must enroll again.
 msgid "删除机器"
 msgstr "Delete machine"
 
+#: src/pages/ConfigSets.tsx
+msgid "删除配置集"
+msgstr "Delete config set"
+
 #: src/pages/ConfigSetDetail.tsx
 #: src/pages/ConfigSets.tsx
 #: src/pages/Credentials.tsx
 #: src/pages/Inbox.tsx
 #: src/pages/Machines.tsx
+#: src/pages/Providers.tsx
 msgid "加载中…"
 msgstr "Loading…"
 
@@ -276,8 +341,10 @@ msgstr "Found {conflictCount} conflicting lines changed differently on both side
 
 #: src/components/AddFileDialog.tsx
 #: src/components/AssignDialog.tsx
+#: src/components/ConfirmDialog.tsx
 #: src/components/DegradedBanner.tsx
-#: src/components/FindingList.tsx
+#: src/components/PromptDialog.tsx
+#: src/components/ProviderDialog.tsx
 #: src/components/PublishDialog.tsx
 #: src/pages/ConfigSets.tsx
 #: src/pages/Credentials.tsx
@@ -294,6 +361,7 @@ msgstr "Clear selection"
 msgid "另有 {0} 条，请到收件箱处理"
 msgstr "{0} more — handle them in the inbox"
 
+#: src/components/ProviderDialog.tsx
 #: src/pages/Machines.tsx
 msgid "名称"
 msgstr "Name"
@@ -305,6 +373,12 @@ msgstr "Name (letters, digits, _-)"
 #: src/components/VersionHistory.tsx
 msgid "回滚"
 msgstr "Rollback"
+
+#. placeholder {0}: pendingRollback.seq
+#. placeholder {1}: (revisions[0]?.seq ?? 0) + 1
+#: src/components/VersionHistory.tsx
+msgid "回滚到 v{0} 会生成新版本 v{1}，历史保留。确定？"
+msgstr "Rolling back to v{0} creates a new version v{1}; history is kept. Continue?"
 
 #: src/components/ApplyHistory.tsx
 #: src/pages/MachineDetail.tsx
@@ -334,6 +408,10 @@ msgstr "Backups"
 #: src/pages/Settings.tsx
 msgid "备份与恢复在 PocketBase 管理后台操作。注意：hub 的私钥也在数据目录里， 恢复时若丢了它，所有 agent 都需要重新 enroll。"
 msgstr "Backup and restore are handled in the PocketBase admin UI. Note: the hub's private key also lives in the data directory — if a restore loses it, every agent must enroll again."
+
+#: src/components/ProviderDialog.tsx
+msgid "备注"
+msgstr "Note"
 
 #: src/pages/Credentials.tsx
 msgid "备注（可选）"
@@ -386,6 +464,10 @@ msgstr "No revisions published yet."
 #: src/pages/MachineDetail.tsx
 msgid "尚未指派配置集。"
 msgstr "No config set assigned yet."
+
+#: src/pages/ConfigSetDetail.tsx
+msgid "已保存"
+msgstr "Saved"
 
 #: src/pages/MachineDetail.tsx
 msgid "已删除"
@@ -442,6 +524,10 @@ msgstr "Connected"
 msgid "已选 {0} 条"
 msgstr "{0} selected"
 
+#: src/components/ProviderDialog.tsx
+msgid "平台"
+msgstr "Platform"
+
 #: src/pages/MachineDetail.tsx
 msgid "应用"
 msgstr "Apply"
@@ -493,6 +579,7 @@ msgid "找不到这台机器。"
 msgstr "Machine not found."
 
 #: src/components/FindingList.tsx
+#: src/pages/ImportWizard.tsx
 msgid "抽取为凭据"
 msgstr "Extract as credential"
 
@@ -515,6 +602,14 @@ msgstr "Assign config set"
 #: src/pages/MachineDetail.tsx
 msgid "指纹"
 msgstr "Fingerprint"
+
+#: src/components/PublishDialog.tsx
+msgid "提示（不影响发布）"
+msgstr "Notices (do not block publishing)"
+
+#: src/components/BindingBar.tsx
+msgid "插入 env 片段"
+msgstr "Insert env snippet"
 
 #: src/components/Sidebar.tsx
 #: src/pages/Inbox.tsx
@@ -547,8 +642,17 @@ msgstr "Added"
 
 #: src/pages/ConfigSets.tsx
 #: src/pages/Credentials.tsx
+#: src/pages/Providers.tsx
 msgid "新建"
 msgstr "New"
+
+#: src/components/ProviderDialog.tsx
+msgid "新建 AI 服务"
+msgstr "New AI service"
+
+#: src/components/ProviderDialog.tsx
+msgid "新建凭据"
+msgstr "New credential"
 
 #: src/pages/ConfigSets.tsx
 msgid "新配置集名称"
@@ -595,6 +699,14 @@ msgstr "No drift items"
 msgid "有未发布改动"
 msgstr "Unpublished changes"
 
+#: src/components/BindingBar.tsx
+msgid "服务绑定"
+msgstr "Service Binding"
+
+#: src/pages/Providers.tsx
+msgid "服务配置决定「用哪家的哪个模型」。配置集绑定它之后，settings.json 里只落占位符， 真实值在 agent 落盘时注入。"
+msgstr "A service config decides which provider and model to use. Once a config set binds one, settings.json holds only placeholders; real values are injected when the agent writes to disk."
+
 #: src/pages/ConfigSetDetail.tsx
 msgid "未保存 diff"
 msgstr "Unsaved diff"
@@ -607,6 +719,10 @@ msgstr "Unpublished · {0}"
 #: src/pages/Inbox.tsx
 msgid "未处理"
 msgstr "Open"
+
+#: src/components/BindingBar.tsx
+msgid "未绑定"
+msgstr "Not bound"
 
 #: src/components/DegradedBanner.tsx
 msgid "本机处于降级状态"
@@ -648,6 +764,14 @@ msgstr "Validation failed; cannot publish"
 #: src/pages/ImportWizard.tsx
 msgid "校验通过，可以发布为 v1。"
 msgstr "Validation passed; ready to publish as v1."
+
+#: src/components/ProviderDialog.tsx
+msgid "模型 id"
+msgstr "Model id"
+
+#: src/components/ProviderDialog.tsx
+msgid "模型清单"
+msgstr "Model list"
 
 #: src/pages/MachineDetail.tsx
 msgid "模式"
@@ -696,6 +820,10 @@ msgstr "Add file"
 msgid "添加机器"
 msgstr "Add machine"
 
+#: src/components/ProviderDialog.tsx
+msgid "添加模型"
+msgstr "Add model"
+
 #: src/pages/MachineDetail.tsx
 #~ msgid "漂移"
 #~ msgstr "Drift"
@@ -738,6 +866,10 @@ msgstr "Sign in with your admin account"
 msgid "用量"
 msgstr "Usage"
 
+#: src/components/ProviderDialog.tsx
+msgid "由 AI 服务配置创建"
+msgstr "Created from an AI service config"
+
 #: src/pages/Login.tsx
 msgid "登录"
 msgstr "Sign in"
@@ -751,14 +883,25 @@ msgstr "Signing in…"
 #~ msgstr "Path relative to HOME, e.g. .claude/CLAUDE.md"
 
 #: src/components/AssignDialog.tsx
+#: src/components/PromptDialog.tsx
 msgid "确定"
 msgstr "OK"
 
-#: src/pages/Credentials.tsx
-msgid "确定删除凭据 {credName}？"
-msgstr "Delete credential {credName}?"
+#. placeholder {0}: pendingDelete.name
+#: src/pages/Providers.tsx
+msgid "确定删除「{0}」吗？被配置集绑定时无法删除。"
+msgstr "Delete \"{0}\"? It cannot be deleted while a config set is bound to it."
 
-#: src/components/FindingList.tsx
+#. placeholder {0}: pendingDelete.name
+#: src/pages/Credentials.tsx
+msgid "确定删除凭据 {0}？"
+msgstr "Delete credential {0}?"
+
+#: src/pages/Credentials.tsx
+#~ msgid "确定删除凭据 {credName}？"
+#~ msgstr "Delete credential {credName}?"
+
+#: src/components/ConfirmDialog.tsx
 msgid "确认"
 msgstr "Confirm"
 
@@ -790,6 +933,14 @@ msgstr "Exclude from management"
 msgid "移除"
 msgstr "Remove"
 
+#: src/components/ProviderDialog.tsx
+msgid "移除 {m}"
+msgstr "Remove {m}"
+
+#: src/pages/ConfigSetDetail.tsx
+msgid "移除文件"
+msgstr "Remove file"
+
 #: src/pages/ImportWizard.tsx
 msgid "稍后在编辑器里处理"
 msgstr "Handle later in the editor"
@@ -811,13 +962,35 @@ msgstr "Enroll token issued"
 msgid "系统"
 msgstr "OS"
 
+#. placeholder {0}: p.name
+#: src/pages/Providers.tsx
+msgid "编辑 {0}"
+msgstr "Edit {0}"
+
+#: src/components/ProviderDialog.tsx
+msgid "编辑 AI 服务"
+msgstr "Edit AI service"
+
 #: src/pages/ConfigSetDetail.tsx
 msgid "编辑器"
 msgstr "Editor"
 
+#: src/components/ProviderDialog.tsx
+msgid "自定义"
+msgstr "Custom"
+
 #: src/components/AddFileDialog.tsx
 msgid "草稿里已有该路径"
 msgstr "This path is already in the draft"
+
+#. placeholder {0}: usedBy.length
+#: src/pages/Credentials.tsx
+msgid "被 {0} 个 AI 服务配置引用"
+msgstr "Used by {0} AI service config(s)"
+
+#: src/pages/Providers.tsx
+msgid "被 {n} 个配置集引用"
+msgstr "Used by {n} config set(s)"
 
 #: src/components/DegradedBanner.tsx
 msgid "解除降级"
@@ -881,6 +1054,10 @@ msgstr "Deselect one side, then adopt the remaining side. The system will not si
 msgid "请输入路径"
 msgstr "Enter a path"
 
+#: src/components/ProviderDialog.tsx
+msgid "请选择"
+msgstr "Select…"
+
 #: src/components/ThemeToggle.tsx
 msgid "跟随系统"
 msgstr "System"
@@ -910,6 +1087,10 @@ msgstr "Back"
 msgid "返回列表"
 msgstr "Back to list"
 
+#: src/pages/Providers.tsx
+msgid "还没有任何 AI 服务配置。"
+msgstr "No AI service configs yet."
+
 #: src/pages/Credentials.tsx
 msgid "还没有凭据。"
 msgstr "No credentials yet."
@@ -926,9 +1107,21 @@ msgstr "No config sets yet. Import from a machine, or create one at the top righ
 msgid "退出"
 msgstr "Sign out"
 
+#: src/components/ProviderDialog.tsx
+msgid "选已有凭据"
+msgstr "Pick existing credential"
+
 #: src/pages/ConfigSetDetail.tsx
 msgid "选择左侧文件开始编辑"
 msgstr "Select a file on the left to start editing"
+
+#: src/components/BindingBar.tsx
+msgid "透传（不指定模型）"
+msgstr "Passthrough (no model)"
+
+#: src/components/BindingBar.tsx
+msgid "透传模式"
+msgstr "Passthrough"
 
 #: src/pages/Login.tsx
 msgid "邮箱"
@@ -969,6 +1162,10 @@ msgstr "Collecting…"
 msgid "重新注册"
 msgstr "Re-enrolled"
 
+#: src/components/ProviderDialog.tsx
+msgid "鉴权字段"
+msgstr "Auth field"
+
 #: src/components/VariablesEditor.tsx
 msgid "键"
 msgstr "Key"
@@ -980,3 +1177,7 @@ msgstr "Degraded"
 #: src/components/DriftCard.tsx
 msgid "需人工复核"
 msgstr "Needs review"
+
+#: src/components/BindingBar.tsx
+msgid "高级"
+msgstr "Advanced"
