@@ -170,10 +170,18 @@ Coding Agent 仍然在每台机器本地运行；Orciny 决定的是：每台机
 - 流程：agent 按默认 manifest 采集 → 上传 → Web 呈现文件清单让用户勾选纳管范围 → **敏感项检测**（识别 settings env 中的 API key 等，引导抽取为凭据占位符）→ 生成配置集 v1 并标记该机器已对齐。
 - 后续机器接入时：选择「应用现有配置集」或「保持本机现状（仅观测，不管配置）」——后者允许纯用量/订阅场景的机器接入。
 
+**服务绑定（M1.5）**
+- 「用哪家的哪个模型」是一等实体，不是配置文件里的一段文本。配置集绑定**一个** AI 服务配置（Provider）+ 四个模型槽（主/opus/sonnet/haiku）。
+- `settings.json` 里只落 `{{provider.*}}` 占位符（`base_url`、`auth_token` 与四个模型槽，共六个内置名），真实值在 agent 落盘时注入；blob 与 Revision 里永远只有占位符。
+- 核心不变量：**换绑定**（配置集从 A 切到 B、换模型）产生新 Revision；**改 Provider 内部**（base_url、追加模型、轮换 key）**不产生**新 Revision，走重注入通知，因此也不产生漂移。
+- 四槽而非单槽：Claude Code 会自己去要 haiku 做标题生成一类的轻量活，只钉主模型会让它拿 `claude-haiku-*` 去打人家的 endpoint。四槽全空 = 透传模式。
+- 内置平台预设编译进二进制、只读；自定义平台由「preset 留空的 Provider」完全覆盖。
+- 绑定漂移：机器上手改 `ANTHROPIC_BASE_URL` 会被识别出来，**禁用收编**（收编会把占位符拍平成硬编码字面值，绑定当场失效），并按 base_url 反查三档给出「改绑定」/「新建服务配置」/兜底说明。
+
 **编辑器（Web）**
 - 文件树 + 等宽文本编辑；JSON 文件做语法校验；`settings.json` 提供 permissions/hooks/env 的表单辅助（MVP 可先纯文本）。
-- 占位符提示：`{{cred.<name>}}`、`{{var.<name>}}` 的自动补全与未定义引用告警。
-- 发布校验：JSON 合法性、凭据引用可解析、路径安全（禁 `..`/绝对路径/符号链接逃逸）。
+- 占位符提示：`{{cred.<name>}}`、`{{var.<name>}}`、`{{provider.<key>}}` 的自动补全与未定义引用告警。
+- 发布校验：JSON 合法性、凭据引用可解析、路径安全（禁 `..`/绝对路径/符号链接逃逸）；服务绑定三条校验（引用了但没绑 = 错误、绑了但没用 = 警告、`auth_field` 键名不符 = 错误 + 一键修复）。
 
 ### 4.3 受管范围与 Manifest
 
@@ -247,6 +255,7 @@ Coding Agent 仍然在每台机器本地运行；Orciny 决定的是：每台机
   - **local 型（agent 执行）**：Claude 订阅（读取本机 OAuth 凭据调用官方 usage 接口）、Cursor、Grok、MiMo、Antigravity（本地模式）。**本地凭据不上传**，agent 本机调用后仅上报结果数据。在哪台机器执行可指定或自动（有凭据者执行）。
   - **push 型（外部推送）**：保留 HTTP 上报端点，**wire 格式兼容 ai-plan-insight 现有 payload**——既是移植期的桥（现有 *-usage-agent 不改一行可继续推），也是长期生态接口（未装 agent 的来源、第三方自写脚本）。
 - 模型别名归并（`model_aliases`）与来源存活告警（24h 未上报）照搬原语义。
+- 与服务绑定共享凭据：采集实例与 AI 服务配置（4.2）引用的是同一份 `credentials`，且内置平台预设同时携带 `base_url`/模型（喂服务配置）与采集器类型/模式（喂采集器）。M2 做采集器时给采集实例加一个**可选**的 Provider 关联即可，不必回头返工服务配置。
 
 **移植策略（E1 的风险控制）**
 - 按「你 config.json 里实际启用的实例」排序移植，先自用后长尾；每移植一家以 ai-plan-insight 现网数据对照验收。
@@ -265,7 +274,8 @@ Coding Agent 仍然在每台机器本地运行；Orciny 决定的是：每台机
 | 收件箱 Inbox | 漂移待处理队列（v1 起并入告警） | M1 |
 | 用量 Usage | 趋势/按机器/按模型/成本估算 | M2 |
 | 订阅 Subscriptions | 卡片墙、阈值、来源健康 | M2 |
-| 凭据 Credentials | 凭据列表、引用计数、轮换 | M1 |
+| AI 服务 Providers | 服务配置列表、新建/编辑（预设网格 + 自定义）、被引用计数 | M1.5 |
+| 凭据 Credentials | 凭据列表、引用计数（含被 AI 服务配置引用）、轮换 | M1 |
 | 设置 Settings | 站点、备份、agent 更新策略、定价表、（v1）通知渠道 | M0 起渐进 |
 
 UI 语言：中/英双语内置（面向国际 self-hosted 社区发布），其余语言社区众包。
@@ -312,11 +322,12 @@ UI 语言：中/英双语内置（面向国际 self-hosted 社区发布），其
 | 实体 | 关键字段 | 说明 |
 |---|---|---|
 | machines | name, fingerprint, os/arch, agent_version, tool_versions, last_seen, status | 机器注册表 |
-| config_sets | name, manifest, paused | 配置集 |
-| revisions | config_set_id, seq, files[], checksum, note, created_at | 不可变版本 |
+| config_sets | name, manifest, paused, draft_binding, head_provider | 配置集；head_provider 是重注入反查用的冗余字段 |
+| revisions | config_set_id, seq, files[], checksum, binding, note, created_at | 不可变版本；binding 冻结绑定**引用**，值不进版本 |
 | assignments | machine_id, config_set_id, applied_revision, applied_at, state | 一机一配置集（MVP） |
-| drift_events | machine_id, path, kind, diff, state(open/adopted/restored/ignored) | 漂移收件箱 |
-| credentials | name, cipher_value, last4, updated_at | 加密凭据 |
+| drift_events | machine_id, path, kind, diff, state(open/adopted/restored/ignored), binding_drift, binding_url | 漂移收件箱；绑定漂移禁用收编 |
+| providers | name, preset, base_url, auth_field, credential, models[], defaults | AI 服务配置（M1.5）；key 不另存，引用 credentials |
+| credentials | name, cipher_value, last4, updated_at | 加密凭据；被 providers 引用时不可删除 |
 | variables | machine_id, key, value | 机器变量 |
 | usage_points | date, machine_id, tool, model, tokens{4类}, source | 用量聚合点 |
 | collector_instances | type, mode(fetch/local/push), label, config, machine_id? | 订阅采集实例 |
