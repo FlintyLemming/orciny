@@ -14,6 +14,7 @@ import (
 
 	"github.com/FlintyLemming/orciny/hub/internal/blobs"
 	"github.com/FlintyLemming/orciny/hub/internal/events"
+	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/internal/manifest"
 	"github.com/FlintyLemming/orciny/protocol"
 )
@@ -22,10 +23,13 @@ type Service struct {
 	app   core.App
 	blobs *blobs.Store
 	ev    *events.Writer
+	provs *providers.Store
 }
 
+// NewService 的签名不变，内部自建 providers.Store——与 revisions.NewService
+// 内部自建 configsets.Service 是同一个手法，装配点不用跟着改。
 func NewService(app core.App, b *blobs.Store, ev *events.Writer) *Service {
-	return &Service{app: app, blobs: b, ev: ev}
+	return &Service{app: app, blobs: b, ev: ev, provs: providers.NewStore(app, ev)}
 }
 
 // Refs 是 config_sets.draft_refs 与 revisions.refs 的形状。
