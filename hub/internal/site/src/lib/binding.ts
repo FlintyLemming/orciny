@@ -7,6 +7,9 @@
 import { parsePlaceholders } from '@/lib/placeholder'
 import type { AuthField, ModelSlots } from '@/types/collections'
 
+/** settings.json 的受管相对路径，与 Go 侧 configsets.SettingsPath 一致。 */
+export const SETTINGS_PATH = '.claude/settings.json'
+
 export function emptySlots(): ModelSlots {
   return { main: '', opus: '', sonnet: '', haiku: '' }
 }

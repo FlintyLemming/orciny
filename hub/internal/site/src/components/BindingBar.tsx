@@ -1,0 +1,140 @@
+import { useState } from 'react'
+import { Trans, useLingui } from '@lingui/react/macro'
+import { ChevronDown, ChevronRight } from 'lucide-react'
+import { emptySlots, fillAllSlots, hasProviderRefs, isPassthrough } from '@/lib/binding'
+import type { Binding, ModelSlots, ProviderRecord } from '@/types/collections'
+
+/**
+ * 配置集的「服务绑定」区（M1.5 spec §8.2）。
+ *
+ * 默认只露主模型下拉，**选定即四槽同填**——cc-switch 的 34 个带模型的预设
+ * 全是这么干的。分开设置与透传模式收进「高级」。
+ */
+export function BindingBar({
+  providers,
+  binding,
+  settingsText,
+  onChange,
+  onInsertSnippet,
+}: {
+  providers: ProviderRecord[]
+  /** null = 未绑定 */
+  binding: Binding | null
+  /** 草稿里 .claude/settings.json 的当前文本；决定要不要显示「插入 env 片段」 */
+  settingsText: string
+  onChange: (b: Binding | null) => void
+  onInsertSnippet: () => void
+}) {
+  const { t } = useLingui()
+  const [advanced, setAdvanced] = useState(false)
+
+  const provider = providers.find((p) => p.id === binding?.provider)
+  const models = provider?.models ?? []
+  const slots = binding?.models ?? emptySlots()
+
+  function setSlot(key: keyof ModelSlots, value: string) {
+    if (!binding) return
+    onChange({ ...binding, models: { ...binding.models, [key]: value } })
+  }
+
+  return (
+    <div className="mb-3 rounded border border-line bg-surface px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-ink3">
+          <Trans>服务绑定</Trans>
+        </span>
+
+        <select
+          aria-label={t`服务绑定`}
+          className="rounded border border-line bg-wash px-2 py-1 text-sm"
+          value={binding?.provider ?? ''}
+          onChange={(e) => {
+            const id = e.target.value
+            if (!id) onChange(null)
+            else onChange({ provider: id, models: emptySlots() })
+          }}
+        >
+          <option value="">{t`未绑定`}</option>
+          {providers.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+
+        {binding && (
+          <>
+            <select
+              aria-label={t`主模型`}
+              className="rounded border border-line bg-wash px-2 py-1 font-mono text-sm"
+              value={slots.main}
+              onChange={(e) => onChange({ ...binding, models: fillAllSlots(e.target.value) })}
+            >
+              <option value="">{t`透传（不指定模型）`}</option>
+              {models.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+
+            <button
+              type="button"
+              className="flex items-center gap-1 rounded border border-line px-2 py-1 text-xs text-ink2"
+              onClick={() => setAdvanced((v) => !v)}
+            >
+              {advanced ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+              <Trans>高级</Trans>
+            </button>
+
+            {!hasProviderRefs(settingsText) && (
+              <button
+                type="button"
+                className="rounded bg-accent px-2 py-1 text-xs text-white"
+                onClick={onInsertSnippet}
+              >
+                <Trans>插入 env 片段</Trans>
+              </button>
+            )}
+          </>
+        )}
+      </div>
+
+      {binding && advanced && (
+        <div className="mt-2 flex flex-wrap items-center gap-3 border-t border-line pt-2">
+          {(['opus', 'sonnet', 'haiku'] as const).map((k) => (
+            <label key={k} className="flex items-center gap-1 text-xs text-ink3">
+              {k}
+              <select
+                aria-label={k}
+                className="rounded border border-line bg-wash px-2 py-1 font-mono text-sm"
+                value={slots[k]}
+                onChange={(e) => setSlot(k, e.target.value)}
+              >
+                <option value="">{t`（空）`}</option>
+                {models.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ))}
+
+          {/* 透传 = 四槽清空，对应那 35 个不设模型变量的中转预设。 */}
+          <label className="flex items-center gap-1 text-xs text-ink3">
+            <input
+              type="checkbox"
+              aria-label={t`透传模式`}
+              checked={isPassthrough(slots)}
+              onChange={(e) => {
+                if (e.target.checked) onChange({ ...binding, models: emptySlots() })
+              }}
+            />
+            <Trans>透传模式</Trans>
+          </label>
+        </div>
+      )}
+    </div>
+  )
+}

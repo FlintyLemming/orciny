@@ -11,6 +11,7 @@ import {
 import { $credentials, subscribeCredentials } from '@/stores/credentials'
 import { navigate } from '@/router'
 import { FileTree } from '@/components/FileTree'
+import { BindingBar } from '@/components/BindingBar'
 import { CodeEditor } from '@/components/CodeEditor'
 import { DiffView } from '@/components/DiffView'
 import { PublishDialog } from '@/components/PublishDialog'
@@ -24,14 +25,19 @@ import {
   normalizeFileEntry,
 } from '@/lib/api'
 import { nextDraftState, type DraftState } from '@/lib/draftState'
+import { insertEnvSnippet } from '@/lib/binding'
+import { $providers, subscribeProviders } from '@/stores/providers'
+import { setBinding } from '@/lib/api'
+import { SETTINGS_PATH } from '@/lib/binding'
 import { pb } from '@/lib/pb'
-import { COLLECTION_ASSIGNMENTS, type FileEntry } from '@/types/collections'
+import { COLLECTION_ASSIGNMENTS, type Binding, type FileEntry } from '@/types/collections'
 
 export function ConfigSetDetail({ id }: { id: string }) {
   const { t } = useLingui()
   const set = useStore($currentSet)
   const revisions = useStore($revisions)
   const creds = useStore($credentials)
+  const providers = useStore($providers)
 
   const [tab, setTab] = useState<'editor' | 'history'>('editor')
   const [selected, setSelected] = useState('')
@@ -47,6 +53,9 @@ export function ConfigSetDetail({ id }: { id: string }) {
 
   useEffect(() => subscribeConfigSet(id), [id])
   useEffect(() => subscribeCredentials(), [])
+  useEffect(() => subscribeProviders(), [])
+  // settings.json 的当前草稿文本，决定要不要显示「插入 env 片段」。
+  const [settingsText, setSettingsText] = useState('')
 
   const draftFiles: FileEntry[] = useMemo(() => {
     const raw = set?.draft ?? []
@@ -103,6 +112,63 @@ export function ConfigSetDetail({ id }: { id: string }) {
       cancelled = true
     }
   }, [selected, selectedHash])
+
+  // settings.json 的草稿内容跟着 draftFiles 走：BindingBar 靠它判断
+  // 「插入 env 片段」该不该出现。
+  const settingsEntry = draftFiles.find((f) => f.path === SETTINGS_PATH)
+  const settingsHash = settingsEntry?.hash ?? ''
+  useEffect(() => {
+    if (!settingsHash) {
+      setSettingsText('')
+      return
+    }
+    let cancelled = false
+    void getBlob(settingsHash)
+      .then((text) => {
+        if (!cancelled) setSettingsText(text)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [settingsHash])
+
+  /**
+   * 改绑定只落进 draft_binding：换绑定要产生新 Revision，
+   * 走正常的草稿/发布流程（M1.5 spec §2.2）。
+   */
+  async function handleBindingChange(b: Binding | null) {
+    if (!set) return
+    setError('')
+    try {
+      await setBinding(set.id, b)
+      await reloadConfigSet(set.id)
+      setDraftState((s) => nextDraftState(s, { type: 'edit' }))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  /** 把占位符形态的 env 块写进草稿的 settings.json；没有该文件就新建。 */
+  async function handleInsertSnippet() {
+    if (!set || !set.draft_binding) return
+    const provider = providers.find((p) => p.id === set.draft_binding?.provider)
+    if (!provider) return
+    setError('')
+    try {
+      const next = insertEnvSnippet(settingsText || '{}', provider.auth_field)
+      await setDraftFile(set.id, SETTINGS_PATH, next, settingsEntry?.mode || 0o600,
+        settingsEntry?.keys)
+      setDraftState((s) => nextDraftState(s, { type: 'edit' }))
+      await reloadConfigSet(set.id)
+      if (selected === SETTINGS_PATH) {
+        setContent(next)
+        setBaseline(next)
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
 
   /** 把编辑器里未落库的内容写入草稿。发布/切文件前必须先调用。 */
   async function flushUnsaved(): Promise<void> {
@@ -248,6 +314,14 @@ export function ConfigSetDetail({ id }: { id: string }) {
           />
         </div>
       ) : (
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <BindingBar
+          providers={providers}
+          binding={set.draft_binding}
+          settingsText={settingsText}
+          onChange={(b) => void handleBindingChange(b)}
+          onInsertSnippet={() => void handleInsertSnippet()}
+        />
         <div className="grid min-h-0 flex-1 grid-cols-[220px_1fr] gap-3 overflow-hidden">
           <aside className="flex min-h-0 flex-col overflow-auto rounded-lg border border-line bg-surface p-2">
             <div className="mb-2 flex items-center justify-between px-1">
@@ -313,6 +387,7 @@ export function ConfigSetDetail({ id }: { id: string }) {
               </div>
             )}
           </div>
+        </div>
         </div>
       )}
 
