@@ -46,7 +46,9 @@ var (
 		`(sk-ant-|sk-|ghp_|gho_|github_pat_|xoxb-|AKIA|AIza|glpat-)[A-Za-z0-9\-_]{8,}`)
 	opaquePattern = regexp.MustCompile(`^[A-Za-z0-9+/_=-]+$`)
 	// 已被抽成占位符的值不再报——否则 Extract 之后 Findings 会把同一条再吐回来。
-	placeholderValue = regexp.MustCompile(`^\{\{(cred|var|machine)\.[A-Za-z0-9_-]+\}\}$`)
+	// provider.* 同理：绑了服务的配置集里它到处都是（M1.5 spec §3.1）。
+	placeholderValue = regexp.MustCompile(
+		`^\{\{(cred|var|machine|provider)\.[A-Za-z0-9_-]+\}\}$`)
 )
 
 // Scan 对一份内容跑三层检测。

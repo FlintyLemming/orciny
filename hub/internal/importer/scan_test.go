@@ -128,3 +128,11 @@ func TestFindingsNeverCarryFullValue(t *testing.T) {
 		require.NotContains(t, f.Suggested, secret)
 	}
 }
+
+// 已被抽成占位符的值不该再报敏感项——provider 前缀也一样。
+func TestScanIgnoresProviderPlaceholders(t *testing.T) {
+	content := []byte(`{"env":{"ANTHROPIC_AUTH_TOKEN":"{{provider.auth_token}}",` +
+		`"ANTHROPIC_BASE_URL":"{{provider.base_url}}",` +
+		`"ANTHROPIC_MODEL":"{{provider.model}}"}}`)
+	require.Empty(t, importer.Scan(".claude/settings.json", content))
+}
