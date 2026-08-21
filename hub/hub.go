@@ -132,7 +132,8 @@ func Attach(app core.App, cfg Config) (*Hub, error) {
 		// 先建 configsync（Drift 留空），再建 drift，最后 SetDrift。
 		h.drift = drift.NewService(drift.Deps{
 			App: e.App, Blobs: h.blobs, Sets: h.sets, Revs: h.revs,
-			Events: h.events, Sync: h.sync, Logger: e.App.Logger(),
+			Events: h.events, Sync: h.sync,
+			Providers: h.provs, Creds: h.creds, Logger: e.App.Logger(),
 		})
 		h.sync.SetDrift(h.drift)
 		// 离线补发：agent 一上线就无条件通知一次，幂等保证它在无事可做时

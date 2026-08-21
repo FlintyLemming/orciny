@@ -1,6 +1,7 @@
 package drift_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/pocketbase/pocketbase/core"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/FlintyLemming/orciny/hub/internal/configsets"
 	"github.com/FlintyLemming/orciny/hub/internal/drift"
+	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/protocol"
 )
 
@@ -247,4 +249,167 @@ func TestAdoptRefusesMixedBatchWithBindingDrift(t *testing.T) {
 	rec, err := r.app.FindRecordById("drift_events", normal)
 	require.NoError(t, err)
 	require.Equal(t, "open", rec.GetString("state"), "整批拒绝，普通那条也不动")
+}
+
+// ---------- 反查（子计划 07） ----------
+
+func (r *rig) seedProvider(t *testing.T, name, baseURL, key string) string {
+	t.Helper()
+	return r.seedProviderWithDefaults(t, name, baseURL, key, providers.ModelSlots{})
+}
+
+func (r *rig) seedProviderWithDefaults(
+	t *testing.T, name, baseURL, key string, defaults providers.ModelSlots,
+) string {
+	t.Helper()
+	// 凭据名只允许 [A-Za-z0-9_-]+，不能直接用中文显示名。
+	credName := fmt.Sprintf("cred_%d", len(name)*31+len(baseURL))
+	_, err := r.creds.Create(credName, key, "")
+	require.NoError(t, err)
+	cred, err := r.app.FindFirstRecordByData("credentials", "name", credName)
+	require.NoError(t, err)
+
+	rec, err := r.provs.Create(providers.Input{
+		Name: name, BaseURL: baseURL, AuthField: providers.AuthToken,
+		Credential: cred.Id, Models: []string{defaults.Main}, Defaults: defaults,
+	})
+	require.NoError(t, err)
+	return rec.Id
+}
+
+// seedBoundSet 建一个绑到给定 Provider 的配置集并发布，指派给 rig 的机器。
+func (r *rig) seedBoundSet(t *testing.T, providerID string, files map[string]string) string {
+	t.Helper()
+	setID := r.assignWith(t, files)
+	require.NoError(t, r.sets.SetDraftBinding(setID, &providers.Binding{Provider: providerID}))
+	rev, err := r.revs.Publish(setID, "绑定", "publish")
+	require.NoError(t, err)
+	r.revID = rev.Id
+	return setID
+}
+
+// seedBindingDrift 造一条绑定漂移。key 为空时那一行留占位符。
+func (r *rig) seedBindingDrift(t *testing.T, path, url, key string) string {
+	t.Helper()
+	r.assignWith(t, map[string]string{
+		path: `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}",` +
+			`"ANTHROPIC_AUTH_TOKEN":"{{provider.auth_token}}"}}`,
+	})
+	return r.reportBindingDriftWithKey(t, path, url, key)
+}
+
+// seedBindingDriftIn 在一个既有配置集上造绑定漂移。
+func (r *rig) seedBindingDriftIn(t *testing.T, setID, path, url, key string) string {
+	t.Helper()
+	require.Equal(t, r.setID, setID, "rig 当前指派的就是这个配置集")
+	return r.reportBindingDriftWithKey(t, path, url, key)
+}
+
+func (r *rig) reportBindingDriftWithKey(t *testing.T, path, url, key string) string {
+	t.Helper()
+	token := "{{provider.auth_token}}"
+	if key != "" {
+		token = key
+	}
+	r.report(t, protocol.DriftItem{
+		Path: path, Kind: protocol.DriftModified,
+		Content: []byte(`{"env":{"ANTHROPIC_BASE_URL":"` + url + `",` +
+			`"ANTHROPIC_AUTH_TOKEN":"` + token + `"}}`),
+		Mode: 0o600,
+	})
+	rec := r.driftAt(t, path)
+	require.True(t, rec.GetBool("binding_drift"), "%s 应当被标记为绑定漂移", path)
+	return rec.Id
+}
+
+func (r *rig) seedNormalDrift(t *testing.T, path string) string {
+	t.Helper()
+	r.assignWith(t, map[string]string{path: "原文"})
+	r.report(t, protocol.DriftItem{
+		Path: path, Kind: protocol.DriftModified,
+		Content: []byte("改过的原文"), Mode: 0o644,
+	})
+	return r.driftAt(t, path).Id
+}
+
+// 第一档：字面 URL 精确命中已有 Provider。
+func TestMatchBindingHitsExistingProvider(t *testing.T) {
+	r := newRig(t)
+	kimi := r.seedProvider(t, "Kimi 官方", "https://api.moonshot.cn/anthropic", "sk-kimi-abcdefghij")
+	eventID := r.seedBindingDrift(t, ".claude/settings.json",
+		"https://api.moonshot.cn/anthropic", "")
+
+	m, err := r.svc.MatchBinding(eventID)
+	require.NoError(t, err)
+	require.Equal(t, "https://api.moonshot.cn/anthropic", m.URL)
+	require.Equal(t, providers.MatchProvider, m.Match.Kind)
+	require.True(t, m.Match.Exact)
+	require.Equal(t, kimi, m.Match.ProviderID)
+}
+
+// 第二档：库里没有，内置预设里有。
+func TestMatchBindingHitsPreset(t *testing.T) {
+	r := newRig(t)
+	eventID := r.seedBindingDrift(t, ".claude/settings.json",
+		"https://api.moonshot.cn/anthropic", "")
+
+	m, err := r.svc.MatchBinding(eventID)
+	require.NoError(t, err)
+	require.Equal(t, providers.MatchPreset, m.Match.Kind)
+	require.Equal(t, "kimi", m.Match.PresetID)
+}
+
+// 第三档：都不命中。
+func TestMatchBindingNoHit(t *testing.T) {
+	r := newRig(t)
+	eventID := r.seedBindingDrift(t, ".claude/settings.json",
+		"https://某个没人听说过的中转.test/v1", "")
+
+	m, err := r.svc.MatchBinding(eventID)
+	require.NoError(t, err)
+	require.Equal(t, providers.MatchNone, m.Match.Kind)
+}
+
+// 第二档还要顺手找出机器上手写的那把 key，供新建向导抽成凭据。
+func TestMatchBindingFindsHandWrittenKey(t *testing.T) {
+	r := newRig(t)
+	eventID := r.seedBindingDrift(t, ".claude/settings.json",
+		"https://api.moonshot.cn/anthropic", "sk-kimi-QWERTYUIOPasdfghjkl1234")
+
+	m, err := r.svc.MatchBinding(eventID)
+	require.NoError(t, err)
+	require.Equal(t, "env.ANTHROPIC_AUTH_TOKEN", m.KeyLocation)
+	require.Contains(t, m.KeyMasked, "…")
+	require.NotContains(t, m.KeyMasked, "QWERTYUIOPasdfghjkl",
+		"掩码里不许出现完整的 key")
+}
+
+func TestMatchBindingRejectsNonBindingDrift(t *testing.T) {
+	r := newRig(t)
+	eventID := r.seedNormalDrift(t, "CLAUDE.md")
+	_, err := r.svc.MatchBinding(eventID)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "不是绑定漂移")
+}
+
+func TestExtractKeyCreatesCredential(t *testing.T) {
+	r := newRig(t)
+	eventID := r.seedBindingDrift(t, ".claude/settings.json",
+		"https://api.moonshot.cn/anthropic", "sk-kimi-QWERTYUIOPasdfghjkl1234")
+
+	credID, err := r.svc.ExtractKey(eventID, "env.ANTHROPIC_AUTH_TOKEN", "kimi_key")
+	require.NoError(t, err)
+
+	v, err := r.creds.ValueByID(credID)
+	require.NoError(t, err)
+	require.Equal(t, "sk-kimi-QWERTYUIOPasdfghjkl1234", v)
+}
+
+// 太短的值抽成凭据会在还原时到处误匹配（M1 spec §6.4），一律拒绝。
+func TestExtractKeyRejectsShortValue(t *testing.T) {
+	r := newRig(t)
+	eventID := r.seedBindingDrift(t, ".claude/settings.json",
+		"https://api.moonshot.cn/anthropic", "abc")
+	_, err := r.svc.ExtractKey(eventID, "env.ANTHROPIC_AUTH_TOKEN", "kimi_key")
+	require.Error(t, err)
 }

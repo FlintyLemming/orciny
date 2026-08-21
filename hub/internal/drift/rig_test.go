@@ -8,6 +8,7 @@ import (
 	"github.com/pocketbase/pocketbase/tests"
 	"github.com/stretchr/testify/require"
 
+	"github.com/FlintyLemming/orciny"
 	"github.com/FlintyLemming/orciny/hub/internal/blobs"
 	"github.com/FlintyLemming/orciny/hub/internal/configsets"
 	"github.com/FlintyLemming/orciny/hub/internal/configsync"
@@ -15,6 +16,7 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/drift"
 	"github.com/FlintyLemming/orciny/hub/internal/events"
 	_ "github.com/FlintyLemming/orciny/hub/internal/migrations"
+	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/hub/internal/revisions"
 	"github.com/FlintyLemming/orciny/protocol"
 )
@@ -62,6 +64,8 @@ type rig struct {
 	sets      *configsets.Service
 	revs      *revisions.Service
 	events    *events.Writer
+	creds     *credentials.Store
+	provs     *providers.Store
 	sync      *configsync.Service
 	sender    *fakeSender
 	svc       *drift.Service
@@ -85,9 +89,10 @@ func newRig(t *testing.T) *rig {
 	sender := &fakeSender{online: map[string]bool{}}
 	sets := configsets.NewService(app, b, ev)
 	revs := revisions.NewService(app, b, ev)
+	provs := providers.NewStore(app, ev)
 	syncSvc := configsync.NewService(configsync.Deps{
 		App: app, Blobs: b, Sets: sets, Revs: revs, Creds: creds,
-		Events: ev, Sender: sender,
+		Providers: provs, Events: ev, Sender: sender,
 	})
 
 	r := &rig{
@@ -96,12 +101,14 @@ func newRig(t *testing.T) *rig {
 		sets:   sets,
 		revs:   revs,
 		events: ev,
+		creds:  creds,
+		provs:  provs,
 		sync:   syncSvc,
 		sender: sender,
 	}
 	r.svc = drift.NewService(drift.Deps{
 		App: app, Blobs: b, Sets: r.sets, Revs: r.revs, Events: ev,
-		Sync: r.sync,
+		Sync: r.sync, Providers: provs, Creds: creds,
 	})
 	r.sync.SetDrift(r.svc)
 
@@ -113,6 +120,7 @@ func newRig(t *testing.T) *rig {
 	m.Set("pub_key", "pk-drift-1")
 	m.Set("status", "online")
 	m.Set("name", "主力机")
+	m.Set("agent_version", orciny.Version)
 	require.NoError(t, app.Save(m))
 	r.machineID = m.Id
 	r.sender.online[m.Id] = true
