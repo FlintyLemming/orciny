@@ -7,7 +7,8 @@ import (
 	"github.com/pocketbase/pocketbase/tests"
 	"github.com/stretchr/testify/require"
 
-	_ "github.com/FlintyLemming/orciny/hub/internal/migrations"
+	"github.com/FlintyLemming/orciny/hub/internal/migrations"
+	"github.com/FlintyLemming/orciny/hub/internal/secretbox"
 )
 
 // newApp 起一个跑完全部迁移的临时 PocketBase。
@@ -233,7 +234,8 @@ func TestProvidersCollectionExists(t *testing.T) {
 
 	rel, ok := c.Fields.GetByName("credential").(*core.RelationField)
 	require.True(t, ok)
-	require.True(t, rel.Required, "credential 必填")
+	// 必填由 003 立、004 撤（key 内联之后没有凭据可指了），
+	// 「必不必填」的断言归 TestProviderEndpointFieldsExist 管。
 	require.False(t, rel.CascadeDelete, "删凭据不得连带删掉服务配置")
 }
 
@@ -284,6 +286,131 @@ func seedCredential(t *testing.T, app core.App, name string) string {
 	r.Set("name", name)
 	r.Set("cipher_value", "x")
 	r.Set("last4", "1234")
+	require.NoError(t, app.Save(r))
+	return r.Id
+}
+
+func TestProviderEndpointFieldsExist(t *testing.T) {
+	app := newApp(t)
+	c, err := app.FindCollectionByNameOrId("providers")
+	require.NoError(t, err)
+
+	for _, f := range []string{
+		"key_cipher", "key_last4",
+		"claude_key_cipher", "openai_key_cipher",
+		"claude", "openai",
+	} {
+		require.NotNil(t, c.Fields.GetByName(f), "providers.%s 缺失", f)
+	}
+
+	// 密文一律 Hidden：PocketBase 的列表查询与 realtime 都不会带上它
+	// （M1.6 spec §5.2「密文永不回传前端」）。
+	for _, f := range []string{"key_cipher", "claude_key_cipher", "openai_key_cipher"} {
+		tf, ok := c.Fields.GetByName(f).(*core.TextField)
+		require.True(t, ok, "%s 必须是 TextField", f)
+		require.True(t, tf.Hidden, "%s 必须 Hidden", f)
+	}
+
+	// last4 是给 UI 回显的，正是要回传的东西。
+	l4, ok := c.Fields.GetByName("key_last4").(*core.TextField)
+	require.True(t, ok)
+	require.False(t, l4.Hidden)
+
+	// credential 在 004 之后必须是非必填，否则新建 provider 会被挡住。
+	rel, ok := c.Fields.GetByName("credential").(*core.RelationField)
+	require.True(t, ok)
+	require.False(t, rel.Required, "004 之后 credential 不再必填")
+}
+
+// 密文**直接搬、不解密**：同一把主密钥、同一套 AES-GCM，secretbox 只是换了
+// 包名（M1.6 spec §6.1 第 2 步）。这条测试是这个前提的证明。
+func TestMigration004MovesCipherIntoProvider(t *testing.T) {
+	app := newApp(t)
+
+	key, err := secretbox.LoadMasterKey(t.TempDir())
+	require.NoError(t, err)
+	cipher, err := secretbox.Encrypt(key, "sk-zhipu-abcdef123456")
+	require.NoError(t, err)
+
+	credID := seedCredentialWith(t, app, "zhipu_key", cipher, "3456")
+	provID := seedLegacyProvider(t, app, "智谱 GLM · 个人",
+		"https://open.bigmodel.cn/api/anthropic", credID)
+
+	require.NoError(t, runUp004(t, app))
+
+	p, err := app.FindRecordById("providers", provID)
+	require.NoError(t, err)
+
+	require.Equal(t, cipher, p.GetString("key_cipher"), "密文必须原样搬过来")
+	require.Equal(t, "3456", p.GetString("key_last4"))
+
+	pt, err := secretbox.Decrypt(key, p.GetString("key_cipher"))
+	require.NoError(t, err, "搬过来的密文必须还解得开")
+	require.Equal(t, "sk-zhipu-abcdef123456", pt)
+
+	var claude struct {
+		BaseURL   string   `json:"base_url"`
+		AuthField string   `json:"auth_field"`
+		Models    []string `json:"models"`
+		Defaults  struct {
+			Main, Opus, Sonnet, Haiku string
+		} `json:"defaults"`
+	}
+	require.NoError(t, p.UnmarshalJSONField("claude", &claude))
+	require.Equal(t, "https://open.bigmodel.cn/api/anthropic", claude.BaseURL)
+	require.Equal(t, "ANTHROPIC_AUTH_TOKEN", claude.AuthField)
+	require.Equal(t, []string{"glm-5.2", "glm-4.7"}, claude.Models)
+	require.Equal(t, "glm-5.2", claude.Defaults.Main)
+
+	// openai 端点没有来源，必须是「未配置」。
+	var openai struct {
+		BaseURL string `json:"base_url"`
+	}
+	require.NoError(t, p.UnmarshalJSONField("openai", &openai))
+	require.Empty(t, openai.BaseURL)
+}
+
+func TestMigration004IsIdempotentOnEmptyProviderTable(t *testing.T) {
+	app := newApp(t) // 一条 provider 都没有
+	require.NoError(t, runUp004(t, app), "空表上重跑迁移不得报错")
+}
+
+// ---------- helpers ----------
+
+// runUp004 重跑 004 的数据搬运部分。字段已在 newApp 时加好，
+// 搬运对已搬过的记录是幂等的（见 up004 的实现）。
+func runUp004(t *testing.T, app core.App) error {
+	t.Helper()
+	return migrations.BackfillProviderEndpoints(app)
+}
+
+// seedCredentialWith 建一条带指定密文的凭据，返回 id。
+func seedCredentialWith(t *testing.T, app core.App, name, cipher, last4 string) string {
+	t.Helper()
+	c, err := app.FindCollectionByNameOrId("credentials")
+	require.NoError(t, err)
+	r := core.NewRecord(c)
+	r.Set("name", name)
+	r.Set("cipher_value", cipher)
+	r.Set("last4", last4)
+	require.NoError(t, app.Save(r))
+	return r.Id
+}
+
+// seedLegacyProvider 用 003 的老字段建一条 provider，返回 id。
+func seedLegacyProvider(t *testing.T, app core.App, name, baseURL, credID string) string {
+	t.Helper()
+	c, err := app.FindCollectionByNameOrId("providers")
+	require.NoError(t, err)
+	r := core.NewRecord(c)
+	r.Set("name", name)
+	r.Set("base_url", baseURL)
+	r.Set("auth_field", "ANTHROPIC_AUTH_TOKEN")
+	r.Set("credential", credID)
+	r.Set("models", []string{"glm-5.2", "glm-4.7"})
+	r.Set("defaults", map[string]string{
+		"main": "glm-5.2", "opus": "glm-5.2", "sonnet": "glm-5.2", "haiku": "glm-4.7",
+	})
 	require.NoError(t, app.Save(r))
 	return r.Id
 }
