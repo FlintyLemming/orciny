@@ -57,7 +57,7 @@ const (
 	SkipUnreadable     = "unreadable"
 )
 
-// ConfigNotify 只发信号不带内容（spec §5.1）：凭据轮换可以复用同一条消息，
+// ConfigNotify 只发信号不带内容（spec §5.1）：key 轮换可以复用同一条消息，
 // 且不产生新 Revision。
 type ConfigNotify struct {
 	ConfigSetID string `cbor:"0,keyasint"`
@@ -71,19 +71,21 @@ type ConfigPull struct {
 }
 
 type ConfigSnapshot struct {
-	ConfigSetID string            `cbor:"0,keyasint"`
-	RevisionID  string            `cbor:"1,keyasint"`
-	Seq         uint32            `cbor:"2,keyasint"`
-	Manifest    []byte            `cbor:"3,keyasint"` // 原样 JSON，与发布时冻结的一致
-	Files       []FileEntry       `cbor:"4,keyasint"`
-	Checksum    string            `cbor:"5,keyasint"`
-	Credentials map[string]string `cbor:"6,keyasint,omitempty"` // 只含本 Revision 引用到的
+	ConfigSetID string      `cbor:"0,keyasint"`
+	RevisionID  string      `cbor:"1,keyasint"`
+	Seq         uint32      `cbor:"2,keyasint"`
+	Manifest    []byte      `cbor:"3,keyasint"` // 原样 JSON，与发布时冻结的一致
+	Files       []FileEntry `cbor:"4,keyasint"`
+	Checksum    string      `cbor:"5,keyasint"`
+	// 键 6 是原 Credentials，随 {{cred.*}} 一起废止（M1.6 spec §3.5）。
+	// **退休不复用**：老 agent 写下的字节里键 6 是一张凭据表，
+	// 让新语义顶着旧编号是最难查的一类 bug。
 	Variables   map[string]string `cbor:"7,keyasint,omitempty"`
 	IgnorePaths []string          `cbor:"8,keyasint,omitempty"`
 	Mode        uint8             `cbor:"9,keyasint,omitempty"`
-	// Provider 是服务绑定注入的六个内置名 → 真实值（M1.5 spec §3.4）。
-	// 只含本 Revision 实际引用到的键（refs.provider_keys 裁剪，spec §5.1）——
-	// 少一个键少一处泄露面，auth_token 尤其。
+	// Provider 是服务绑定注入的九个端点限定名 → 真实值（M1.6 spec §3.1）。
+	// 只含本 Revision 实际引用到的键（refs.provider_keys 裁剪，spec §3.4）——
+	// 少一个键少一处泄露面，两个端点的 key 尤其。
 	//
 	// omitempty + 新 keyasint 键：旧 agent 解码时静默忽略，wire 层兼容。
 	Provider map[string]string `cbor:"10,keyasint,omitempty"`

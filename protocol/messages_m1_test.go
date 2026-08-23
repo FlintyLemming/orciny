@@ -1,6 +1,8 @@
 package protocol_test
 
 import (
+	"github.com/fxamacker/cbor/v2"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -28,7 +30,6 @@ func TestConfigSnapshotRoundTrip(t *testing.T) {
 			{Path: ".claude.json", Hash: "bb", Size: 34, Mode: 0o644, Keys: []string{"mcpServers"}},
 		},
 		Checksum:    "cc",
-		Credentials: map[string]string{"anthropic_key": "sk-test"},
 		Variables:   map[string]string{"workspace": "main"},
 		IgnorePaths: []string{".claude/skills/scratch/**"},
 		Mode:        protocol.ModeSurvey,
@@ -155,8 +156,7 @@ type legacySnapshot struct {
 func TestOldSnapshotShapeIgnoresProviderField(t *testing.T) {
 	b, err := protocol.Encode(protocol.KindConfigSnapshot, nil, protocol.ConfigSnapshot{
 		ConfigSetID: "cs1", RevisionID: "r1", Checksum: "abc",
-		Credentials: map[string]string{"k": "v"},
-		Provider:    map[string]string{"base_url": "https://example.test"},
+		Provider: map[string]string{"claude.base_url": "https://example.test"},
 	})
 	require.NoError(t, err)
 
@@ -165,7 +165,7 @@ func TestOldSnapshotShapeIgnoresProviderField(t *testing.T) {
 	old, err := protocol.DecodePayload[legacySnapshot](env)
 	require.NoError(t, err, "旧形状必须能解出来")
 	require.Equal(t, "cs1", old.ConfigSetID)
-	require.Equal(t, map[string]string{"k": "v"}, old.Credentials)
+	require.Empty(t, old.Credentials, "hub 不再写键 6")
 }
 
 // 反向：新 agent 收到旧 hub 的快照，Provider 为 nil 而不是报错。
@@ -180,4 +180,34 @@ func TestNewSnapshotShapeAcceptsMissingProvider(t *testing.T) {
 	snap, err := protocol.DecodePayload[protocol.ConfigSnapshot](env)
 	require.NoError(t, err)
 	require.Nil(t, snap.Provider)
+}
+
+// 键 6 退休：ConfigSnapshot 不再有 Credentials 字段，
+// 而这个编号也不许被任何新字段占用（M1.6 spec §3.5 + 计划 Global Constraints）。
+func TestConfigSnapshotHasNoCredentialsField(t *testing.T) {
+	typ := reflect.TypeOf(protocol.ConfigSnapshot{})
+	for i := range typ.NumField() {
+		f := typ.Field(i)
+		require.NotEqual(t, "Credentials", f.Name)
+		require.NotContains(t, f.Tag.Get("cbor"), "6,keyasint",
+			"CBOR 键 6 已退休，字段 %s 不许占用它", f.Name)
+	}
+}
+
+// 老 agent 发来的、带键 6 的快照要能被静默忽略（wire 层向后兼容）。
+func TestConfigSnapshotDecodeIgnoresRetiredKey(t *testing.T) {
+	// 手工编一份带键 6 的 map，模拟老版本写下的字节。
+	raw := map[int]any{
+		0: "set1", 1: "rev1", 2: 1,
+		3: []byte("{}"), 5: "checksum",
+		6:  map[string]string{"zhipu": "sk-old"},
+		10: map[string]string{"claude.base_url": "https://x.example"},
+	}
+	b, err := cbor.Marshal(raw)
+	require.NoError(t, err)
+
+	var snap protocol.ConfigSnapshot
+	require.NoError(t, cbor.Unmarshal(b, &snap))
+	require.Equal(t, "set1", snap.ConfigSetID)
+	require.Equal(t, "https://x.example", snap.Provider["claude.base_url"])
 }
