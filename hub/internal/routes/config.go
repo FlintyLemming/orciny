@@ -156,14 +156,10 @@ func (d Deps) setManifest(e *core.RequestEvent) error {
 }
 
 func (d Deps) validateConfigSet(e *core.RequestEvent) error {
-	if d.Sets == nil || d.Creds == nil {
+	if d.Sets == nil {
 		return e.InternalServerError("配置集服务未就绪", nil)
 	}
-	known, err := d.knownRefs(e.App)
-	if err != nil {
-		return mapErr(e, err)
-	}
-	problems, err := d.Sets.Validate(e.Request.PathValue("id"), known)
+	problems, err := d.Sets.Validate(e.Request.PathValue("id"))
 	if err != nil {
 		return mapErr(e, err)
 	}
@@ -494,25 +490,6 @@ func (d Deps) clearDegraded(e *core.RequestEvent) error {
 }
 
 // ---------- helpers ----------
-
-func (d Deps) knownRefs(app core.App) (map[string]bool, error) {
-	known := map[string]bool{}
-	creds, err := app.FindAllRecords("credentials")
-	if err != nil {
-		return nil, err
-	}
-	for _, r := range creds {
-		known["cred."+r.GetString("name")] = true
-	}
-	vars, err := app.FindAllRecords("variables")
-	if err != nil {
-		return nil, err
-	}
-	for _, r := range vars {
-		known["var."+r.GetString("key")] = true
-	}
-	return known, nil
-}
 
 func fileEntryJSON(f protocol.FileEntry) map[string]any {
 	return map[string]any{

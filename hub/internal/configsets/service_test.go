@@ -3,6 +3,7 @@ package configsets_test
 import (
 	"testing"
 
+	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 	"github.com/stretchr/testify/require"
 
@@ -91,27 +92,23 @@ func TestDraftRefsAreRecomputedOnEveryChange(t *testing.T) {
 	set, err := s.Create("s", "")
 	require.NoError(t, err)
 
-	_, err = s.SetDraftFile(set.Id, "a", []byte(`{{cred.key_a}} {{var.ws}}`), 0o600, nil)
+	_, err = s.SetDraftFile(set.Id, "a", []byte(`{{var.key_a}} {{var.ws}}`), 0o600, nil)
 	require.NoError(t, err)
-	_, err = s.SetDraftFile(set.Id, "b", []byte(`{{cred.key_b}}`), 0o644, nil)
+	_, err = s.SetDraftFile(set.Id, "b", []byte(`{{var.key_b}}`), 0o644, nil)
 	require.NoError(t, err)
 
-	var refs struct {
-		Creds []string `json:"creds"`
-		Vars  []string `json:"vars"`
-	}
+	var refs configsets.Refs
 	rec, err := app.FindRecordById("config_sets", set.Id)
 	require.NoError(t, err)
 	require.NoError(t, rec.UnmarshalJSONField("draft_refs", &refs))
-	require.Equal(t, []string{"key_a", "key_b"}, refs.Creds)
-	require.Equal(t, []string{"ws"}, refs.Vars)
+	require.Equal(t, []string{"key_a", "key_b", "ws"}, refs.Vars)
 
 	// 删掉引用 key_b 的文件之后，refs 必须跟着缩
 	require.NoError(t, s.RemoveDraftFile(set.Id, "b"))
 	rec, err = app.FindRecordById("config_sets", set.Id)
 	require.NoError(t, err)
 	require.NoError(t, rec.UnmarshalJSONField("draft_refs", &refs))
-	require.Equal(t, []string{"key_a"}, refs.Creds)
+	require.Equal(t, []string{"key_a", "ws"}, refs.Vars)
 }
 
 func TestSetDraftFileRejectsOversizeAndBadPath(t *testing.T) {
@@ -146,9 +143,9 @@ func TestDraftRefsCollectsProviderKeys(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = s.SetDraftFile(set.Id, ".claude/settings.json", []byte(
-		`{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}",`+
-			`"ANTHROPIC_AUTH_TOKEN":"{{provider.auth_token}}",`+
-			`"ANTHROPIC_MODEL":"{{provider.model}}","X":"{{cred.k}}"}}`), 0o600, nil)
+		`{"env":{"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}",`+
+			`"ANTHROPIC_AUTH_TOKEN":"{{provider.claude.auth_token}}",`+
+			`"ANTHROPIC_MODEL":"{{provider.claude.model}}","X":"{{var.k}}"}}`), 0o600, nil)
 	require.NoError(t, err)
 
 	rec, err := app.FindRecordById("config_sets", set.Id)
@@ -156,9 +153,9 @@ func TestDraftRefsCollectsProviderKeys(t *testing.T) {
 	var refs configsets.Refs
 	require.NoError(t, rec.UnmarshalJSONField("draft_refs", &refs))
 
-	require.Equal(t, []string{"auth_token", "base_url", "model"}, refs.ProviderKeys,
-		"去重后按名字升序")
-	require.Equal(t, []string{"k"}, refs.Creds)
+	require.Equal(t, []string{"claude.auth_token", "claude.base_url", "claude.model"},
+		refs.ProviderKeys, "去重后按名字升序")
+	require.Equal(t, []string{"k"}, refs.Vars)
 }
 
 // 转义的 {{{{provider.x}}}} 是字面文本，不算引用（spec §11）。
@@ -168,7 +165,7 @@ func TestDraftRefsIgnoresEscapedProviderRefs(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = s.SetDraftFile(set.Id, "CLAUDE.md",
-		[]byte("写法是 {{{{provider.base_url}}"), 0o644, nil)
+		[]byte("写法是 {{{{provider.claude.base_url}}"), 0o644, nil)
 	require.NoError(t, err)
 
 	rec, err := app.FindRecordById("config_sets", set.Id)
@@ -178,20 +175,41 @@ func TestDraftRefsIgnoresEscapedProviderRefs(t *testing.T) {
 	require.Empty(t, refs.ProviderKeys)
 }
 
-// provider.* 的「已定义」由三条绑定校验判定，不走未定义引用那条路——
+// provider.* 的「已定义」由绑定与端点校验判定，不走未定义引用那条路——
 // 否则每个绑定了服务的配置集都会报一堆假的未定义引用。
 func TestValidateDoesNotReportProviderAsUndefinedRef(t *testing.T) {
 	_, s := newService(t)
 	set, err := s.Create("主力配置", "")
 	require.NoError(t, err)
 	_, err = s.SetDraftFile(set.Id, ".claude/settings.json",
-		[]byte(`{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}"}}`), 0o600, nil)
+		[]byte(`{"env":{"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}"}}`), 0o600, nil)
 	require.NoError(t, err)
 
-	problems, err := s.Validate(set.Id, map[string]bool{})
+	problems, err := s.Validate(set.Id)
 	require.NoError(t, err)
 	for _, p := range problems {
 		require.NotEqual(t, configsets.ProblemUndefinedRef, p.Kind,
 			"provider.* 不该被当成未定义引用：%+v", p)
 	}
+}
+
+// seedVariable 建一台机器并给它定义一个机器变量。
+// Validate 的「已定义」判定是全库汇总，与哪台机器无关（见 knownVars）。
+func seedVariable(t *testing.T, app core.App, key, value string) {
+	t.Helper()
+	mc, err := app.FindCollectionByNameOrId("machines")
+	require.NoError(t, err)
+	m := core.NewRecord(mc)
+	m.Set("fingerprint", "fp-"+key)
+	m.Set("pub_key", "pk")
+	m.Set("status", "offline")
+	require.NoError(t, app.Save(m))
+
+	vc, err := app.FindCollectionByNameOrId("variables")
+	require.NoError(t, err)
+	v := core.NewRecord(vc)
+	v.Set("machine", m.Id)
+	v.Set("key", key)
+	v.Set("value", value)
+	require.NoError(t, app.Save(v))
 }

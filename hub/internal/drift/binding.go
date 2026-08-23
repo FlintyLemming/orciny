@@ -14,8 +14,11 @@ import (
 	"github.com/FlintyLemming/orciny/protocol"
 )
 
-// baseURLToken 是基线里 base_url 那一处的字面形态。
-const baseURLToken = "{{provider.base_url}}"
+// baseURLToken 是基线里 claude 端点 base_url 那一处的字面形态。
+//
+// 只认 claude 端点（M1.6 spec §1.3）：漂移源只有 .claude/**，
+// openai 端点本期不会产生漂移。
+const baseURLToken = "{{provider.claude.base_url}}"
 
 // DetectBindingDrift 识别绑定漂移（M1.5 spec §6.1）：
 // **基线侧是 {{provider.base_url}} 占位符、现状侧是字面值**。

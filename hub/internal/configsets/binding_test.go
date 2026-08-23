@@ -9,24 +9,37 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/providers"
 )
 
-// seedProvider 建一条最小可用 Provider（含一条凭据），返回记录 id。
+// seedProvider 建一条只配了 claude 端点的 Provider，返回记录 id。
+// 直接写记录而不走 providers.Store：configsets 的测试不该被 Store 的校验绑住。
 func seedProvider(t *testing.T, app core.App, name string) string {
 	t.Helper()
-	creds, err := app.FindCollectionByNameOrId("credentials")
-	require.NoError(t, err)
-	cred := core.NewRecord(creds)
-	cred.Set("name", "zhipu_key")
-	cred.Set("cipher_value", "x")
-	cred.Set("last4", "1234")
-	require.NoError(t, app.Save(cred))
+	return seedProviderWith(t, app, name, "")
+}
 
+// seedProviderWith 可以额外配上 openai 端点。openaiBaseURL 为空即不配。
+func seedProviderWith(t *testing.T, app core.App, name, openaiBaseURL string) string {
+	t.Helper()
 	c, err := app.FindCollectionByNameOrId("providers")
 	require.NoError(t, err)
 	p := core.NewRecord(c)
 	p.Set("name", name)
-	p.Set("base_url", "https://open.bigmodel.cn/api/anthropic")
-	p.Set("auth_field", providers.AuthToken)
-	p.Set("credential", cred.Id)
+	p.Set("key_cipher", "x")
+	p.Set("key_last4", "1234")
+	p.Set("claude", providers.ClaudeEndpoint{
+		Endpoint: providers.Endpoint{
+			BaseURL:   "https://open.bigmodel.cn/api/anthropic",
+			AuthField: providers.AuthToken,
+			KeyLast4:  "1234",
+			Models:    []string{"glm-5.2"},
+		},
+	})
+	p.Set("openai", providers.OpenAIEndpoint{
+		Endpoint: providers.Endpoint{
+			BaseURL:   openaiBaseURL,
+			AuthField: providers.DefaultOpenAIAuthField,
+			Models:    []string{},
+		},
+	})
 	require.NoError(t, app.Save(p))
 	return p.Id
 }

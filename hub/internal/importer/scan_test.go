@@ -131,8 +131,24 @@ func TestFindingsNeverCarryFullValue(t *testing.T) {
 
 // 已被抽成占位符的值不该再报敏感项——provider 前缀也一样。
 func TestScanIgnoresProviderPlaceholders(t *testing.T) {
-	content := []byte(`{"env":{"ANTHROPIC_AUTH_TOKEN":"{{provider.auth_token}}",` +
-		`"ANTHROPIC_BASE_URL":"{{provider.base_url}}",` +
-		`"ANTHROPIC_MODEL":"{{provider.model}}"}}`)
+	content := []byte(`{"env":{"ANTHROPIC_AUTH_TOKEN":"{{provider.claude.auth_token}}",` +
+		`"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}",` +
+		`"ANTHROPIC_MODEL":"{{provider.claude.model}}"}}`)
 	require.Empty(t, importer.Scan(".claude/settings.json", content))
+}
+
+// 已经是占位符的值不再报——否则 Extract 之后 Findings 会把同一条再吐回来。
+func TestScanSkipsEndpointQualifiedPlaceholders(t *testing.T) {
+	content := []byte(`{"env":{
+		"ANTHROPIC_AUTH_TOKEN":"{{provider.claude.auth_token}}",
+		"OPENAI_API_KEY":"{{provider.openai.api_key}}",
+		"X_TOKEN":"{{var.some_token}}"
+	}}`)
+	require.Empty(t, importer.Scan(".claude/settings.json", content))
+}
+
+// {{cred.*}} 已废止，它现在只是一个普通字符串。这条锁住不炸。
+func TestScanHandlesLegacyCredPlaceholder(t *testing.T) {
+	content := []byte(`{"env":{"ANTHROPIC_AUTH_TOKEN":"{{cred.zhipu}}"}}`)
+	require.NotPanics(t, func() { _ = importer.Scan(".claude/settings.json", content) })
 }

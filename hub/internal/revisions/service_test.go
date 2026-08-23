@@ -32,7 +32,7 @@ func TestPublishFreezesDraft(t *testing.T) {
 	app, cs, rs := newBoth(t)
 	set, err := cs.Create("s", "")
 	require.NoError(t, err)
-	_, err = cs.SetDraftFile(set.Id, ".claude/CLAUDE.md", []byte("v1 {{cred.k}}"), 0o600, nil)
+	_, err = cs.SetDraftFile(set.Id, ".claude/CLAUDE.md", []byte("v1 {{var.k}}"), 0o600, nil)
 	require.NoError(t, err)
 
 	rev, err := rs.Publish(set.Id, "第一版", "publish")
@@ -47,7 +47,7 @@ func TestPublishFreezesDraft(t *testing.T) {
 
 	var refs configsets.Refs
 	require.NoError(t, rev.UnmarshalJSONField("refs", &refs))
-	require.Equal(t, []string{"k"}, refs.Creds)
+	require.Equal(t, []string{"k"}, refs.Vars)
 
 	head, err := rs.Head(set.Id)
 	require.NoError(t, err)
@@ -174,9 +174,9 @@ func TestPublishFreezesProviderKeys(t *testing.T) {
 	set, err := cs.Create("主力配置", "")
 	require.NoError(t, err)
 	_, err = cs.SetDraftFile(set.Id, ".claude/settings.json", []byte(
-		`{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}",`+
-			`"ANTHROPIC_AUTH_TOKEN":"{{provider.auth_token}}",`+
-			`"ANTHROPIC_MODEL":"{{provider.model}}"}}`), 0o600, nil)
+		`{"env":{"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}",`+
+			`"ANTHROPIC_AUTH_TOKEN":"{{provider.claude.auth_token}}",`+
+			`"ANTHROPIC_MODEL":"{{provider.claude.model}}"}}`), 0o600, nil)
 	require.NoError(t, err)
 
 	rev, err := rs.Publish(set.Id, "v1", "publish")
@@ -184,28 +184,28 @@ func TestPublishFreezesProviderKeys(t *testing.T) {
 
 	var refs configsets.Refs
 	require.NoError(t, rev.UnmarshalJSONField("refs", &refs))
-	require.Equal(t, []string{"auth_token", "base_url", "model"}, refs.ProviderKeys)
-	require.Empty(t, refs.Creds)
+	require.Equal(t, []string{"claude.auth_token", "claude.base_url", "claude.model"},
+		refs.ProviderKeys)
+	require.Empty(t, refs.Vars)
 }
 
-// seedProvider 建一条最小可用 Provider（含一条凭据），返回记录 id。
-func seedProvider(t *testing.T, app core.App, name, credName string) string {
+// seedProvider 建一条只配了 claude 端点的 Provider，返回记录 id。
+func seedProvider(t *testing.T, app core.App, name string) string {
 	t.Helper()
-	creds, err := app.FindCollectionByNameOrId("credentials")
-	require.NoError(t, err)
-	cred := core.NewRecord(creds)
-	cred.Set("name", credName)
-	cred.Set("cipher_value", "x")
-	cred.Set("last4", "1234")
-	require.NoError(t, app.Save(cred))
-
 	c, err := app.FindCollectionByNameOrId("providers")
 	require.NoError(t, err)
 	p := core.NewRecord(c)
 	p.Set("name", name)
-	p.Set("base_url", "https://open.bigmodel.cn/api/anthropic")
-	p.Set("auth_field", providers.AuthToken)
-	p.Set("credential", cred.Id)
+	p.Set("key_cipher", "x")
+	p.Set("key_last4", "1234")
+	p.Set("claude", providers.ClaudeEndpoint{
+		Endpoint: providers.Endpoint{
+			BaseURL:   "https://open.bigmodel.cn/api/anthropic",
+			AuthField: providers.AuthToken,
+			KeyLast4:  "1234",
+			Models:    []string{"glm-5.2"},
+		},
+	})
 	require.NoError(t, app.Save(p))
 	return p.Id
 }
@@ -221,7 +221,7 @@ func TestPublishFreezesBindingAndSyncsHeadProvider(t *testing.T) {
 	_, err = cs.SetDraftFile(set.Id, ".claude/CLAUDE.md", []byte("内容"), 0o644, nil)
 	require.NoError(t, err)
 
-	provID := seedProvider(t, app, "智谱 GLM · 个人", "zhipu_key")
+	provID := seedProvider(t, app, "智谱 GLM · 个人")
 	require.NoError(t, cs.SetDraftBinding(set.Id, &providers.Binding{
 		Provider: provID, Models: fullSlots("glm-5.1"),
 	}))
@@ -247,7 +247,7 @@ func TestPublishWithoutBindingClearsHeadProvider(t *testing.T) {
 	_, err = cs.SetDraftFile(set.Id, ".claude/CLAUDE.md", []byte("内容"), 0o644, nil)
 	require.NoError(t, err)
 
-	provID := seedProvider(t, app, "智谱 GLM · 个人", "zhipu_key")
+	provID := seedProvider(t, app, "智谱 GLM · 个人")
 	require.NoError(t, cs.SetDraftBinding(set.Id, &providers.Binding{
 		Provider: provID, Models: fullSlots("glm-5.1"),
 	}))
@@ -272,8 +272,8 @@ func TestRollbackRestoresBinding(t *testing.T) {
 	_, err = cs.SetDraftFile(set.Id, ".claude/CLAUDE.md", []byte("v1"), 0o644, nil)
 	require.NoError(t, err)
 
-	provA := seedProvider(t, app, "智谱 GLM · 个人", "zhipu_key")
-	provB := seedProvider(t, app, "Kimi · 个人", "kimi_key")
+	provA := seedProvider(t, app, "智谱 GLM · 个人")
+	provB := seedProvider(t, app, "Kimi · 个人")
 
 	require.NoError(t, cs.SetDraftBinding(set.Id, &providers.Binding{
 		Provider: provA, Models: fullSlots("glm-5.1"),

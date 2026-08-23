@@ -28,8 +28,11 @@ type Service struct {
 
 // NewService 的签名不变，内部自建 providers.Store——与 revisions.NewService
 // 内部自建 configsets.Service 是同一个手法，装配点不用跟着改。
+//
+// 主密钥传 nil：configsets 只读 provider 的**非秘密**部分（端点是否配置、
+// auth_field），从不解密。给它一把钥匙反而扩大了明文可及的范围。
 func NewService(app core.App, b *blobs.Store, ev *events.Writer) *Service {
-	return &Service{app: app, blobs: b, ev: ev, provs: providers.NewStore(app, ev)}
+	return &Service{app: app, blobs: b, ev: ev, provs: providers.NewStore(app, nil, ev)}
 }
 
 // Refs 是 config_sets.draft_refs 与 revisions.refs 的形状。
@@ -37,10 +40,22 @@ func NewService(app core.App, b *blobs.Store, ev *events.Writer) *Service {
 // ProviderKeys 记的是**哪几个 {{provider.*}} 内置名被引用**（形如
 // ["auth_token","base_url"]），不是绑定指向哪条 Provider——后者在
 // head_provider / binding 里。下发时靠它裁剪，不读 blob 内容（M1.5 spec §2.2）。
+// Creds 字段随 {{cred.*}} 一起删除（M1.6 spec §3.5）。存量 JSON 里多出的
+// creds 键反序列化时自然忽略，**不清洗**（spec §6.2）。
 type Refs struct {
-	Creds        []string `json:"creds"`
 	Vars         []string `json:"vars"`
 	ProviderKeys []string `json:"provider_keys"`
+}
+
+// DraftRefs 读回草稿的引用集合。
+func (s *Service) DraftRefs(setID string) (Refs, error) {
+	r, err := s.record(setID)
+	if err != nil {
+		return Refs{}, err
+	}
+	var refs Refs
+	_ = r.UnmarshalJSONField("draft_refs", &refs)
+	return refs, nil
 }
 
 func (s *Service) Create(name, note string) (*core.Record, error) {
@@ -57,7 +72,7 @@ func (s *Service) Create(name, note string) (*core.Record, error) {
 	r.Set("note", note)
 	r.Set("manifest", json.RawMessage(mj))
 	r.Set("draft", []protocol.FileEntry{})
-	r.Set("draft_refs", Refs{Creds: []string{}, Vars: []string{}, ProviderKeys: []string{}})
+	r.Set("draft_refs", Refs{Vars: []string{}, ProviderKeys: []string{}})
 	if err := s.app.Save(r); err != nil {
 		return nil, fmt.Errorf("configsets: 创建 %s: %w", name, err)
 	}
@@ -174,10 +189,10 @@ func (s *Service) saveDraft(r *core.Record, files []protocol.FileEntry) error {
 }
 
 // collectRefs 读回每个 blob 的内容并提取占位符引用，去重后按名字升序。
+// 引用集合是快照裁剪与发布校验的依据。
 // 清单项可能来自外部组装（导入、收编），内容尚未落库时跳过该文件的引用提取——
 // 真正的把关在 Validate。
 func (s *Service) collectRefs(files []protocol.FileEntry) (Refs, error) {
-	creds := map[string]bool{}
 	vars := map[string]bool{}
 	providerKeys := map[string]bool{}
 	for _, f := range files {
@@ -191,8 +206,6 @@ func (s *Service) collectRefs(files []protocol.FileEntry) (Refs, error) {
 		}
 		for _, ref := range rs {
 			switch ref.Kind {
-			case protocol.RefCred:
-				creds[ref.Name] = true
 			case protocol.RefVar:
 				vars[ref.Name] = true
 			case protocol.RefProvider:
@@ -202,7 +215,6 @@ func (s *Service) collectRefs(files []protocol.FileEntry) (Refs, error) {
 		}
 	}
 	return Refs{
-		Creds:        sortedKeys(creds),
 		Vars:         sortedKeys(vars),
 		ProviderKeys: sortedKeys(providerKeys),
 	}, nil

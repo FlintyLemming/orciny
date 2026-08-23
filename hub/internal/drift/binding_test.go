@@ -15,7 +15,7 @@ import (
 
 const bindingBase = `{
   "env": {
-    "ANTHROPIC_BASE_URL": "{{provider.base_url}}",
+    "ANTHROPIC_BASE_URL": "{{provider.claude.base_url}}",
     "ANTHROPIC_AUTH_TOKEN": "{{provider.auth_token}}",
     "ANTHROPIC_MODEL": "{{provider.model}}"
   }
@@ -46,7 +46,7 @@ func TestDetectBindingDriftIgnoresUnboundBaseline(t *testing.T) {
 func TestDetectBindingDriftIgnoresOtherChanges(t *testing.T) {
 	cur := `{
   "env": {
-    "ANTHROPIC_BASE_URL": "{{provider.base_url}}",
+    "ANTHROPIC_BASE_URL": "{{provider.claude.base_url}}",
     "ANTHROPIC_AUTH_TOKEN": "{{provider.auth_token}}",
     "ANTHROPIC_MODEL": "{{provider.model}}",
     "MY_VAR": "1"
@@ -71,7 +71,7 @@ func TestDetectBindingDriftIgnoresNonURL(t *testing.T) {
 
 // 紧凑写法（无缩进、单行）也要认得。
 func TestDetectBindingDriftHandlesCompactJSON(t *testing.T) {
-	base := `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}"}}`
+	base := `{"env":{"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}"}}`
 	cur := `{"env":{"ANTHROPIC_BASE_URL":"https://zenmux.ai/api/anthropic"}}`
 	url, ok := drift.DetectBindingDrift([]byte(base), []byte(cur))
 	require.True(t, ok)
@@ -114,7 +114,7 @@ func (r *rig) driftAt(t *testing.T, path string) *core.Record {
 func TestHandleReportMarksBindingDrift(t *testing.T) {
 	r := newRig(t)
 	r.assignWith(t, map[string]string{
-		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}"}}`,
+		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}"}}`,
 	})
 
 	r.report(t, protocol.DriftItem{
@@ -147,7 +147,7 @@ func TestHandleReportLeavesNormalDriftUnmarked(t *testing.T) {
 func TestHandleReportClearsBindingDriftWhenReverted(t *testing.T) {
 	r := newRig(t)
 	r.assignWith(t, map[string]string{
-		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}","X":"1"}}`,
+		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}","X":"1"}}`,
 	})
 
 	report := func(content string) {
@@ -159,7 +159,7 @@ func TestHandleReportClearsBindingDriftWhenReverted(t *testing.T) {
 	report(`{"env":{"ANTHROPIC_BASE_URL":"https://api.moonshot.cn/anthropic","X":"1"}}`)
 	require.True(t, r.driftAt(t, ".claude/settings.json").GetBool("binding_drift"))
 
-	report(`{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}","X":"2"}}`)
+	report(`{"env":{"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}","X":"2"}}`)
 	rec := r.driftAt(t, ".claude/settings.json")
 	require.False(t, rec.GetBool("binding_drift"))
 	require.Empty(t, rec.GetString("binding_url"))
@@ -169,7 +169,7 @@ func TestHandleReportClearsBindingDriftWhenReverted(t *testing.T) {
 func TestHandleReportDoesNotMarkTruncated(t *testing.T) {
 	r := newRig(t)
 	r.assignWith(t, map[string]string{
-		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}"}}`,
+		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}"}}`,
 	})
 
 	r.report(t, protocol.DriftItem{
@@ -200,7 +200,7 @@ func (r *rig) reportBindingDrift(t *testing.T, path, url string) string {
 func TestAdoptRefusesBindingDrift(t *testing.T) {
 	r := newRig(t)
 	r.assignWith(t, map[string]string{
-		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}"}}`,
+		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}"}}`,
 	})
 	id := r.reportBindingDrift(t, ".claude/settings.json", "https://api.moonshot.cn/anthropic")
 
@@ -217,8 +217,8 @@ func TestAdoptRefusesBindingDrift(t *testing.T) {
 func TestRestoreAndIgnoreAllowBindingDrift(t *testing.T) {
 	r := newRig(t)
 	r.assignWith(t, map[string]string{
-		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}"}}`,
-		".claude/other.json":    `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}"}}`,
+		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}"}}`,
+		".claude/other.json":    `{"env":{"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}"}}`,
 	})
 	a := r.reportBindingDrift(t, ".claude/settings.json", "https://a.test/v1")
 	b := r.reportBindingDrift(t, ".claude/other.json", "https://b.test/v1")
@@ -232,7 +232,7 @@ func TestRestoreAndIgnoreAllowBindingDrift(t *testing.T) {
 func TestAdoptRefusesMixedBatchWithBindingDrift(t *testing.T) {
 	r := newRig(t)
 	r.assignWith(t, map[string]string{
-		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}"}}`,
+		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}"}}`,
 		"CLAUDE.md":             "原文",
 	})
 	r.report(t, protocol.DriftItem{
@@ -292,7 +292,7 @@ func (r *rig) seedBoundSet(t *testing.T, providerID string, files map[string]str
 func (r *rig) seedBindingDrift(t *testing.T, path, url, key string) string {
 	t.Helper()
 	r.assignWith(t, map[string]string{
-		path: `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}",` +
+		path: `{"env":{"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}",` +
 			`"ANTHROPIC_AUTH_TOKEN":"{{provider.auth_token}}"}}`,
 	})
 	return r.reportBindingDriftWithKey(t, path, url, key)
@@ -424,7 +424,7 @@ func TestRebindProducesNewRevisionAndKeepsBindingAlive(t *testing.T) {
 		"sk-kimi-abcdefghij")
 
 	setID := r.seedBoundSet(t, zhipu, map[string]string{
-		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}"}}`,
+		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}"}}`,
 	})
 	before, err := r.revs.Head(setID)
 	require.NoError(t, err)
@@ -471,7 +471,7 @@ func TestRebindTakesNewProviderDefaults(t *testing.T) {
 		})
 
 	setID := r.seedBoundSet(t, zhipu, map[string]string{
-		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}"}}`,
+		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}"}}`,
 	})
 	eventID := r.seedBindingDriftIn(t, setID, ".claude/settings.json",
 		"https://api.moonshot.cn/anthropic", "")
@@ -495,7 +495,7 @@ func TestRebindLeavesDriftOpen(t *testing.T) {
 	kimi := r.seedProvider(t, "KimiOfficial", "https://api.moonshot.cn/anthropic",
 		"sk-kimi-abcdefghij")
 	setID := r.seedBoundSet(t, zhipu, map[string]string{
-		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}"}}`,
+		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}"}}`,
 	})
 	eventID := r.seedBindingDriftIn(t, setID, ".claude/settings.json",
 		"https://api.moonshot.cn/anthropic", "")
@@ -514,4 +514,22 @@ func TestRebindRefusesNonBindingDrift(t *testing.T) {
 	_, err := r.svc.Rebind(eventID, "p1")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "不是绑定漂移")
+}
+
+func TestDetectBindingDriftUsesEndpointQualifiedToken(t *testing.T) {
+	base := []byte(`{"env":{"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}"}}`)
+	cur := []byte(`{"env":{"ANTHROPIC_BASE_URL":"https://relay.example/anthropic"}}`)
+
+	url, ok := drift.DetectBindingDrift(base, cur)
+	require.True(t, ok)
+	require.Equal(t, "https://relay.example/anthropic", url)
+}
+
+// 旧字面量不再被认作绑定漂移的基线锚点：存量 blob 里的它下次发布时会被
+// 词法拒掉，不该再顺着它去猜（spec §6.2）。
+func TestDetectBindingDriftIgnoresOldToken(t *testing.T) {
+	base := []byte(`{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}"}}`)
+	cur := []byte(`{"env":{"ANTHROPIC_BASE_URL":"https://relay.example/anthropic"}}`)
+	_, ok := drift.DetectBindingDrift(base, cur)
+	require.False(t, ok)
 }

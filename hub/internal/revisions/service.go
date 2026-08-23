@@ -219,7 +219,6 @@ func (s *Service) nextSeq(setID string) (int, error) {
 }
 
 func (s *Service) refsOf(files []protocol.FileEntry) (configsets.Refs, error) {
-	creds := map[string]bool{}
 	vars := map[string]bool{}
 	providerKeys := map[string]bool{}
 	for _, f := range files {
@@ -233,8 +232,6 @@ func (s *Service) refsOf(files []protocol.FileEntry) (configsets.Refs, error) {
 		}
 		for _, ref := range rs {
 			switch ref.Kind {
-			case protocol.RefCred:
-				creds[ref.Name] = true
 			case protocol.RefVar:
 				vars[ref.Name] = true
 			case protocol.RefProvider:
@@ -243,7 +240,6 @@ func (s *Service) refsOf(files []protocol.FileEntry) (configsets.Refs, error) {
 		}
 	}
 	return configsets.Refs{
-		Creds:        sortedKeys(creds),
 		Vars:         sortedKeys(vars),
 		ProviderKeys: sortedKeys(providerKeys),
 	}, nil
