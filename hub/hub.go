@@ -29,6 +29,7 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/revisions"
 	"github.com/FlintyLemming/orciny/hub/internal/routes"
 	"github.com/FlintyLemming/orciny/hub/internal/secretbox"
+	"github.com/FlintyLemming/orciny/hub/internal/variables"
 	"github.com/FlintyLemming/orciny/hub/internal/ws"
 
 	// 空 import 触发 init()，把初始迁移注册进 core.AppMigrations。
@@ -48,6 +49,7 @@ type Hub struct {
 	machines *machines.Manager
 	ws       *ws.Handler
 	creds    *credentials.Store
+	vars     *variables.Store
 	blobs    *blobs.Store
 	sets     *configsets.Service
 	revs     *revisions.Service
@@ -113,6 +115,7 @@ func Attach(app core.App, cfg Config) (*Hub, error) {
 			return fmt.Errorf("加载凭据主密钥: %w", err)
 		}
 		h.creds = credentials.NewStore(e.App, key, h.events)
+		h.vars = variables.NewStore(e.App)
 		if err := h.creds.VerifyAll(); err != nil {
 			return err
 		}
@@ -126,7 +129,7 @@ func Attach(app core.App, cfg Config) (*Hub, error) {
 		h.importer = importer.NewService(e.App, h.blobs, h.sets, h.creds, h.events, h.machines)
 		h.sync = configsync.NewService(configsync.Deps{
 			App: e.App, Blobs: h.blobs, Sets: h.sets, Revs: h.revs,
-			Creds: h.creds, Providers: h.provs, Events: h.events, Sender: h.machines,
+			Creds: h.creds, Vars: h.vars, Providers: h.provs, Events: h.events, Sender: h.machines,
 			Importer: h.importer, Logger: e.App.Logger(),
 		})
 		// drift 需要 configsync（发 DriftCommand），configsync 需要 drift（转交上报）：
@@ -171,6 +174,7 @@ func Attach(app core.App, cfg Config) (*Hub, error) {
 			Revs:         h.revs,
 			Blobs:        h.blobs,
 			Creds:        h.creds,
+			Vars:         h.vars,
 		}); err != nil {
 			return fmt.Errorf("注册路由: %w", err)
 		}

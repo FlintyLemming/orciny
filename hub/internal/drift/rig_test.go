@@ -19,6 +19,7 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/hub/internal/revisions"
 	"github.com/FlintyLemming/orciny/hub/internal/secretbox"
+	"github.com/FlintyLemming/orciny/hub/internal/variables"
 	"github.com/FlintyLemming/orciny/protocol"
 )
 
@@ -86,13 +87,14 @@ func newRig(t *testing.T) *rig {
 	key, err := secretbox.LoadMasterKey(t.TempDir())
 	require.NoError(t, err)
 	creds := credentials.NewStore(app, key, ev)
+	vars := variables.NewStore(app)
 
 	sender := &fakeSender{online: map[string]bool{}}
 	sets := configsets.NewService(app, b, ev)
 	revs := revisions.NewService(app, b, ev)
 	provs := providers.NewStore(app, ev)
 	syncSvc := configsync.NewService(configsync.Deps{
-		App: app, Blobs: b, Sets: sets, Revs: revs, Creds: creds,
+		App: app, Blobs: b, Sets: sets, Revs: revs, Creds: creds, Vars: vars,
 		Providers: provs, Events: ev, Sender: sender,
 	})
 

@@ -18,6 +18,7 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/hub/internal/revisions"
 	"github.com/FlintyLemming/orciny/hub/internal/secretbox"
+	"github.com/FlintyLemming/orciny/hub/internal/variables"
 	"github.com/FlintyLemming/orciny/protocol"
 )
 
@@ -58,6 +59,7 @@ type rig struct {
 	sets   *configsets.Service
 	revs   *revisions.Service
 	creds  *credentials.Store
+	vars   *variables.Store
 	provs  *providers.Store
 	sender *fakeSender
 	svc    *configsync.Service
@@ -79,11 +81,12 @@ func newRig(t *testing.T) *rig {
 		sets:   configsets.NewService(app, b, ev),
 		revs:   revisions.NewService(app, b, ev),
 		creds:  credentials.NewStore(app, key, ev),
+		vars:   variables.NewStore(app),
 		provs:  providers.NewStore(app, ev),
 		sender: &fakeSender{online: map[string]bool{}},
 	}
 	r.svc = configsync.NewService(configsync.Deps{
-		App: app, Blobs: b, Sets: r.sets, Revs: r.revs, Creds: r.creds,
+		App: app, Blobs: b, Sets: r.sets, Revs: r.revs, Creds: r.creds, Vars: r.vars,
 		Providers: r.provs, Events: ev, Sender: r.sender,
 	})
 	return r
@@ -122,7 +125,7 @@ func TestSnapshotCarriesOnlyReferencedCredentials(t *testing.T) {
 	_, err = r.revs.Publish(set.Id, "", "publish")
 	require.NoError(t, err)
 
-	require.NoError(t, r.creds.SetVariable(m, "ws", "main"))
+	require.NoError(t, r.vars.SetVariable(m, "ws", "main"))
 	_, err = r.sets.Assign(m, set.Id, "apply")
 	require.NoError(t, err)
 

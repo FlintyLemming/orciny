@@ -16,6 +16,7 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/machines"
 	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/hub/internal/revisions"
+	"github.com/FlintyLemming/orciny/hub/internal/variables"
 	"github.com/FlintyLemming/orciny/internal/manifest"
 	"github.com/FlintyLemming/orciny/protocol"
 )
@@ -356,8 +357,8 @@ func (d Deps) credName(e *core.RequestEvent, idOrName string) (string, error) {
 // ---------- variables ----------
 
 func (d Deps) setVariables(e *core.RequestEvent) error {
-	if d.Creds == nil {
-		return e.InternalServerError("凭据服务未就绪", nil)
+	if d.Vars == nil {
+		return e.InternalServerError("变量服务未就绪", nil)
 	}
 	machineID := e.Request.PathValue("id")
 	var req map[string]string
@@ -365,7 +366,7 @@ func (d Deps) setVariables(e *core.RequestEvent) error {
 		return e.BadRequestError("请求体格式错误", nil)
 	}
 	for k, v := range req {
-		if err := d.Creds.SetVariable(machineID, k, v); err != nil {
+		if err := d.Vars.SetVariable(machineID, k, v); err != nil {
 			return mapErr(e, err)
 		}
 	}
@@ -569,7 +570,8 @@ func mapErr(e *core.RequestEvent, err error) error {
 	case errors.Is(err, drift.ErrMixedConfigSets):
 		return e.BadRequestError(err.Error(), nil)
 	case errors.Is(err, credentials.ErrShortValue),
-		errors.Is(err, credentials.ErrBadName):
+		errors.Is(err, credentials.ErrBadName),
+		errors.Is(err, variables.ErrBadName):
 		return e.BadRequestError(err.Error(), nil)
 	case errors.Is(err, credentials.ErrNotFound),
 		errors.Is(err, providers.ErrNotFound),

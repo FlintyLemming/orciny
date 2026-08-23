@@ -18,6 +18,7 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/events"
 	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/hub/internal/revisions"
+	"github.com/FlintyLemming/orciny/hub/internal/variables"
 	"github.com/FlintyLemming/orciny/protocol"
 )
 
@@ -42,6 +43,7 @@ type Deps struct {
 	Sets  *configsets.Service
 	Revs  *revisions.Service
 	Creds *credentials.Store
+	Vars  *variables.Store
 	// Providers 供组装快照时查绑定指向的服务配置。
 	Providers *providers.Store
 	Events    *events.Writer
@@ -116,7 +118,7 @@ func (s *Service) Snapshot(machineID string) (protocol.ConfigSnapshot, error) {
 	if err != nil {
 		return snap, err
 	}
-	allVars, err := s.d.Creds.MachineVariables(machineID)
+	allVars, err := s.d.Vars.MachineVariables(machineID)
 	if err != nil {
 		return snap, err
 	}

@@ -16,6 +16,7 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/enroll"
 	"github.com/FlintyLemming/orciny/hub/internal/identity"
 	"github.com/FlintyLemming/orciny/hub/internal/revisions"
+	"github.com/FlintyLemming/orciny/hub/internal/variables"
 	"github.com/FlintyLemming/orciny/hub/internal/ws"
 )
 
@@ -39,6 +40,7 @@ type Deps struct {
 	Revs  *revisions.Service
 	Blobs *blobs.Store
 	Creds *credentials.Store
+	Vars  *variables.Store
 }
 
 // Register 在 OnServe 阶段注册全部自定义路由。
