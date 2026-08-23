@@ -320,6 +320,12 @@ func TestProviderEndpointFieldsExist(t *testing.T) {
 	rel, ok := c.Fields.GetByName("credential").(*core.RelationField)
 	require.True(t, ok)
 	require.False(t, rel.Required, "004 之后 credential 不再必填")
+
+	// base_url 同理：它搬进 claude 子结构之后没有写入方了，
+	// 留着必填会让 004 与 005 之间新建的 provider 存不进去。
+	bu, ok := c.Fields.GetByName("base_url").(*core.TextField)
+	require.True(t, ok)
+	require.False(t, bu.Required, "004 之后顶层 base_url 不再必填")
 }
 
 // 密文**直接搬、不解密**：同一把主密钥、同一套 AES-GCM，secretbox 只是换了

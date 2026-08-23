@@ -39,10 +39,14 @@ func up004(app core.App) error {
 		&core.JSONField{Name: "openai", MaxSize: 16384},
 	)
 
-	// credential 转非必填：004 之后新建的 provider 不再有凭据可指。
-	// 字段本身留到 005 才删。
+	// credential 与 base_url 转非必填：004 之后新建的 provider 既没有凭据可指，
+	// 也不再写顶层 base_url（它搬进 claude 子结构了）。两个字段本身留到 005 才删，
+	// 但「必填」这条约束必须现在就撤——否则 004 与 005 之间新建 provider 会被挡住。
 	if rel, ok := provs.Fields.GetByName("credential").(*core.RelationField); ok {
 		rel.Required = false
+	}
+	if tf, ok := provs.Fields.GetByName("base_url").(*core.TextField); ok {
+		tf.Required = false
 	}
 
 	if err := app.Save(provs); err != nil {
@@ -135,6 +139,9 @@ func down004(app core.App) error {
 	}
 	if rel, ok := provs.Fields.GetByName("credential").(*core.RelationField); ok {
 		rel.Required = true
+	}
+	if tf, ok := provs.Fields.GetByName("base_url").(*core.TextField); ok {
+		tf.Required = true
 	}
 	return app.Save(provs)
 }

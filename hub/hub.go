@@ -108,11 +108,11 @@ func Attach(app core.App, cfg Config) (*Hub, error) {
 		}
 		e.App.Logger().Info("hub 身份就绪", "fingerprint", h.identity.Fingerprint())
 
-		// 凭据主密钥。必须排在 ws 之前：一台解不开凭据的 hub 不该接客
-		// ——它会把空值下发到全机队（spec §6.6）。
+		// 主密钥。必须排在 ws 之前：一台解不开自己 key 的 hub 不该接客
+		// ——它会把空值下发到全机队（M1.6 spec §2.6）。
 		key, err := secretbox.LoadMasterKey(e.App.DataDir())
 		if err != nil {
-			return fmt.Errorf("加载凭据主密钥: %w", err)
+			return fmt.Errorf("加载主密钥: %w", err)
 		}
 		h.creds = credentials.NewStore(e.App, key, h.events)
 		h.vars = variables.NewStore(e.App)
@@ -121,7 +121,10 @@ func Attach(app core.App, cfg Config) (*Hub, error) {
 		}
 
 		h.blobs = blobs.New(e.App)
-		h.provs = providers.NewStore(e.App, h.events)
+		h.provs = providers.NewStore(e.App, key, h.events)
+		if err := h.provs.VerifyAll(); err != nil {
+			return err
+		}
 		h.sets = configsets.NewService(e.App, h.blobs, h.events)
 		h.revs = revisions.NewService(e.App, h.blobs, h.events)
 		// 先建 importer（它要 Sender = h.machines），再建 configsync（它要 Importer）。

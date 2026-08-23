@@ -1,8 +1,12 @@
-// Package providers 管 AI 服务配置（M1.5 spec §2）。
+// Package providers 管 AI 服务配置（M1.6 spec §2）。
 //
-// 它与 credentials 是同一类东西——被配置集引用的资源，不是配置本身。
-// key 不另存：服务配置里的 API key 就是一条 credential。
+// 一条记录 = **一家平台**，内含 claude 与 openai 两个协议端点。
+// API key 直接落在这条记录上（平台级一把，端点可单独覆盖）：
+// 加密落库、末四位回显、启动自检这套复用降在代码层（secretbox 包），
+// 不再做成用户可见的 credentials 实体（spec §1.1 第二条）。
 package providers
+
+import "github.com/pocketbase/pocketbase/core"
 
 // 鉴权字段名。auth_field 决定的是 env 的**键名**，占位符替的是**值**，
 // 替不了键名——所以换绑到 auth_field 不同的 Provider 时，settings.json 里
@@ -34,6 +38,71 @@ func (m ModelSlots) Full() bool {
 	return m.Main != "" && m.Opus != "" && m.Sonnet != "" && m.Haiku != ""
 }
 
+// 端点名。与占位符的端点段（protocol.ProviderKeys）逐字符一致。
+const (
+	EndpointClaude = "claude"
+	EndpointOpenAI = "openai"
+)
+
+// DefaultOpenAIAuthField 是 openai 端点的默认鉴权字段名。
+//
+// 它是**自由文本，不是枚举**（spec §2.4）：auth_field 的二选一枚举是
+// Claude Code 的 settings.json env 键名问题；openai 侧本期没有消费者，
+// 也就没有依据去定枚举。一个默认 OPENAI_API_KEY 的文本字段既够用，
+// 又不会在接 Codex 时挡路。
+const DefaultOpenAIAuthField = "OPENAI_API_KEY"
+
+// Endpoint 是两个协议端点的公共部分。
+//
+// **密文不在这里**：三处密文放在记录的顶层 Hidden 字段
+// （key_cipher / claude_key_cipher / openai_key_cipher），
+// 因为 PocketBase 没法只隐藏 JSON 字段里的一个子键，而 spec §5.2 要求
+// 密文永不回传前端。末四位留在这里——它正是要回传给 UI 回显的东西。
+type Endpoint struct {
+	BaseURL   string   `json:"base_url"`
+	AuthField string   `json:"auth_field"`
+	KeyLast4  string   `json:"key_last4,omitempty"`
+	Models    []string `json:"models"`
+}
+
+// Configured 是「这个端点配没配」的唯一判定（spec §2.2）。
+//
+// 一个没有 base_url 的端点本来就无从使用，因此不另加 enabled 布尔——
+// 两个字段表达同一件事只会产生「enabled=true 但 base_url 为空」这种
+// 需要额外校验、且没有正确处理方式的中间态。
+// 发布校验、UI 置灰、快照组装三处共用这一个判断。
+func (e Endpoint) Configured() bool { return e.BaseURL != "" }
+
+// ClaudeEndpoint 比 openai 侧多四个模型槽。
+//
+// 两个端点的字段刻意不对称（spec §2.4）：四模型槽是 Claude Code 特有的
+// 概念——它会自己去要 haiku 做标题生成一类的轻量活。Codex 没有这个机制，
+// 强行统一等于给它编造出不存在的 opus/haiku 概念。
+type ClaudeEndpoint struct {
+	Endpoint
+	Defaults ModelSlots `json:"defaults"`
+}
+
+// OpenAIEndpoint 只有一个默认模型。
+type OpenAIEndpoint struct {
+	Endpoint
+	DefaultModel string `json:"default_model"`
+}
+
+// ClaudeOf / OpenAIOf 从记录解出端点。
+// 空 JSON 字段返回零值——刚建的记录与 004 之前的老记录都是这样，不是错误。
+func ClaudeOf(r *core.Record) ClaudeEndpoint {
+	var e ClaudeEndpoint
+	_ = r.UnmarshalJSONField(EndpointClaude, &e)
+	return e
+}
+
+func OpenAIOf(r *core.Record) OpenAIEndpoint {
+	var e OpenAIEndpoint
+	_ = r.UnmarshalJSONField(EndpointOpenAI, &e)
+	return e
+}
+
 // Binding 是配置集的服务绑定：{provider, models{main,opus,sonnet,haiku}}。
 //
 // **单数，不是数组**（spec §1.3）。多绑定的位置留给以后的迁移，现在不预留
@@ -43,18 +112,29 @@ type Binding struct {
 	Models   ModelSlots `json:"models"`
 }
 
-// Preset 是内置平台条目。编译进二进制、只读（spec §2.3）。
+// PresetEndpoint 是预设表里的一个协议端点。BaseURL 为空 = 该平台没有这个口。
+type PresetEndpoint struct {
+	BaseURL      string     `json:"base_url"`
+	AuthField    string     `json:"auth_field"`
+	Models       []string   `json:"models"`
+	Defaults     ModelSlots `json:"defaults"`      // 仅 claude 侧填
+	DefaultModel string     `json:"default_model"` // 仅 openai 侧填
+}
+
+// Preset 是内置平台条目。编译进二进制、只读（M1.5 spec §2.3）。
+//
+// 一条 = 一家平台，两组端点一起带出（spec §5.6）：选预设时对话框把两个
+// 端点分区都填好，用户只需要粘一次 key。
 type Preset struct {
-	ID         string     `json:"id"`
-	Name       string     `json:"name"`
-	BaseURL    string     `json:"base_url"`
-	AuthField  string     `json:"auth_field"`
-	Models     []string   `json:"models"`
-	Defaults   ModelSlots `json:"defaults"`
-	WebsiteURL string     `json:"website_url,omitempty"`
-	APIKeyURL  string     `json:"api_key_url,omitempty"`
-	Icon       string     `json:"icon,omitempty"`
-	IconColor  string     `json:"icon_color,omitempty"`
+	ID     string         `json:"id"`
+	Name   string         `json:"name"`
+	Claude PresetEndpoint `json:"claude"`
+	OpenAI PresetEndpoint `json:"openai"`
+
+	WebsiteURL string `json:"website_url,omitempty"`
+	APIKeyURL  string `json:"api_key_url,omitempty"`
+	Icon       string `json:"icon,omitempty"`
+	IconColor  string `json:"icon_color,omitempty"`
 
 	// —— 订阅域预留（spec §9），本期只填数据不消费 ——
 	// 预设表是服务配置与订阅采集器的公共接缝：一个平台条目同时携带
@@ -71,16 +151,25 @@ type Preset struct {
 // preset 为空的自定义 Provider 随时绕过（spec §13），因此不做在线更新。
 var presets = []Preset{
 	{
-		ID:        "zhipu",
-		Name:      "智谱 GLM",
-		BaseURL:   "https://open.bigmodel.cn/api/anthropic",
-		AuthField: AuthToken,
-		// [1m] 后缀开 100 万上下文窗口，官方文档同时要求把
-		// CLAUDE_CODE_AUTO_COMPACT_WINDOW 调到 1000000。
-		Models: []string{"glm-5.2[1m]", "glm-5.2", "glm-5-turbo", "glm-4.7"},
-		Defaults: ModelSlots{
-			Main: "glm-5.2[1m]", Opus: "glm-5.2[1m]",
-			Sonnet: "glm-5.2[1m]", Haiku: "glm-4.7",
+		ID:   "zhipu",
+		Name: "智谱 GLM",
+		Claude: PresetEndpoint{
+			BaseURL:   "https://open.bigmodel.cn/api/anthropic",
+			AuthField: AuthToken,
+			// [1m] 后缀开 100 万上下文窗口，官方文档同时要求把
+			// CLAUDE_CODE_AUTO_COMPACT_WINDOW 调到 1000000。
+			Models: []string{"glm-5.2[1m]", "glm-5.2", "glm-5-turbo", "glm-4.7"},
+			Defaults: ModelSlots{
+				Main: "glm-5.2[1m]", Opus: "glm-5.2[1m]",
+				Sonnet: "glm-5.2[1m]", Haiku: "glm-4.7",
+			},
+		},
+		OpenAI: PresetEndpoint{
+			// OpenAI 协议口是 /api/paas/v4，不认 [1m] 那类 Claude Code 侧的后缀。
+			BaseURL:      "https://open.bigmodel.cn/api/paas/v4",
+			AuthField:    DefaultOpenAIAuthField,
+			Models:       []string{"glm-5.2", "glm-5-turbo", "glm-4.7"},
+			DefaultModel: "glm-5.2",
 		},
 		WebsiteURL:    "https://open.bigmodel.cn",
 		APIKeyURL:     "https://open.bigmodel.cn/usercenter/apikeys",
@@ -90,13 +179,21 @@ var presets = []Preset{
 		CollectorMode: "fetch",
 	},
 	{
-		ID:        "zhipu_intl",
-		Name:      "Z.ai (GLM International)",
-		BaseURL:   "https://api.z.ai/api/anthropic",
-		AuthField: AuthToken,
-		Models:    []string{"glm-5.2", "glm-5-turbo", "glm-4.7"},
-		Defaults: ModelSlots{
-			Main: "glm-5.2", Opus: "glm-5.2", Sonnet: "glm-5.2", Haiku: "glm-4.7",
+		ID:   "zhipu_intl",
+		Name: "Z.ai (GLM International)",
+		Claude: PresetEndpoint{
+			BaseURL:   "https://api.z.ai/api/anthropic",
+			AuthField: AuthToken,
+			Models:    []string{"glm-5.2", "glm-5-turbo", "glm-4.7"},
+			Defaults: ModelSlots{
+				Main: "glm-5.2", Opus: "glm-5.2", Sonnet: "glm-5.2", Haiku: "glm-4.7",
+			},
+		},
+		OpenAI: PresetEndpoint{
+			BaseURL:      "https://api.z.ai/api/paas/v4",
+			AuthField:    DefaultOpenAIAuthField,
+			Models:       []string{"glm-5.2", "glm-5-turbo", "glm-4.7"},
+			DefaultModel: "glm-5.2",
 		},
 		WebsiteURL:    "https://z.ai",
 		APIKeyURL:     "https://z.ai/manage-apikey/apikey-list",
@@ -106,16 +203,26 @@ var presets = []Preset{
 		CollectorMode: "fetch",
 	},
 	{
-		ID:        "kimi",
-		Name:      "Kimi (Moonshot)",
-		BaseURL:   "https://api.moonshot.cn/anthropic",
-		AuthField: AuthToken,
-		Models: []string{
-			"kimi-k3[1m]", "kimi-k2.7-code", "kimi-k2.7-code-highspeed", "kimi-k2.6",
+		ID:   "kimi",
+		Name: "Kimi (Moonshot)",
+		Claude: PresetEndpoint{
+			BaseURL:   "https://api.moonshot.cn/anthropic",
+			AuthField: AuthToken,
+			Models: []string{
+				"kimi-k3[1m]", "kimi-k2.7-code", "kimi-k2.7-code-highspeed", "kimi-k2.6",
+			},
+			Defaults: ModelSlots{
+				Main: "kimi-k3[1m]", Opus: "kimi-k3[1m]",
+				Sonnet: "kimi-k3[1m]", Haiku: "kimi-k3[1m]",
+			},
 		},
-		Defaults: ModelSlots{
-			Main: "kimi-k3[1m]", Opus: "kimi-k3[1m]",
-			Sonnet: "kimi-k3[1m]", Haiku: "kimi-k3[1m]",
+		OpenAI: PresetEndpoint{
+			BaseURL:   "https://api.moonshot.cn/v1",
+			AuthField: DefaultOpenAIAuthField,
+			Models: []string{
+				"kimi-k3", "kimi-k2.7-code", "kimi-k2.7-code-highspeed", "kimi-k2.6",
+			},
+			DefaultModel: "kimi-k3",
 		},
 		WebsiteURL:    "https://platform.moonshot.cn",
 		APIKeyURL:     "https://platform.moonshot.cn/console/api-keys",
@@ -125,19 +232,31 @@ var presets = []Preset{
 		CollectorMode: "fetch",
 	},
 	{
-		ID:      "volcengine",
-		Name:    "火山方舟 Coding Plan",
-		BaseURL: "https://ark.cn-beijing.volces.com/api/coding",
-		// 注意：/api/v3 是 OpenAI 协议口，/api/coding 才是 Anthropic 协议口。
-		// 用错会走计费不同的通道。
-		AuthField: AuthToken,
-		Models: []string{
-			"doubao-seed-code-preview-latest", "doubao-seed-2.0-code",
-			"deepseek-v3.2", "glm-4.7", "kimi-k2.5",
+		ID:   "volcengine",
+		Name: "火山方舟 Coding Plan",
+		// 同一个域名下两个协议口，用错会走计费不同的通道：
+		//   /api/coding 是 Anthropic 协议口
+		//   /api/v3     是 OpenAI 协议口
+		Claude: PresetEndpoint{
+			BaseURL:   "https://ark.cn-beijing.volces.com/api/coding",
+			AuthField: AuthToken,
+			Models: []string{
+				"doubao-seed-code-preview-latest", "doubao-seed-2.0-code",
+				"deepseek-v3.2", "glm-4.7", "kimi-k2.5",
+			},
+			Defaults: ModelSlots{
+				Main: "doubao-seed-code-preview-latest", Opus: "doubao-seed-code-preview-latest",
+				Sonnet: "doubao-seed-code-preview-latest", Haiku: "doubao-seed-code-preview-latest",
+			},
 		},
-		Defaults: ModelSlots{
-			Main: "doubao-seed-code-preview-latest", Opus: "doubao-seed-code-preview-latest",
-			Sonnet: "doubao-seed-code-preview-latest", Haiku: "doubao-seed-code-preview-latest",
+		OpenAI: PresetEndpoint{
+			BaseURL:   "https://ark.cn-beijing.volces.com/api/v3",
+			AuthField: DefaultOpenAIAuthField,
+			Models: []string{
+				"doubao-seed-code-preview-latest", "doubao-seed-2.0-code",
+				"deepseek-v3.2", "glm-4.7", "kimi-k2.5",
+			},
+			DefaultModel: "doubao-seed-code-preview-latest",
 		},
 		WebsiteURL:    "https://www.volcengine.com/product/ark",
 		APIKeyURL:     "https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey",
@@ -147,19 +266,31 @@ var presets = []Preset{
 		CollectorMode: "fetch",
 	},
 	{
-		ID:        "zenmux",
-		Name:      "ZenMux",
-		BaseURL:   "https://zenmux.ai/api/anthropic",
-		AuthField: AuthToken,
-		// Claude 系用别名（能开 1M 上下文与 effort 控制），
-		// 其余厂商用 `厂商/模型` 全 id。
-		Models: []string{
-			"claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5",
-			"openai/gpt-5.2", "google/gemini-3-pro-preview", "volcengine/doubao-seed-code",
+		ID:   "zenmux",
+		Name: "ZenMux",
+		Claude: PresetEndpoint{
+			BaseURL:   "https://zenmux.ai/api/anthropic",
+			AuthField: AuthToken,
+			// Claude 系用别名（能开 1M 上下文与 effort 控制），
+			// 其余厂商用 `厂商/模型` 全 id。
+			Models: []string{
+				"claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5",
+				"openai/gpt-5.2", "google/gemini-3-pro-preview", "volcengine/doubao-seed-code",
+			},
+			Defaults: ModelSlots{
+				Main: "claude-sonnet-4-6", Opus: "claude-opus-4-7",
+				Sonnet: "claude-sonnet-4-6", Haiku: "claude-haiku-4-5",
+			},
 		},
-		Defaults: ModelSlots{
-			Main: "claude-sonnet-4-6", Opus: "claude-opus-4-7",
-			Sonnet: "claude-sonnet-4-6", Haiku: "claude-haiku-4-5",
+		OpenAI: PresetEndpoint{
+			// OpenAI 协议口不认 Claude 系的别名，一律 `厂商/模型` 全 id。
+			BaseURL:   "https://zenmux.ai/api/v1",
+			AuthField: DefaultOpenAIAuthField,
+			Models: []string{
+				"openai/gpt-5.2", "anthropic/claude-opus-4-7", "anthropic/claude-sonnet-4-6",
+				"google/gemini-3-pro-preview", "volcengine/doubao-seed-code",
+			},
+			DefaultModel: "openai/gpt-5.2",
 		},
 		WebsiteURL: "https://zenmux.ai",
 		APIKeyURL:  "https://zenmux.ai/settings/keys",
@@ -167,15 +298,24 @@ var presets = []Preset{
 		IconColor:  "#6D28D9",
 	},
 	{
-		ID:      "minimax",
-		Name:    "MiniMax",
-		BaseURL: "https://api.minimax.io/anthropic",
-		// 国内站是 https://api.minimaxi.com/anthropic，建自定义 Provider 即可。
-		AuthField: AuthToken,
-		Models:    []string{"MiniMax-M2"},
-		Defaults: ModelSlots{
-			Main: "MiniMax-M2", Opus: "MiniMax-M2",
-			Sonnet: "MiniMax-M2", Haiku: "MiniMax-M2",
+		ID:   "minimax",
+		Name: "MiniMax",
+		// 国内站两个口都换域名：Anthropic 口是 https://api.minimaxi.com/anthropic，
+		// OpenAI 口是 https://api.minimaxi.com/v1，建自定义 Provider 即可。
+		Claude: PresetEndpoint{
+			BaseURL:   "https://api.minimax.io/anthropic",
+			AuthField: AuthToken,
+			Models:    []string{"MiniMax-M2"},
+			Defaults: ModelSlots{
+				Main: "MiniMax-M2", Opus: "MiniMax-M2",
+				Sonnet: "MiniMax-M2", Haiku: "MiniMax-M2",
+			},
+		},
+		OpenAI: PresetEndpoint{
+			BaseURL:      "https://api.minimax.io/v1",
+			AuthField:    DefaultOpenAIAuthField,
+			Models:       []string{"MiniMax-M2"},
+			DefaultModel: "MiniMax-M2",
 		},
 		WebsiteURL: "https://platform.minimax.io",
 		APIKeyURL:  "https://platform.minimax.io/user-center/basic-information/interface-key",
@@ -183,16 +323,21 @@ var presets = []Preset{
 		IconColor:  "#F23F5D",
 	},
 	{
-		ID:        "anthropic",
-		Name:      "Anthropic 官方",
-		BaseURL:   "https://api.anthropic.com",
-		AuthField: AuthAPIKey,
-		Models: []string{
-			"claude-opus-5", "claude-sonnet-5", "claude-fable-5", "claude-haiku-4-5-20251001",
+		ID:   "anthropic",
+		Name: "Anthropic 官方",
+		Claude: PresetEndpoint{
+			BaseURL:   "https://api.anthropic.com",
+			AuthField: AuthAPIKey,
+			Models: []string{
+				"claude-opus-5", "claude-sonnet-5", "claude-fable-5", "claude-haiku-4-5-20251001",
+			},
+			// 透传：四槽留空，让 Claude Code 用它自己的默认模型。
+			// 那 35 个中转预设就是这么干的（M1.5 spec §2.3）。
+			Defaults: ModelSlots{},
 		},
-		// 透传：四槽留空，让 Claude Code 用它自己的默认模型。
-		// 那 35 个中转预设就是这么干的（spec §2.3）。
-		Defaults:   ModelSlots{},
+		// Anthropic 官方没有 OpenAI 协议口。UI 显示「该平台未提供 OpenAI 端点」，
+		// 用户仍可手填（比如挂在自己的兼容层后面）。
+		OpenAI:     PresetEndpoint{},
 		WebsiteURL: "https://www.anthropic.com",
 		APIKeyURL:  "https://console.anthropic.com/settings/keys",
 		Icon:       "anthropic",

@@ -3,7 +3,6 @@
 package hub
 
 import (
-	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -42,23 +41,18 @@ func (h *Hub) SeedConfigSet(t *testing.T, name string, files map[string]string) 
 	return set.Id, rev.Id
 }
 
-// SeedProvider 建一条凭据 + 一条 AI 服务配置，返回 provider id。
-// 凭据名由 name 派生，测试里不需要关心。
+// SeedProvider 建一条 AI 服务配置（只配 claude 端点，key 内联在平台级），
+// 返回 provider id。
 func (h *Hub) SeedProvider(t *testing.T, name, baseURL, key string) string {
 	t.Helper()
-
-	credName := "seed_" + strconv.Itoa(len(name)) + "_key"
-	_, err := h.creds.Create(credName, key, "由 testsupport 生成")
-	require.NoError(t, err, "建凭据")
-	cred, err := h.App.FindFirstRecordByData("credentials", "name", credName)
-	require.NoError(t, err)
-
 	id, err := h.CreateProvider(providers.Input{
-		Name:       name,
-		BaseURL:    baseURL,
-		AuthField:  providers.AuthToken,
-		Credential: cred.Id,
-		Models:     []string{"glm-5.1", "glm-4.7"},
+		Name: name,
+		Key:  &key,
+		Claude: providers.EndpointInput{
+			BaseURL:   baseURL,
+			AuthField: providers.AuthToken,
+			Models:    []string{"glm-5.1", "glm-4.7"},
+		},
 	})
 	require.NoError(t, err, "建服务配置")
 	return id
@@ -79,21 +73,26 @@ func (h *Hub) BindConfigSet(t *testing.T, setID, providerID, model string) strin
 	return revID
 }
 
-// ProviderInputOf 读回一条 Provider 的当前值，只把 base_url 换成新的。
-// 测试里改 base_url 用它，免得每次手工拼一整个 Input。
+// ProviderInputOf 读回一条 Provider 的当前值，只把 claude 端点的 base_url
+// 换成新的。三处 Key 都留 nil = 不修改，免得测试无意间把 key 冲掉。
 func (h *Hub) ProviderInputOf(t *testing.T, providerID, baseURL string) providers.Input {
 	t.Helper()
 	r, err := h.provs.Get(providerID)
 	require.NoError(t, err)
-	var models []string
-	_ = r.UnmarshalJSONField("models", &models)
-	var defaults providers.ModelSlots
-	_ = r.UnmarshalJSONField("defaults", &defaults)
+	cl := providers.ClaudeOf(r)
+	oa := providers.OpenAIOf(r)
 	return providers.Input{
-		Name: r.GetString("name"), Preset: r.GetString("preset"),
-		BaseURL: baseURL, AuthField: r.GetString("auth_field"),
-		Credential: r.GetString("credential"), Models: models,
-		Defaults: defaults, Note: r.GetString("note"),
+		Name:   r.GetString("name"),
+		Preset: r.GetString("preset"),
+		Note:   r.GetString("note"),
+		Claude: providers.EndpointInput{
+			BaseURL: baseURL, AuthField: cl.AuthField,
+			Models: cl.Models, Defaults: cl.Defaults,
+		},
+		OpenAI: providers.EndpointInput{
+			BaseURL: oa.BaseURL, AuthField: oa.AuthField,
+			Models: oa.Models, DefaultModel: oa.DefaultModel,
+		},
 	}
 }
 
