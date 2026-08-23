@@ -86,7 +86,7 @@ Coding Agent 仍然在每台机器本地运行；Orciny 决定的是：每台机
 | 漂移 | Drift | 机器本地受管文件与已应用版本之间的差异 |
 | 收编 | Adopt | 把某台机器的漂移提升为配置集新版本的动作（个人版核心交互） |
 | 恢复 | Restore | 丢弃本地漂移、回到已发布基线的动作 |
-| 凭据 | Credential | API key / token 等秘密，独立于配置版本管理，下发时注入 |
+| AI 服务配置 | Provider | 一家平台，内含 Claude / OpenAI 两个协议端点；API key 直接填在它上面，下发时注入（M1.6） |
 | 机器变量 | Variable | 机器级键值对，配置文件中以占位符引用，落盘时替换 |
 | 用量点 | UsagePoint | 一条聚合后的 Token 用量记录（日期 × 机器 × 工具 × 模型） |
 | 采集器 | Collector | 订阅余额的抓取单元，分 fetch（hub 拉）/ local（agent 抓）/ push（外部推）三型 |
@@ -101,7 +101,7 @@ Coding Agent 仍然在每台机器本地运行；Orciny 决定的是：每台机
 
 **Hub（`orciny`）**
 - Go 单二进制，PocketBase 内核（内嵌 SQLite、认证、realtime、admin、备份），Web UI（React）编译内嵌。
-- 职责：配置集存储与版本管理、下发调度、漂移收件箱、凭据库、用量与订阅数据聚合、fetch 型采集器、Web UI、（v1）告警。
+- 职责：配置集存储与版本管理、下发调度、漂移收件箱、AI 服务配置与 key 保管、用量与订阅数据聚合、fetch 型采集器、Web UI、（v1）告警。
 - 部署：`docker run` 一行，或单二进制直跑；数据 = 一个目录（SQLite + 上传文件）。
 
 **Agent（`orciny-agent`）**
@@ -119,7 +119,7 @@ Coding Agent 仍然在每台机器本地运行；Orciny 决定的是：每台机
 
 ### 3.3 数据流（四条）
 
-1. **配置下行**：Web 编辑 → 发布 Revision → hub 推送信号 → agent 拉取快照 → 落盘（凭据/变量注入）→ apply 回执上行。
+1. **配置下行**：Web 编辑 → 发布 Revision → hub 推送信号 → agent 拉取快照 → 落盘（key / 变量注入）→ apply 回执上行。
 2. **漂移上行**：agent 监视受管路径（fs 事件 + 定时哈希对账）→ 差异摘要上报 → hub 收件箱 → 用户「收编 / 恢复 / 忽略」→ 收编则物化为新 Revision 并向其余机器下发。
 3. **用量上行**：agent 增量解析本地会话 JSONL → 聚合为 UsagePoint 批量上报（含首次历史回灌）。
 4. **订阅采集**：fetch 型由 hub 定时拉取各家 API；local 型由 agent 在本机完成（本地凭据不出机器，只上报结果）；push 型由外部进程向 hub HTTP 端点推送。
@@ -156,8 +156,8 @@ Coding Agent 仍然在每台机器本地运行；Orciny 决定的是：每台机
 ### 4.2 配置集与版本
 
 **配置集（ConfigSet）**
-- 内容 = 受管清单（manifest）+ 文件树（受管文件的内容）+ 凭据/变量引用。
-- MVP 结构为**单层**（无继承/叠加）；多机差异通过「机器变量 + 凭据引用」表达；配置集可**克隆**。继承/叠加层留 v2。
+- 内容 = 受管清单（manifest）+ 文件树（受管文件的内容）+ 服务绑定与变量引用。
+- MVP 结构为**单层**（无继承/叠加）；多机差异通过「机器变量 + 服务绑定」表达；配置集可**克隆**。继承/叠加层留 v2。
 - 指派：一台机器同一时间指派**一个**配置集；一个配置集可指派给多台机器。
 - 下发开关：配置集级「暂停下发」（对齐 leycode `distribution_enabled` 语义）。
 
@@ -167,21 +167,23 @@ Coding Agent 仍然在每台机器本地运行；Orciny 决定的是：每台机
 
 **导入向导（个人版关键路径）**
 - 首台机器接入后引导：「把这台机器现有的 `~/.claude` 采集为初始配置集」。
-- 流程：agent 按默认 manifest 采集 → 上传 → Web 呈现文件清单让用户勾选纳管范围 → **敏感项检测**（识别 settings env 中的 API key 等，引导抽取为凭据占位符）→ 生成配置集 v1 并标记该机器已对齐。
+- 流程：agent 按默认 manifest 采集 → 上传 → Web 呈现文件清单让用户勾选纳管范围 → **敏感项检测**（识别 settings env 中的 API key 等，引导抽取成某条 AI 服务配置的端点 key，文件里换成占位符）→ 生成配置集 v1 并标记该机器已对齐。
 - 后续机器接入时：选择「应用现有配置集」或「保持本机现状（仅观测，不管配置）」——后者允许纯用量/订阅场景的机器接入。
 
 **服务绑定（M1.5）**
 - 「用哪家的哪个模型」是一等实体，不是配置文件里的一段文本。配置集绑定**一个** AI 服务配置（Provider）+ 四个模型槽（主/opus/sonnet/haiku）。
-- `settings.json` 里只落 `{{provider.*}}` 占位符（`base_url`、`auth_token` 与四个模型槽，共六个内置名），真实值在 agent 落盘时注入；blob 与 Revision 里永远只有占位符。
-- 核心不变量：**换绑定**（配置集从 A 切到 B、换模型）产生新 Revision；**改 Provider 内部**（base_url、追加模型、轮换 key）**不产生**新 Revision，走重注入通知，因此也不产生漂移。
+- `settings.json` 里只落 `{{provider.*}}` 占位符，真实值在 agent 落盘时注入；blob 与 Revision 里永远只有占位符。
+- 占位符是**端点限定**的（M1.6）：`{{provider.claude.base_url}}` / `{{provider.openai.api_key}}` 等九个内置名。端点段显式写在占位符里，而不是按文件路径推断——发布校验因此能说出「这个文件引用了 claude 端点」，agent 还原时也不必靠路径猜哪把 key。
+- 核心不变量：**换绑定**（配置集从 A 切到 B、换模型）产生新 Revision；**改 Provider 内部**（任一端点的 base_url、追加模型、轮换 API key）**不产生**新 Revision，走重注入通知，因此也不产生漂移。
 - 四槽而非单槽：Claude Code 会自己去要 haiku 做标题生成一类的轻量活，只钉主模型会让它拿 `claude-haiku-*` 去打人家的 endpoint。四槽全空 = 透传模式。
-- 内置平台预设编译进二进制、只读；自定义平台由「preset 留空的 Provider」完全覆盖。
+- 一条 Provider = **一家平台**（M1.6）：同一家平台的两个协议口（Anthropic 与 OpenAI）是它的两个面，不再拆成两条互不相干的记录。绑定本期恒指 claude 端点，openai 端点是「记下来的配置」，等 `~/.codex` 纳管落地后才产生注入。
+- 内置平台预设编译进二进制、只读，一条预设同时给出两个端点；自定义平台由「preset 留空的 Provider」完全覆盖。
 - 绑定漂移：机器上手改 `ANTHROPIC_BASE_URL` 会被识别出来，**禁用收编**（收编会把占位符拍平成硬编码字面值，绑定当场失效），并按 base_url 反查三档给出「改绑定」/「新建服务配置」/兜底说明。
 
 **编辑器（Web）**
 - 文件树 + 等宽文本编辑；JSON 文件做语法校验；`settings.json` 提供 permissions/hooks/env 的表单辅助（MVP 可先纯文本）。
-- 占位符提示：`{{cred.<name>}}`、`{{var.<name>}}`、`{{provider.<key>}}` 的自动补全与未定义引用告警。
-- 发布校验：JSON 合法性、凭据引用可解析、路径安全（禁 `..`/绝对路径/符号链接逃逸）；服务绑定三条校验（引用了但没绑 = 错误、绑了但没用 = 警告、`auth_field` 键名不符 = 错误 + 一键修复）。
+- 占位符提示：`{{var.<name>}}`、`{{machine.<key>}}`、`{{provider.<endpoint>.<key>}}` 的自动补全与未定义引用告警。
+- 发布校验：JSON 合法性、变量引用可解析、路径安全（禁 `..`/绝对路径/符号链接逃逸）；服务绑定四条校验（引用了但没绑 = 错误、绑了但没用 = 警告、`auth_field` 键名不符 = 错误 + 一键修复、引用了某端点但绑定的 Provider 没配它 = 错误）。
 
 ### 4.3 受管范围与 Manifest
 
@@ -189,7 +191,7 @@ Coding Agent 仍然在每台机器本地运行；Orciny 决定的是：每台机
 
 | 类别 | 路径 | 策略 |
 |---|---|---|
-| 纳管（默认） | `settings.json` | 整文件受管，env 中敏感值以凭据占位符表达 |
+| 纳管（默认） | `settings.json` | 整文件受管，env 中敏感值以 `{{provider.claude.*}}` 占位符表达 |
 | 纳管（默认） | `CLAUDE.md`、`agents/**`、`commands/**`、`skills/**`、`keybindings.json` | 整文件受管 |
 | 纳管（键级） | `~/.claude.json` 中的 `mcpServers` | **键级受管**：该文件混有运行时状态，agent 只重写受管键，其余键原样保留 |
 | 恒排除 | `projects/`（会话历史）、`todos/`、`shell-snapshots/`、`statsig/`、缓存目录 | 永不采集、永不下发、永不上传 |
@@ -215,14 +217,17 @@ Coding Agent 仍然在每台机器本地运行；Orciny 决定的是：每台机
 - 路径级规则：如 `skills/**` 设为「自动收编」——本机新写的 skill 直接成为新版本同步全机队；`settings.json` 设为「必须手动确认」。
 - 默认规则：全部手动，用户逐步放开。
 
-### 4.5 凭据与机器变量
+### 4.5 API key 与机器变量
 
-**凭据库（Credential Store）**
-- 用途：API key、订阅 token 等秘密，**永不进入配置版本**。
-- 引用：配置文件内写 `{{cred.<name>}}`；agent 落盘时向 hub 换取真实值并注入；落盘文件权限 0600。
-- 存储：hub 侧加密落库（AES-GCM，主密钥来自环境变量或密钥文件）；Web UI 只显示凭据名与末四位。
-- 轮换：更新凭据值**不产生**配置新版本；hub 通知受影响机器重注入。
-- 引用计数：凭据页显示被哪些配置集/机器引用，防误删。
+**API key（内联在 AI 服务配置上）**
+- 用途：各家平台的 API key，**永不进入配置版本**。
+- 存放：直接填在 AI 服务配置上——平台级一把，两个端点默认都用它；端点可单独覆盖（中转类平台两个口有时是两把 key）。
+  M1.6 之前它是一层独立的「凭据」实体，用户要先去凭据页建一条、起个名，再回来在下拉框里选它；
+  那一层提供的全部价值（加密落库、末四位回显、防误删）Provider 自己完全能承担，因此收掉了，**复用降回代码层**。
+- 引用：配置文件内写 `{{provider.claude.auth_token}}` / `{{provider.openai.api_key}}`；agent 落盘时注入真实值；落盘文件权限 0600。
+- 存储：hub 侧加密落库（AES-GCM，主密钥来自环境变量或密钥文件）；Web UI 只显示末四位。启动时逐条解密自检，解不开则拒绝启动。
+- 轮换：更新 key **不产生**配置新版本；hub 通知受影响机器重注入。
+- 删除保护：AI 服务配置被任何配置集的当前版本或草稿绑定时不许删——key 就在它上面，删它就是删 key。
 
 **机器变量（Variables）**
 - 机器级键值对（如 `workspace_root`、`preferred_model`），配置中以 `{{var.<name>}}` 引用；内置变量：`{{machine.name}}`、`{{machine.os}}`。
@@ -255,7 +260,7 @@ Coding Agent 仍然在每台机器本地运行；Orciny 决定的是：每台机
   - **local 型（agent 执行）**：Claude 订阅（读取本机 OAuth 凭据调用官方 usage 接口）、Cursor、Grok、MiMo、Antigravity（本地模式）。**本地凭据不上传**，agent 本机调用后仅上报结果数据。在哪台机器执行可指定或自动（有凭据者执行）。
   - **push 型（外部推送）**：保留 HTTP 上报端点，**wire 格式兼容 ai-plan-insight 现有 payload**——既是移植期的桥（现有 *-usage-agent 不改一行可继续推），也是长期生态接口（未装 agent 的来源、第三方自写脚本）。
 - 模型别名归并（`model_aliases`）与来源存活告警（24h 未上报）照搬原语义。
-- 与服务绑定共享凭据：采集实例与 AI 服务配置（4.2）引用的是同一份 `credentials`，且内置平台预设同时携带 `base_url`/模型（喂服务配置）与采集器类型/模式（喂采集器）。M2 做采集器时给采集实例加一个**可选**的 Provider 关联即可，不必回头返工服务配置。
+- 与服务绑定共享一份 key：采集实例与 AI 服务配置（4.2）指向同一条 `providers` 记录——key 就内联在它上面（4.5），不再有独立的凭据表。内置平台预设同时携带两个端点的 `base_url`/模型（喂服务配置）与采集器类型/模式（喂采集器）。M2 做采集器时给采集实例加一个**可选**的 Provider 关联即可，不必回头返工服务配置。
 
 **移植策略（E1 的风险控制）**
 - 按「你 config.json 里实际启用的实例」排序移植，先自用后长尾；每移植一家以 ai-plan-insight 现网数据对照验收。
@@ -275,7 +280,6 @@ Coding Agent 仍然在每台机器本地运行；Orciny 决定的是：每台机
 | 用量 Usage | 趋势/按机器/按模型/成本估算 | M2 |
 | 订阅 Subscriptions | 卡片墙、阈值、来源健康 | M2 |
 | AI 服务 Providers | 服务配置列表、新建/编辑（预设网格 + 自定义）、被引用计数 | M1.5 |
-| 凭据 Credentials | 凭据列表、引用计数（含被 AI 服务配置引用）、轮换 | M1 |
 | 设置 Settings | 站点、备份、agent 更新策略、定价表、（v1）通知渠道 | M0 起渐进 |
 
 UI 语言：中/英双语内置（面向国际 self-hosted 社区发布），其余语言社区众包。
@@ -326,8 +330,7 @@ UI 语言：中/英双语内置（面向国际 self-hosted 社区发布），其
 | revisions | config_set_id, seq, files[], checksum, binding, note, created_at | 不可变版本；binding 冻结绑定**引用**，值不进版本 |
 | assignments | machine_id, config_set_id, applied_revision, applied_at, state | 一机一配置集（MVP） |
 | drift_events | machine_id, path, kind, diff, state(open/adopted/restored/ignored), binding_drift, binding_url | 漂移收件箱；绑定漂移禁用收编 |
-| providers | name, preset, base_url, auth_field, credential, models[], defaults | AI 服务配置（M1.5）；key 不另存，引用 credentials |
-| credentials | name, cipher_value, last4, updated_at | 加密凭据；被 providers 引用时不可删除 |
+| providers | name, preset, note, key_cipher, key_last4, claude{...}, openai{...} | AI 服务配置（M1.5，M1.6 改为双端点）；一条 = 一家平台，key 内联，密文字段对 API 隐藏 |
 | variables | machine_id, key, value | 机器变量 |
 | usage_points | date, machine_id, tool, model, tokens{4类}, source | 用量聚合点 |
 | collector_instances | type, mode(fetch/local/push), label, config, machine_id? | 订阅采集实例 |
@@ -350,13 +353,13 @@ UI 语言：中/英双语内置（面向国际 self-hosted 社区发布），其
 
 | leycode | Orciny | 备注 |
 |---|---|---|
-| Profile（base/group 两层） | ConfigSet（单层） | Orciny 用变量+凭据表达差异，暂无层级 |
+| Profile（base/group 两层） | ConfigSet（单层） | Orciny 用变量+服务绑定表达差异，暂无层级 |
 | Revision + checksum + 发布物化 | Revision + checksum | 语义一致 |
 | agent_device_bindings（多绑定） | Assignment（一机一集） | Orciny 有意简化 |
 | distribution_enabled 下发开关 | ConfigSet「暂停下发」 | 语义一致 |
 | 注册码 + 设备指纹 | 一次性 token + 密钥指纹 | 语义一致 |
 | apply 回执 / 审计留痕 | apply 回执 / events 事件流 | Orciny 弱化为事件流 |
-| 凭据下发注入（newapiToken） | `{{cred.*}}` 注入 | Orciny 泛化为通用占位符 |
+| 凭据下发注入（newapiToken） | `{{provider.<endpoint>.*}}` 注入 | Orciny 泛化为通用占位符 |
 | AgentAdapter（Claude/OpenCode） | Tool adapter（MVP 仅 Claude） | 接口形状对齐，v2 引入多工具 |
 | 会话日志（块八） | v2 会话检索（可选上传） | 上传协议届时对齐块八 append/replace 语义 |
 | 漂移告警（纠正视角） | 漂移收件箱 + 收编（创作视角） | **有意不同**：个人版新增「收编」动作 |
@@ -367,7 +370,7 @@ UI 语言：中/英双语内置（面向国际 self-hosted 社区发布），其
 |---|---|---|
 | agent → hub | hello / heartbeat | 上线、心跳与基本信息 |
 | hub → agent | config.notify | 有新版本（推送信号） |
-| agent → hub | config.pull | 拉取指派快照（含凭据换取） |
+| agent → hub | config.pull | 拉取指派快照（含 key 与变量的注入值） |
 | agent → hub | apply.ack | 应用结果（成功/失败/部分，幂等可重放） |
 | agent → hub | drift.report | 漂移摘要（批量） |
 | hub → agent | drift.restore | 指令恢复基线 |
@@ -386,10 +389,10 @@ UI 语言：中/英双语内置（面向国际 self-hosted 社区发布），其
 |---|---|
 | 注册 token 泄露 | 一次性 + 15 分钟 TTL + 使用即焚；Web 可撤销未用 token |
 | agent 身份冒充 | 密钥对指纹绑定；吊销即断 |
-| hub 数据库泄露 | 凭据 AES-GCM 加密，主密钥不在库中；会话历史等敏感内容根本不采集（MVP） |
+| hub 数据库泄露 | API key AES-GCM 加密，主密钥不在库中；会话历史等敏感内容根本不采集（MVP） |
 | 传输窃听 | 反向代理 TLS；文档默认给出 HTTPS 配置，HTTP 仅限内网明示 |
 | agent 写坏本机配置 | manifest 白名单 + 路径安全校验 + apply 前快照 + 失败回滚 |
-| 凭据在下游泄露 | 落盘 0600；日志全链路脱敏；Web 只显末四位 |
+| API key 在下游泄露 | 落盘 0600；日志全链路脱敏；Web 只显末四位；快照按引用集合裁剪，没被引用的键一个都不下发 |
 
 ### 8.2 隐私立场（写进 README 的承诺）
 
@@ -423,7 +426,7 @@ MVP = 四件事：**机器清单与在线状态 · 配置闭环（导入/下发/
 | 里程碑 | 内容 | 验收标准（对作者本人） |
 |---|---|---|
 | **M0 · 骨架** | hub 可跑（docker+二进制）、enroll、WS 心跳、机器列表与在线状态、设置页雏形 | ≥3 台真机接入，杀 agent/断网后状态与重连表现正确 |
-| **M1 · 配置闭环** | 导入向导（含敏感项抽取）、编辑器、发布/diff/回滚、下发落盘回执、漂移收件箱（收编/恢复/忽略）、凭据库与变量、快照回滚 | 主力机导入成配置集；全机队对齐；在任一机器改 CLAUDE.md/新增 skill 能被收编并同步到其余机器；apply 失败可自动回滚 |
+| **M1 · 配置闭环** | 导入向导（含敏感项抽取）、编辑器、发布/diff/回滚、下发落盘回执、漂移收件箱（收编/恢复/忽略）、API key 与变量、快照回滚 | 主力机导入成配置集；全机队对齐；在任一机器改 CLAUDE.md/新增 skill 能被收编并同步到其余机器；apply 失败可自动回滚 |
 | **M2 · 数据面** | JSONL 解析上报+历史回灌、用量页；采集器框架 + 自用 provider 全部移植 + push 兼容端点；订阅卡片页 | 用量数字与本机 ccusage 一致；ai-plan-insight 面板可下线（自用实例 100% 移植并对照验收） |
 | **M3 · 毕业与发布** | 全机队迁移完毕、旧方案下线；安装体验打磨（脚本/brew/docker）；双语 README、安全模型文档、截图与 demo | 连续 30 天全机队由 Orciny 管理且无需手工 ssh 改配置 → 公开发布 |
 
@@ -472,7 +475,7 @@ MVP = 四件事：**机器清单与在线状态 · 配置闭环（导入/下发/
 | R3 | JSONL / settings schema 随版本漂移 | 中 | 解析层独立成包 + 契约测试 + 版本探测；社区共摊（ccusage 生态先例） |
 | R4 | PocketBase v0.x API 变动 | 低中 | 锁定版本、薄封装其 API；业务逻辑不渗入框架层 |
 | R5 | 三线作战精力不足 | 高 | MVP 卡死四件事；M2 完成即净减一个在维护项目（ai-plan-insight）；leycode 客户端收尾与 Orciny M0 错峰排期 |
-| R6 | 凭据集中保管的安全事故 | 影响高/概率低 | §8 全套；开源前过一遍外部 review；安全文档随首发 |
+| R6 | API key 集中保管的安全事故 | 影响高/概率低 | §8 全套；开源前过一遍外部 review；安全文档随首发 |
 | R7 | 做着做着长出编排功能 | 中 | §1.5 非目标清单为红线；任何「远程开会话」类需求一律指向相邻项目 |
 
 ---
