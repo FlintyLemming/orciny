@@ -21,12 +21,12 @@ func (h *Hub) CreateCredential(name, value, note string) error {
 	return err
 }
 
-// RotateCredential 轮换凭据并通知受影响的机器。不产生新 Revision。
+// RotateCredential 轮换凭据。
+//
+// **已废弃**：凭据实体在 M1.6 里被废止，key 内联到 provider 上，
+// 轮换走 UpdateProvider → NotifyProvider。本方法与它的路由在子计划 08 删除。
 func (h *Hub) RotateCredential(name, value string) error {
-	if err := h.creds.Rotate(name, value); err != nil {
-		return err
-	}
-	return h.sync.NotifyCredential(name)
+	return h.creds.Rotate(name, value)
 }
 
 // DeleteCredential 删除凭据。被引用时拒绝。

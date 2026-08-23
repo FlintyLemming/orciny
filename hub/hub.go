@@ -132,7 +132,7 @@ func Attach(app core.App, cfg Config) (*Hub, error) {
 		h.importer = importer.NewService(e.App, h.blobs, h.sets, h.creds, h.events, h.machines)
 		h.sync = configsync.NewService(configsync.Deps{
 			App: e.App, Blobs: h.blobs, Sets: h.sets, Revs: h.revs,
-			Creds: h.creds, Vars: h.vars, Providers: h.provs, Events: h.events, Sender: h.machines,
+			Vars: h.vars, Providers: h.provs, Events: h.events, Sender: h.machines,
 			Importer: h.importer, Logger: e.App.Logger(),
 		})
 		// drift 需要 configsync（发 DriftCommand），configsync 需要 drift（转交上报）：

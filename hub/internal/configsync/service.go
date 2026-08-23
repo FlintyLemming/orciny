@@ -14,7 +14,6 @@ import (
 
 	"github.com/FlintyLemming/orciny/hub/internal/blobs"
 	"github.com/FlintyLemming/orciny/hub/internal/configsets"
-	"github.com/FlintyLemming/orciny/hub/internal/credentials"
 	"github.com/FlintyLemming/orciny/hub/internal/events"
 	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/hub/internal/revisions"
@@ -42,7 +41,6 @@ type Deps struct {
 	Blobs *blobs.Store
 	Sets  *configsets.Service
 	Revs  *revisions.Service
-	Creds *credentials.Store
 	Vars  *variables.Store
 	// Providers 供组装快照时查绑定指向的服务配置。
 	Providers *providers.Store
@@ -111,13 +109,6 @@ func (s *Service) Snapshot(machineID string) (protocol.ConfigSnapshot, error) {
 	if err := head.UnmarshalJSONField("refs", &refs); err != nil {
 		return snap, fmt.Errorf("configsync: 解析 refs: %w", err)
 	}
-	// 只发这个 Revision 实际引用到的凭据（spec §5.3）：最小权限，
-	// 也是一条实际的防线——一台被攻陷的机器不该因为连着 hub
-	// 就拿到所有订阅的 key。
-	creds, err := s.d.Creds.Values(refs.Creds)
-	if err != nil {
-		return snap, err
-	}
 	allVars, err := s.d.Vars.MachineVariables(machineID)
 	if err != nil {
 		return snap, err
@@ -151,7 +142,6 @@ func (s *Service) Snapshot(machineID string) (protocol.ConfigSnapshot, error) {
 		Manifest:    []byte(head.GetString("manifest")),
 		Files:       files,
 		Checksum:    head.GetString("checksum"),
-		Credentials: creds,
 		Variables:   vars,
 		Provider:    provider,
 		IgnorePaths: ignore,

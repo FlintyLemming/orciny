@@ -126,11 +126,29 @@ func findAuthKey(path string, content []byte) (location, masked string) {
 	return "", ""
 }
 
-// ExtractKey 把漂移内容里 location 处的值抽成凭据，返回凭据记录 id。
+// ExtractKey 把漂移内容里 location 处的值写进某个 provider 的端点 key。
 //
 // 源是漂移 blob 而不是草稿（与 importer.Extract 的区别就在这里）：
-// 这把 key 是用户在**机器上**手写的，中台从没见过它。
-func (s *Service) ExtractKey(eventID, location, credName string) (string, error) {
+// 这把 key 是用户在**机器上**手写的，中台从没见过它。除了取值的来源，
+// 两者是同一条代码路径——都落到 providers.Store.SetEndpointKey
+// （M1.6 spec §5.5）。
+func (s *Service) ExtractKey(eventID, location, providerID, endpoint string) error {
+	value, err := s.DriftValue(eventID, location)
+	if err != nil {
+		return err
+	}
+	prov, err := s.d.Providers.Get(providerID)
+	if err != nil {
+		return err
+	}
+	// 长度下限由 SetEndpointKey 把关（M1 spec §6.4）：
+	// 太短的值抽出来会在还原时到处误匹配。
+	return s.d.Providers.SetEndpointKey(prov, endpoint, value)
+}
+
+// DriftValue 读漂移内容里 location 处的明文值。
+// 建 provider 的向导用它把机器上手写的 key 内联进 Input。
+func (s *Service) DriftValue(eventID, location string) (string, error) {
 	rec, err := s.d.App.FindRecordById("drift_events", eventID)
 	if err != nil {
 		return "", fmt.Errorf("drift: 漂移 %s 不存在: %w", eventID, err)
@@ -143,14 +161,7 @@ func (s *Service) ExtractKey(eventID, location, credName string) (string, error)
 	if value == "" {
 		return "", fmt.Errorf("drift: %s 的 %s 取不到值", rec.GetString("path"), location)
 	}
-	// 长度下限由 credentials.Store.Create 把关（M1 spec §6.4）：
-	// 太短的值抽成凭据会在还原时到处误匹配。
-	cred, err := s.d.Creds.Create(credName, value,
-		"从机器 "+rec.GetString("machine")+" 的漂移里抽取")
-	if err != nil {
-		return "", err
-	}
-	return cred.Id, nil
+	return value, nil
 }
 
 // driftContent 读一条漂移的现状内容。
@@ -192,11 +203,13 @@ func (s *Service) Rebind(eventID, providerID string) (*core.Record, error) {
 	if err != nil {
 		return nil, err
 	}
-	// 模型槽取新 Provider 的 defaults：换了家供应商，旧供应商的模型 id
+	// 模型槽取新 Provider 的 claude 端点 defaults：换了家供应商，旧供应商的模型 id
 	// 在新 endpoint 上没有意义。
-	var defaults providers.ModelSlots
-	_ = prov.UnmarshalJSONField("defaults", &defaults)
-	binding := &providers.Binding{Provider: providerID, Models: defaults}
+	// 绑定本期恒指 claude 端点（M1.6 spec §1.3）。
+	binding := &providers.Binding{
+		Provider: providerID,
+		Models:   providers.ClaudeOf(prov).Defaults,
+	}
 
 	head, err := s.d.Revs.Head(setID)
 	if err != nil {

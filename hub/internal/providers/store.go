@@ -374,6 +374,38 @@ func (s *Store) Key(r *core.Record, endpoint string) (string, error) {
 	return "", fmt.Errorf("%w: %s 的 %s 端点", ErrNoKey, r.GetString("name"), endpoint)
 }
 
+// SetEndpointKey 把一把明文 key 写进某端点，并回填末四位。
+//
+// 与 Update 走同一套加密与长度校验，但**不碰其余字段**：抽取的语义是
+// 「给这个端点补上 key」，不该顺手把用户在 UI 上没动过的 base_url 改掉。
+func (s *Store) SetEndpointKey(r *core.Record, endpoint, value string) error {
+	if len(value) < secretbox.MinValueLen {
+		return fmt.Errorf("%w: 至少 %d 个字符", secretbox.ErrShortValue, secretbox.MinValueLen)
+	}
+	var field string
+	switch endpoint {
+	case EndpointClaude:
+		field = "claude_key_cipher"
+	case EndpointOpenAI:
+		field = "openai_key_cipher"
+	default:
+		return fmt.Errorf("providers: 未知端点 %q", endpoint)
+	}
+	enc, err := secretbox.Encrypt(s.key, value)
+	if err != nil {
+		return err
+	}
+	r.Set(field, enc)
+	if err := setEndpointLast4(r, endpoint, secretbox.Last4(value)); err != nil {
+		return err
+	}
+	if err := s.app.Save(r); err != nil {
+		return fmt.Errorf("providers: 写入 %s 端点的 key: %w", endpoint, err)
+	}
+	s.write(events.KindProviderUpdated, r)
+	return nil
+}
+
 // VerifyAll 在启动时逐条解密自检（spec §2.6）。
 //
 // **这条不能丢。** 它防的是「从备份恢复到新机器时忘了带 secret.key」——

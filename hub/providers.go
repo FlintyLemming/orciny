@@ -1,6 +1,7 @@
 package hub
 
 import (
+	"fmt"
 	"github.com/FlintyLemming/orciny/hub/internal/drift"
 	"github.com/FlintyLemming/orciny/hub/internal/providers"
 )
@@ -78,18 +79,29 @@ func (h *Hub) RebindFromDrift(eventID, providerID string) (string, error) {
 	return rev.Id, nil
 }
 
-// CreateProviderFromDrift 先把漂移内容里 location 处的值抽成名为 credName
-// 的凭据，再用它建服务配置（M1.5 spec §6.3 第二档）。in.Credential 由本方法填。
+// CreateProviderFromDrift 把漂移内容里 location 处的值取出来内联进
+// providers.Input，然后一次建成（M1.5 spec §6.3 第二档 + M1.6 spec §5.5）。
 //
-// 两步之间失败时凭据会留下来——这是有意的：让用户在凭据页看得见它，
-// 好过悄悄回滚掉一把他刚在机器上生成的 key。
+// 一次成型而不是「先建再补」：providers.Store 会校验「配了 base_url 的端点
+// 必须能解出一把 key」，先建会被它挡住；而放宽那条校验去迁就一个向导，
+// 是拿数据面的正确性换交互的便利。顺带也少了 M1.5 里「两步之间失败留下一条
+// 孤儿凭据」的中间态。
 func (h *Hub) CreateProviderFromDrift(
-	eventID, location, credName string, in providers.Input,
+	eventID, location, endpoint string, in providers.Input,
 ) (string, error) {
-	credID, err := h.drift.ExtractKey(eventID, location, credName)
-	if err != nil {
-		return "", err
+	if location != "" {
+		value, err := h.drift.DriftValue(eventID, location)
+		if err != nil {
+			return "", err
+		}
+		switch endpoint {
+		case providers.EndpointClaude:
+			in.Claude.Key = &value
+		case providers.EndpointOpenAI:
+			in.OpenAI.Key = &value
+		default:
+			return "", fmt.Errorf("未知端点 %q", endpoint)
+		}
 	}
-	in.Credential = credID
 	return h.CreateProvider(in)
 }

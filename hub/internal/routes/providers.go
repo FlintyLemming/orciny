@@ -8,31 +8,47 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/providers"
 )
 
+// endpointBody 是请求体里的一个协议端点。
+//
+// Key 用 *string 承载三态（M1.6 spec §5.2）：JSON 里字段缺席 = 不修改，
+// 显式的 "" = 清空，非空 = 替换。两种意图在 wire 上就分得开。
+type endpointBody struct {
+	BaseURL      string               `json:"base_url"`
+	AuthField    string               `json:"auth_field"`
+	Models       []string             `json:"models"`
+	Key          *string              `json:"key"`
+	Defaults     providers.ModelSlots `json:"defaults"`
+	DefaultModel string               `json:"default_model"`
+}
+
+func (b endpointBody) input() providers.EndpointInput {
+	return providers.EndpointInput{
+		BaseURL: b.BaseURL, AuthField: b.AuthField, Models: b.Models,
+		Key: b.Key, Defaults: b.Defaults, DefaultModel: b.DefaultModel,
+	}
+}
+
 // providerBody 是新建 / 更新服务配置的请求体。
 type providerBody struct {
-	Name       string               `json:"name"`
-	Preset     string               `json:"preset"`
-	BaseURL    string               `json:"base_url"`
-	AuthField  string               `json:"auth_field"`
-	Credential string               `json:"credential"`
-	Models     []string             `json:"models"`
-	Defaults   providers.ModelSlots `json:"defaults"`
-	Note       string               `json:"note"`
+	Name   string       `json:"name"`
+	Preset string       `json:"preset"`
+	Note   string       `json:"note"`
+	Key    *string      `json:"key"` // 平台级，三态同 endpointBody.Key
+	Claude endpointBody `json:"claude"`
+	OpenAI endpointBody `json:"openai"`
 
-	// FromDrift 非空时，先把漂移内容里的 key 抽成凭据再建（M1.5 spec §6.3
-	// 第二档）。此时 Credential 字段被忽略。
+	// FromDrift 非空时先把漂移里的 key 取出来内联进 provider（M1.6 spec §5.5）。
 	FromDrift *struct {
 		Event    string `json:"event"`
 		Location string `json:"location"`
-		Name     string `json:"name"`
+		Endpoint string `json:"endpoint"`
 	} `json:"from_drift"`
 }
 
 func (b providerBody) input() providers.Input {
 	return providers.Input{
-		Name: b.Name, Preset: b.Preset, BaseURL: b.BaseURL,
-		AuthField: b.AuthField, Credential: b.Credential,
-		Models: b.Models, Defaults: b.Defaults, Note: b.Note,
+		Name: b.Name, Preset: b.Preset, Note: b.Note, Key: b.Key,
+		Claude: b.Claude.input(), OpenAI: b.OpenAI.input(),
 	}
 }
 
@@ -53,7 +69,7 @@ func (d Deps) createProvider(e *core.RequestEvent) error {
 	}
 	if req.FromDrift != nil {
 		id, err := d.Admin.CreateProviderFromDrift(
-			req.FromDrift.Event, req.FromDrift.Location, req.FromDrift.Name, req.input())
+			req.FromDrift.Event, req.FromDrift.Location, req.FromDrift.Endpoint, req.input())
 		if err != nil {
 			return mapErr(e, err)
 		}

@@ -82,11 +82,11 @@ func newRig(t *testing.T) *rig {
 		revs:   revisions.NewService(app, b, ev),
 		creds:  credentials.NewStore(app, key, ev),
 		vars:   variables.NewStore(app),
-		provs:  providers.NewStore(app, ev),
+		provs:  providers.NewStore(app, key, ev),
 		sender: &fakeSender{online: map[string]bool{}},
 	}
 	r.svc = configsync.NewService(configsync.Deps{
-		App: app, Blobs: b, Sets: r.sets, Revs: r.revs, Creds: r.creds, Vars: r.vars,
+		App: app, Blobs: b, Sets: r.sets, Revs: r.revs, Vars: r.vars,
 		Providers: r.provs, Events: ev, Sender: r.sender,
 	})
 	return r
@@ -107,33 +107,28 @@ func (r *rig) machine(t *testing.T, fp string) string {
 	return rec.Id
 }
 
-// 只发该版本引用到的凭据（spec §5.3）。
-func TestSnapshotCarriesOnlyReferencedCredentials(t *testing.T) {
+// 只发该版本引用到的机器变量（spec §5.3）。
+func TestSnapshotCarriesOnlyReferencedVariables(t *testing.T) {
 	r := newRig(t)
 	m := r.machine(t, "fp1")
-
-	_, err := r.creds.Create("used_key", "sk-used-1234", "")
-	require.NoError(t, err)
-	_, err = r.creds.Create("other_key", "sk-other-9999", "")
-	require.NoError(t, err)
 
 	set, err := r.sets.Create("s", "")
 	require.NoError(t, err)
 	_, err = r.sets.SetDraftFile(set.Id, ".claude/settings.json",
-		[]byte(`{"K":"{{cred.used_key}}","W":"{{var.ws}}"}`), 0o600, nil)
+		[]byte(`{"W":"{{var.ws}}"}`), 0o600, nil)
 	require.NoError(t, err)
 	_, err = r.revs.Publish(set.Id, "", "publish")
 	require.NoError(t, err)
 
 	require.NoError(t, r.vars.SetVariable(m, "ws", "main"))
+	require.NoError(t, r.vars.SetVariable(m, "other", "unused"))
 	_, err = r.sets.Assign(m, set.Id, "apply")
 	require.NoError(t, err)
 
 	snap, err := r.svc.Snapshot(m)
 	require.NoError(t, err)
-	require.Equal(t, map[string]string{"used_key": "sk-used-1234"}, snap.Credentials,
-		"不该把整个凭据库发给一台机器")
-	require.Equal(t, map[string]string{"ws": "main"}, snap.Variables)
+	require.Equal(t, map[string]string{"ws": "main"}, snap.Variables,
+		"不该把整台机器的变量都发下去")
 	require.Equal(t, protocol.ModeApply, snap.Mode)
 	require.NotEmpty(t, snap.Manifest)
 	require.Len(t, snap.Files, 1)
@@ -201,50 +196,6 @@ func TestNotifySkipsPausedConfigSet(t *testing.T) {
 	require.NoError(t, r.app.Save(set))
 
 	require.NoError(t, r.svc.NotifyConfigSet(set.Id, rev.Id, protocol.ReasonPublished))
-	require.Empty(t, r.sender.of(protocol.KindConfigNotify))
-}
-
-// 轮换复用同一条消息，且不带 RevisionID（spec §5.1）。
-func TestNotifyCredentialSendsRotatedNotify(t *testing.T) {
-	r := newRig(t)
-	m := r.machine(t, "fp6")
-	_, err := r.creds.Create("k", "sk-value-1234", "")
-	require.NoError(t, err)
-
-	set, err := r.sets.Create("s", "")
-	require.NoError(t, err)
-	_, err = r.sets.SetDraftFile(set.Id, "a", []byte(`{{cred.k}}`), 0o600, nil)
-	require.NoError(t, err)
-	_, err = r.revs.Publish(set.Id, "", "publish")
-	require.NoError(t, err)
-	_, err = r.sets.Assign(m, set.Id, "apply")
-	require.NoError(t, err)
-
-	require.NoError(t, r.svc.NotifyCredential("k"))
-	sent := r.sender.of(protocol.KindConfigNotify)
-	require.Len(t, sent, 1)
-	n := sent[0].payload.(protocol.ConfigNotify)
-	require.Empty(t, n.RevisionID, "轮换不产生新版本")
-	require.Equal(t, protocol.ReasonRotated, n.Reason)
-}
-
-// 引用不到这枚凭据的配置集，其机器不该被打扰。
-func TestNotifyCredentialSkipsUnrelatedMachines(t *testing.T) {
-	r := newRig(t)
-	m := r.machine(t, "fp7")
-	_, err := r.creds.Create("k", "sk-value-1234", "")
-	require.NoError(t, err)
-
-	set, err := r.sets.Create("s", "")
-	require.NoError(t, err)
-	_, err = r.sets.SetDraftFile(set.Id, "a", []byte("没有占位符"), 0o644, nil)
-	require.NoError(t, err)
-	_, err = r.revs.Publish(set.Id, "", "publish")
-	require.NoError(t, err)
-	_, err = r.sets.Assign(m, set.Id, "apply")
-	require.NoError(t, err)
-
-	require.NoError(t, r.svc.NotifyCredential("k"))
 	require.Empty(t, r.sender.of(protocol.KindConfigNotify))
 }
 

@@ -75,39 +75,6 @@ func (s *Service) NotifyMachine(machineID, reason string) error {
 	return nil
 }
 
-// NotifyCredential 在轮换后通知受影响的机器。
-//
-// 复用 ConfigNotify 且**不带 RevisionID**：agent 拉回来发现 revision 相同
-// 但 secrets 变了，只重渲染受影响的文件。不产生新 Revision（产品 §4.5）。
-func (s *Service) NotifyCredential(name string) error {
-	setIDs, _, providerIDs, err := s.d.Creds.ReferencedBy(name)
-	if err != nil {
-		return err
-	}
-	for _, setID := range setIDs {
-		set, err := s.d.App.FindRecordById("config_sets", setID)
-		if err != nil || set.GetBool("paused") {
-			continue
-		}
-		machineIDs, err := s.d.Sets.AssignedMachines(setID)
-		if err != nil {
-			return err
-		}
-		for _, id := range machineIDs {
-			s.send(id, protocol.ConfigNotify{ConfigSetID: setID, Reason: protocol.ReasonRotated})
-		}
-	}
-
-	// Provider 引用凭据的方式是 relation 字段，不在 refs 里（M1.5 spec §5.3）。
-	// 漏掉这一段，轮换 key 之后全机队还在用旧 key。
-	for _, pid := range providerIDs {
-		if err := s.NotifyProvider(pid); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // NotifyProvider 在改了 Provider 之后重注入全机队（M1.5 spec §5.2）。
 //
 // **不产生新 Revision**：走 ConfigNotify 且不带 RevisionID（= 仅 secrets 变更，

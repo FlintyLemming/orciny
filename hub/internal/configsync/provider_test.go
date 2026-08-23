@@ -1,6 +1,7 @@
 package configsync_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -10,18 +11,60 @@ import (
 	"github.com/FlintyLemming/orciny/protocol"
 )
 
-// seedProvider 建一条凭据 + 一条服务配置，返回 provider 记录 id。
-// 凭据名固定为 zhipu_key，轮换测试要按名字找它。
+// seedProvider 建一条只配了 claude 端点的服务配置，返回 provider 记录 id。
+// key 内联在平台级（M1.6 spec §2.3）。
 func (r *rig) seedProvider(t *testing.T, name, baseURL, key string) string {
 	t.Helper()
-	_, err := r.creds.Create("zhipu_key", key, "")
-	require.NoError(t, err)
-	cred, err := r.app.FindFirstRecordByData("credentials", "name", "zhipu_key")
-	require.NoError(t, err)
+	return r.seedProviderWith(t, name, baseURL, key, "", "")
+}
 
+// seedProviderWith 可以额外配上 openai 端点。openaiURL 为空即不配。
+func (r *rig) seedProviderWith(
+	t *testing.T, name, baseURL, key, openaiURL, openaiModel string,
+) string {
+	t.Helper()
+	in := providers.Input{
+		Name: name,
+		Key:  &key,
+		Claude: providers.EndpointInput{
+			BaseURL:   baseURL,
+			AuthField: providers.AuthToken,
+			Models:    []string{"glm-5.1"},
+		},
+	}
+	if openaiURL != "" {
+		in.OpenAI = providers.EndpointInput{
+			BaseURL:      openaiURL,
+			AuthField:    providers.DefaultOpenAIAuthField,
+			Models:       []string{openaiModel},
+			DefaultModel: openaiModel,
+		}
+	}
+	rec, err := r.provs.Create(in)
+	require.NoError(t, err)
+	return rec.Id
+}
+
+// seedProviderWithTwoKeys 建一条平台级与 claude 端点级各有一把 key 的 provider。
+func (r *rig) seedProviderWithTwoKeys(
+	t *testing.T, name, platformKey, claudeKey string,
+) string {
+	t.Helper()
 	rec, err := r.provs.Create(providers.Input{
-		Name: name, BaseURL: baseURL, AuthField: providers.AuthToken,
-		Credential: cred.Id, Models: []string{"glm-5.1"},
+		Name: name,
+		Key:  &platformKey,
+		Claude: providers.EndpointInput{
+			BaseURL:   "https://relay.example/anthropic",
+			AuthField: providers.AuthToken,
+			Models:    []string{"relay-max"},
+			Key:       &claudeKey,
+		},
+		OpenAI: providers.EndpointInput{
+			BaseURL:      "https://relay.example/v1",
+			AuthField:    providers.DefaultOpenAIAuthField,
+			Models:       []string{"relay-max"},
+			DefaultModel: "relay-max",
+		},
 	})
 	require.NoError(t, err)
 	return rec.Id
@@ -62,20 +105,26 @@ func (r *rig) revisionCount(t *testing.T, setID string) int {
 	return len(recs)
 }
 
-// inputFor 读回一条 Provider 的当前值，只把 base_url 换成新的。
+// inputFor 读回一条 Provider 的当前值，只把 claude 端点的 base_url 换成新的。
+// 三处 Key 都留 nil = 不修改。
 func (r *rig) inputFor(t *testing.T, providerID, baseURL string) providers.Input {
 	t.Helper()
 	rec, err := r.provs.Get(providerID)
 	require.NoError(t, err)
-	var models []string
-	_ = rec.UnmarshalJSONField("models", &models)
-	var defaults providers.ModelSlots
-	_ = rec.UnmarshalJSONField("defaults", &defaults)
+	cl := providers.ClaudeOf(rec)
+	oa := providers.OpenAIOf(rec)
 	return providers.Input{
-		Name: rec.GetString("name"), Preset: rec.GetString("preset"),
-		BaseURL: baseURL, AuthField: rec.GetString("auth_field"),
-		Credential: rec.GetString("credential"), Models: models,
-		Defaults: defaults, Note: rec.GetString("note"),
+		Name:   rec.GetString("name"),
+		Preset: rec.GetString("preset"),
+		Note:   rec.GetString("note"),
+		Claude: providers.EndpointInput{
+			BaseURL: baseURL, AuthField: cl.AuthField,
+			Models: cl.Models, Defaults: cl.Defaults,
+		},
+		OpenAI: providers.EndpointInput{
+			BaseURL: oa.BaseURL, AuthField: oa.AuthField,
+			Models: oa.Models, DefaultModel: oa.DefaultModel,
+		},
 	}
 }
 
@@ -93,9 +142,9 @@ func TestSnapshotFillsProviderValues(t *testing.T) {
 
 	setID := r.seedSetWithBinding(t, map[string]string{
 		".claude/settings.json": `{"env":{` +
-			`"ANTHROPIC_BASE_URL":"{{provider.base_url}}",` +
-			`"ANTHROPIC_AUTH_TOKEN":"{{provider.auth_token}}",` +
-			`"ANTHROPIC_MODEL":"{{provider.model}}"}}`,
+			`"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}",` +
+			`"ANTHROPIC_AUTH_TOKEN":"{{provider.claude.auth_token}}",` +
+			`"ANTHROPIC_MODEL":"{{provider.claude.model}}"}}`,
 	}, &providers.Binding{Provider: provID, Models: fullSlots("glm-5.1")})
 	_, err := r.sets.Assign(m, setID, "apply")
 	require.NoError(t, err)
@@ -103,9 +152,9 @@ func TestSnapshotFillsProviderValues(t *testing.T) {
 	snap, err := r.svc.Snapshot(m)
 	require.NoError(t, err)
 	require.Equal(t, map[string]string{
-		"base_url":   "https://open.bigmodel.cn/api/anthropic",
-		"auth_token": "sk-zhipu-abcdefghij",
-		"model":      "glm-5.1",
+		"claude.base_url":   "https://open.bigmodel.cn/api/anthropic",
+		"claude.auth_token": "sk-zhipu-abcdefghij",
+		"claude.model":      "glm-5.1",
 	}, snap.Provider, "只发被引用到的三个键，四槽里没被引用的不发")
 }
 
@@ -116,15 +165,15 @@ func TestSnapshotOmitsUnreferencedProviderKeys(t *testing.T) {
 	provID := r.seedProvider(t, "智谱 GLM · 个人",
 		"https://open.bigmodel.cn/api/anthropic", "sk-zhipu-abcdefghij")
 	setID := r.seedSetWithBinding(t, map[string]string{
-		"CLAUDE.md": "主模型是 {{provider.model}}",
+		"CLAUDE.md": "主模型是 {{provider.claude.model}}",
 	}, &providers.Binding{Provider: provID, Models: fullSlots("glm-5.1")})
 	_, err := r.sets.Assign(m, setID, "apply")
 	require.NoError(t, err)
 
 	snap, err := r.svc.Snapshot(m)
 	require.NoError(t, err)
-	require.Equal(t, map[string]string{"model": "glm-5.1"}, snap.Provider)
-	require.NotContains(t, snap.Provider, "auth_token", "没引用就绝不下发 key")
+	require.Equal(t, map[string]string{"claude.model": "glm-5.1"}, snap.Provider)
+	require.NotContains(t, snap.Provider, "claude.auth_token", "没引用就绝不下发 key")
 }
 
 // 纵深防御：这种状态本应被发布校验挡住（spec §5.1 / §7）。
@@ -132,7 +181,7 @@ func TestSnapshotRefusesProviderRefsWithoutBinding(t *testing.T) {
 	r := newRig(t)
 	m := r.machine(t, "fp-prov-3")
 	setID := r.seedSetWithBinding(t, map[string]string{
-		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}"}}`,
+		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}"}}`,
 	}, nil)
 	_, err := r.sets.Assign(m, setID, "apply")
 	require.NoError(t, err)
@@ -149,14 +198,14 @@ func TestSnapshotRefusesEmptyModelSlot(t *testing.T) {
 	provID := r.seedProvider(t, "Anthropic 官方",
 		"https://api.anthropic.com", "sk-ant-abcdefghij")
 	setID := r.seedSetWithBinding(t, map[string]string{
-		".claude/settings.json": `{"env":{"ANTHROPIC_MODEL":"{{provider.model}}"}}`,
+		".claude/settings.json": `{"env":{"ANTHROPIC_MODEL":"{{provider.claude.model}}"}}`,
 	}, &providers.Binding{Provider: provID}) // 四槽全空 = 透传
 	_, err := r.sets.Assign(m, setID, "apply")
 	require.NoError(t, err)
 
 	_, err = r.svc.Snapshot(m)
 	require.ErrorIs(t, err, configsync.ErrEmptyModelSlot)
-	require.Contains(t, err.Error(), "provider.model")
+	require.Contains(t, err.Error(), "provider.claude.model")
 }
 
 // 绑了但没用：警告级，照常下发，Provider 为空。
@@ -186,7 +235,7 @@ func TestSnapshotRefusesOldAgentWhenBound(t *testing.T) {
 	provID := r.seedProvider(t, "智谱 GLM · 个人",
 		"https://open.bigmodel.cn/api/anthropic", "sk-zhipu-abcdefghij")
 	setID := r.seedSetWithBinding(t, map[string]string{
-		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}"}}`,
+		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}"}}`,
 	}, &providers.Binding{Provider: provID})
 	_, err := r.sets.Assign(m, setID, "apply")
 	require.NoError(t, err)
@@ -194,7 +243,7 @@ func TestSnapshotRefusesOldAgentWhenBound(t *testing.T) {
 	_, err = r.svc.Snapshot(m)
 	require.ErrorIs(t, err, configsync.ErrAgentTooOld)
 	require.Contains(t, err.Error(), "0.1.0")
-	require.Contains(t, err.Error(), "0.2.0")
+	require.Contains(t, err.Error(), "0.3.0")
 }
 
 // 没绑定的配置集不受门槛影响——惩罚面不该扩大到无关机器。
@@ -219,7 +268,7 @@ func TestPullMarksAssignmentFailedOnOldAgent(t *testing.T) {
 	provID := r.seedProvider(t, "智谱 GLM · 个人",
 		"https://open.bigmodel.cn/api/anthropic", "sk-zhipu-abcdefghij")
 	setID := r.seedSetWithBinding(t, map[string]string{
-		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}"}}`,
+		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}"}}`,
 	}, &providers.Binding{Provider: provID})
 	_, err := r.sets.Assign(m, setID, "apply")
 	require.NoError(t, err)
@@ -243,7 +292,7 @@ func TestNotifyProviderDoesNotCreateRevision(t *testing.T) {
 	provID := r.seedProvider(t, "智谱 GLM · 个人",
 		"https://open.bigmodel.cn/api/anthropic", "sk-zhipu-abcdefghij")
 	setID := r.seedSetWithBinding(t, map[string]string{
-		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}"}}`,
+		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}"}}`,
 	}, &providers.Binding{Provider: provID})
 	_, err := r.sets.Assign(m, setID, "apply")
 	require.NoError(t, err)
@@ -273,7 +322,8 @@ func TestNotifyProviderDoesNotCreateRevision(t *testing.T) {
 	// 新快照里的值确实变了。
 	snap, err := r.svc.Snapshot(m)
 	require.NoError(t, err)
-	require.Equal(t, "https://open.bigmodel.cn/api/coding/paas/v4", snap.Provider["base_url"])
+	require.Equal(t, "https://open.bigmodel.cn/api/coding/paas/v4",
+		snap.Provider["claude.base_url"])
 }
 
 func TestNotifyProviderSkipsPausedSets(t *testing.T) {
@@ -282,7 +332,7 @@ func TestNotifyProviderSkipsPausedSets(t *testing.T) {
 	provID := r.seedProvider(t, "智谱 GLM · 个人",
 		"https://open.bigmodel.cn/api/anthropic", "sk-zhipu-abcdefghij")
 	setID := r.seedSetWithBinding(t, map[string]string{
-		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}"}}`,
+		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}"}}`,
 	}, &providers.Binding{Provider: provID})
 	_, err := r.sets.Assign(m, setID, "apply")
 	require.NoError(t, err)
@@ -297,38 +347,11 @@ func TestNotifyProviderSkipsPausedSets(t *testing.T) {
 		"暂停下发的配置集不该收到重注入通知")
 }
 
-// 轮换 Provider 用的凭据也要重注入——它落在现有的凭据轮换通道上，
-// 但那条通道只认 refs.creds，认不出 relation 引用（spec §5.2 / §5.3）。
-func TestNotifyCredentialReachesProviderBoundMachines(t *testing.T) {
-	r := newRig(t)
-	m := r.machine(t, "fp-notify-3")
-	provID := r.seedProvider(t, "智谱 GLM · 个人",
-		"https://open.bigmodel.cn/api/anthropic", "sk-zhipu-abcdefghij")
-	setID := r.seedSetWithBinding(t, map[string]string{
-		".claude/settings.json": `{"env":{"ANTHROPIC_AUTH_TOKEN":"{{provider.auth_token}}"}}`,
-	}, &providers.Binding{Provider: provID})
-	_, err := r.sets.Assign(m, setID, "apply")
-	require.NoError(t, err)
-
-	require.NoError(t, r.creds.Rotate("zhipu_key", "sk-zhipu-newvalue123"))
-	require.NoError(t, r.svc.NotifyCredential("zhipu_key"))
-
-	notifies := r.sender.of(protocol.KindConfigNotify)
-	require.Len(t, notifies, 1, "配置集本身没有 cred.* 引用，但 Provider 引用了它")
-	n := notifies[0].payload.(protocol.ConfigNotify)
-	require.Equal(t, setID, n.ConfigSetID)
-	require.Empty(t, n.RevisionID)
-
-	snap, err := r.svc.Snapshot(m)
-	require.NoError(t, err)
-	require.Equal(t, "sk-zhipu-newvalue123", snap.Provider["auth_token"])
-}
-
 // git describe 注入的版本形如 v0.2.0-38-g3161fd4：语义上是「v0.2.0 之后
 // 第 38 个提交」，但按 semver 带 pre-release 的版本小于同号正式版。
 // 不丢掉 pre-release 就会把每一个非 tag 构建都判成过老。
 func TestSnapshotAcceptsGitDescribeVersion(t *testing.T) {
-	for _, ver := range []string{"v0.2.0-38-g3161fd4", "0.2.0", "v0.2.0", "v0.3.0-1-gabcdef"} {
+	for _, ver := range []string{"v0.3.0-38-g3161fd4", "0.3.0", "v0.3.0", "v0.4.0-1-gabcdef"} {
 		t.Run(ver, func(t *testing.T) {
 			r := newRig(t)
 			m := r.machine(t, "fp-ver-"+ver)
@@ -336,7 +359,7 @@ func TestSnapshotAcceptsGitDescribeVersion(t *testing.T) {
 			provID := r.seedProvider(t, "智谱 GLM · 个人",
 				"https://open.bigmodel.cn/api/anthropic", "sk-zhipu-abcdefghij")
 			setID := r.seedSetWithBinding(t, map[string]string{
-				".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}"}}`,
+				".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}"}}`,
 			}, &providers.Binding{Provider: provID})
 			_, err := r.sets.Assign(m, setID, "apply")
 			require.NoError(t, err)
@@ -351,15 +374,172 @@ func TestSnapshotAcceptsGitDescribeVersion(t *testing.T) {
 func TestSnapshotStillRefusesOldPrereleaseVersion(t *testing.T) {
 	r := newRig(t)
 	m := r.machine(t, "fp-ver-old")
-	r.setAgentVersion(t, m, "v0.1.0-5-gdeadbee")
+	r.setAgentVersion(t, m, "v0.2.0-5-gdeadbee")
 	provID := r.seedProvider(t, "智谱 GLM · 个人",
 		"https://open.bigmodel.cn/api/anthropic", "sk-zhipu-abcdefghij")
 	setID := r.seedSetWithBinding(t, map[string]string{
-		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}"}}`,
+		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}"}}`,
 	}, &providers.Binding{Provider: provID})
 	_, err := r.sets.Assign(m, setID, "apply")
 	require.NoError(t, err)
 
 	_, err = r.svc.Snapshot(m)
 	require.ErrorIs(t, err, configsync.ErrAgentTooOld)
+}
+
+// ---------- M1.6：九键取值与端点缺失 ----------
+
+func TestProviderValuesMapsAllNineKeys(t *testing.T) {
+	r := newRig(t)
+	m := r.machine(t, "fp-nine")
+	provID := r.seedProviderWith(t, "智谱 GLM",
+		"https://open.bigmodel.cn/api/anthropic", "sk-zhipu-abcdef123456",
+		"https://open.bigmodel.cn/api/paas/v4", "glm-5.2")
+
+	// 一个文件把九个键全引一遍。
+	var sb strings.Builder
+	for _, k := range protocol.ProviderKeys {
+		sb.WriteString("{{provider." + k + "}}\n")
+	}
+	setID := r.seedSetWithBinding(t, map[string]string{"CLAUDE.md": sb.String()},
+		&providers.Binding{Provider: provID, Models: providers.ModelSlots{
+			Main: "glm-5.2[1m]", Opus: "glm-5.2[1m]",
+			Sonnet: "glm-5.2[1m]", Haiku: "glm-4.7",
+		}})
+	_, err := r.sets.Assign(m, setID, "apply")
+	require.NoError(t, err)
+
+	snap, err := r.svc.Snapshot(m)
+	require.NoError(t, err)
+	require.Equal(t, map[string]string{
+		"claude.base_url":     "https://open.bigmodel.cn/api/anthropic",
+		"claude.auth_token":   "sk-zhipu-abcdef123456",
+		"claude.model":        "glm-5.2[1m]",
+		"claude.model_opus":   "glm-5.2[1m]",
+		"claude.model_sonnet": "glm-5.2[1m]",
+		"claude.model_haiku":  "glm-4.7",
+		"openai.base_url":     "https://open.bigmodel.cn/api/paas/v4",
+		"openai.api_key":      "sk-zhipu-abcdef123456",
+		"openai.model":        "glm-5.2",
+	}, snap.Provider)
+}
+
+// openai.model 取的是 provider 的 default_model，不是 binding（spec §3.4）。
+func TestOpenAIModelComesFromProviderDefault(t *testing.T) {
+	r := newRig(t)
+	m := r.machine(t, "fp-oa-model")
+	provID := r.seedProviderWith(t, "智谱 GLM",
+		"https://open.bigmodel.cn/api/anthropic", "sk-zhipu-abcdef123456",
+		"https://open.bigmodel.cn/api/paas/v4", "glm-4.7")
+
+	setID := r.seedSetWithBinding(t,
+		map[string]string{"CLAUDE.md": "{{provider.openai.model}}"},
+		&providers.Binding{Provider: provID, Models: fullSlots("glm-5.2")})
+	_, err := r.sets.Assign(m, setID, "apply")
+	require.NoError(t, err)
+
+	snap, err := r.svc.Snapshot(m)
+	require.NoError(t, err)
+	require.Equal(t, "glm-4.7", snap.Provider["openai.model"],
+		"binding 的四槽只管 claude 端点")
+}
+
+// 端点级 key 覆盖平台级，快照里两个端点各拿各的。
+func TestProviderValuesUsesPerEndpointKeys(t *testing.T) {
+	r := newRig(t)
+	m := r.machine(t, "fp-two-keys")
+	provID := r.seedProviderWithTwoKeys(t, "两把 key 的中转",
+		"sk-platform-000000", "sk-claude-side-111111")
+
+	setID := r.seedSetWithBinding(t, map[string]string{
+		"CLAUDE.md": "{{provider.claude.auth_token}} {{provider.openai.api_key}}",
+	}, &providers.Binding{Provider: provID})
+	_, err := r.sets.Assign(m, setID, "apply")
+	require.NoError(t, err)
+
+	snap, err := r.svc.Snapshot(m)
+	require.NoError(t, err)
+	require.Equal(t, "sk-claude-side-111111", snap.Provider["claude.auth_token"])
+	require.Equal(t, "sk-platform-000000", snap.Provider["openai.api_key"])
+}
+
+// 纵深防御：本应被发布校验挡住，走到这里说明有路径绕过了它（spec §4.3）。
+func TestProviderValuesRejectsUnconfiguredEndpoint(t *testing.T) {
+	r := newRig(t)
+	m := r.machine(t, "fp-ep-missing")
+	provID := r.seedProvider(t, "只有 claude",
+		"https://open.bigmodel.cn/api/anthropic", "sk-zhipu-abcdef123456")
+
+	setID := r.seedSetWithBinding(t,
+		map[string]string{".codex/config.toml": "u = \"{{provider.openai.base_url}}\"\n"},
+		&providers.Binding{Provider: provID})
+	_, err := r.sets.Assign(m, setID, "apply")
+	require.NoError(t, err)
+
+	_, err = r.svc.Snapshot(m)
+	require.ErrorIs(t, err, configsync.ErrEndpointMissing)
+	require.Contains(t, err.Error(), "openai")
+}
+
+// 端点缺失走到 Pull：指派置 failed 且**不置** degraded——
+// 机器上什么都没被改过，不需要人工解除（spec §4.3）。
+func TestPullMarksAssignmentFailedOnEndpointMissing(t *testing.T) {
+	r := newRig(t)
+	m := r.machine(t, "fp-ep-fail")
+	provID := r.seedProvider(t, "只有 claude",
+		"https://open.bigmodel.cn/api/anthropic", "sk-zhipu-abcdef123456")
+	setID := r.seedSetWithBinding(t,
+		map[string]string{".codex/config.toml": "u = \"{{provider.openai.base_url}}\"\n"},
+		&providers.Binding{Provider: provID})
+	_, err := r.sets.Assign(m, setID, "apply")
+	require.NoError(t, err)
+
+	r.svc.Pull(m, protocol.ConfigPull{Have: ""})
+
+	assign, err := r.sets.Assignment(m)
+	require.NoError(t, err)
+	require.Equal(t, "failed", assign.GetString("state"))
+	require.NotEqual(t, "degraded", assign.GetString("state"),
+		"机器上什么都没被改过，不需要人工解除")
+	require.Contains(t, assign.GetString("last_error"), "openai")
+	require.Empty(t, r.sender.of(protocol.KindConfigSnapshot), "不许下发任何快照")
+}
+
+// 轮换 provider 的 key → 重注入全机队、不产生新 Revision。
+// 这是 M1.5「改 Provider 不产生新 Revision」不变量在 key 内联之后的延续。
+func TestRotatingProviderKeyReinjectsWithoutNewRevision(t *testing.T) {
+	r := newRig(t)
+	m := r.machine(t, "fp-rotate")
+	provID := r.seedProvider(t, "智谱 GLM",
+		"https://open.bigmodel.cn/api/anthropic", "sk-zhipu-old-000000")
+	setID := r.seedSetWithBinding(t, map[string]string{
+		".claude/settings.json": `{"env":{` +
+			`"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}",` +
+			`"ANTHROPIC_AUTH_TOKEN":"{{provider.claude.auth_token}}"}}`,
+	}, &providers.Binding{Provider: provID})
+	_, err := r.sets.Assign(m, setID, "apply")
+	require.NoError(t, err)
+
+	before := r.revisionCount(t, setID)
+
+	in := r.inputFor(t, provID, "https://open.bigmodel.cn/api/anthropic")
+	newKey := "sk-zhipu-new-999999"
+	in.Key = &newKey
+	_, err = r.provs.Update(provID, in)
+	require.NoError(t, err)
+	require.NoError(t, r.svc.NotifyProvider(provID))
+
+	require.Equal(t, before, r.revisionCount(t, setID),
+		"轮换 key 绝不产生新 Revision")
+
+	snap, err := r.svc.Snapshot(m)
+	require.NoError(t, err)
+	require.Equal(t, "sk-zhipu-new-999999", snap.Provider["claude.auth_token"])
+
+	// 收到的是不带 RevisionID 的 ConfigNotify（= 仅 secrets 变更）。
+	notifies := r.sender.of(protocol.KindConfigNotify)
+	require.Len(t, notifies, 1)
+	n := notifies[0].payload.(protocol.ConfigNotify)
+	require.Empty(t, n.RevisionID)
+	require.Equal(t, protocol.ReasonRotated, n.Reason)
 }
