@@ -29,17 +29,17 @@ describe('env 片段', () => {
   it('往空 settings.json 里插入六个键的占位符块', () => {
     const out = insertEnvSnippet('{}', 'ANTHROPIC_AUTH_TOKEN')
     const parsed = JSON.parse(out)
-    expect(parsed.env.ANTHROPIC_BASE_URL).toBe('{{provider.base_url}}')
-    expect(parsed.env.ANTHROPIC_AUTH_TOKEN).toBe('{{provider.auth_token}}')
-    expect(parsed.env.ANTHROPIC_MODEL).toBe('{{provider.model}}')
-    expect(parsed.env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe('{{provider.model_opus}}')
-    expect(parsed.env.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe('{{provider.model_sonnet}}')
-    expect(parsed.env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe('{{provider.model_haiku}}')
+    expect(parsed.env.ANTHROPIC_BASE_URL).toBe('{{provider.claude.base_url}}')
+    expect(parsed.env.ANTHROPIC_AUTH_TOKEN).toBe('{{provider.claude.auth_token}}')
+    expect(parsed.env.ANTHROPIC_MODEL).toBe('{{provider.claude.model}}')
+    expect(parsed.env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe('{{provider.claude.model_opus}}')
+    expect(parsed.env.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe('{{provider.claude.model_sonnet}}')
+    expect(parsed.env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe('{{provider.claude.model_haiku}}')
   })
 
   it('用 API_KEY 鉴权的平台插的是 ANTHROPIC_API_KEY', () => {
     const parsed = JSON.parse(insertEnvSnippet('{}', 'ANTHROPIC_API_KEY'))
-    expect(parsed.env.ANTHROPIC_API_KEY).toBe('{{provider.auth_token}}')
+    expect(parsed.env.ANTHROPIC_API_KEY).toBe('{{provider.claude.auth_token}}')
     expect(parsed.env.ANTHROPIC_AUTH_TOKEN).toBeUndefined()
   })
 
@@ -52,7 +52,7 @@ describe('env 片段', () => {
     )
     expect(parsed.permissions.allow).toEqual(['Bash'])
     expect(parsed.env.MY_VAR).toBe('1')
-    expect(parsed.env.ANTHROPIC_BASE_URL).toBe('{{provider.base_url}}')
+    expect(parsed.env.ANTHROPIC_BASE_URL).toBe('{{provider.claude.base_url}}')
   })
 
   it('内容不是合法 JSON 时原样返回，绝不写坏用户的文件', () => {
@@ -62,9 +62,11 @@ describe('env 片段', () => {
 
 describe('hasProviderRefs', () => {
   it('认得引用', () => {
-    expect(hasProviderRefs('{"a":"{{provider.base_url}}"}')).toBe(true)
+    expect(hasProviderRefs('{"a":"{{provider.claude.base_url}}"}')).toBe(true)
+    expect(hasProviderRefs('{"a":"{{provider.openai.api_key}}"}')).toBe(true)
+    expect(hasProviderRefs('{"a":"{{provider.base_url}}"}')).toBe(false)
     expect(hasProviderRefs('{"a":"{{cred.k}}"}')).toBe(false)
     // 转义的不算
-    expect(hasProviderRefs('写法是 {{{{provider.base_url}}')).toBe(false)
+    expect(hasProviderRefs('写法是 {{{{provider.claude.base_url}}')).toBe(false)
   })
 })

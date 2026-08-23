@@ -34,15 +34,20 @@ export function hasProviderRefs(text: string): boolean {
   return parsePlaceholders(text).refs.some((r) => r.kind === 'provider')
 }
 
-/** env 片段的六个键名 → 占位符。authField 决定承载 key 的那一行的键名。 */
+/**
+ * env 片段的六个键名 → 占位符。authField 决定承载 key 的那一行的键名。
+ *
+ * 六个全部是 **claude 端点**：受管范围只有 .claude/**，openai 端点本期
+ * 没有消费者（M1.6 spec §1.3）。接 Codex 时会另起一套片段。
+ */
 export function envSnippet(authField: AuthField): Record<string, string> {
   return {
-    ANTHROPIC_BASE_URL: '{{provider.base_url}}',
-    [authField]: '{{provider.auth_token}}',
-    ANTHROPIC_MODEL: '{{provider.model}}',
-    ANTHROPIC_DEFAULT_OPUS_MODEL: '{{provider.model_opus}}',
-    ANTHROPIC_DEFAULT_SONNET_MODEL: '{{provider.model_sonnet}}',
-    ANTHROPIC_DEFAULT_HAIKU_MODEL: '{{provider.model_haiku}}',
+    ANTHROPIC_BASE_URL: '{{provider.claude.base_url}}',
+    [authField]: '{{provider.claude.auth_token}}',
+    ANTHROPIC_MODEL: '{{provider.claude.model}}',
+    ANTHROPIC_DEFAULT_OPUS_MODEL: '{{provider.claude.model_opus}}',
+    ANTHROPIC_DEFAULT_SONNET_MODEL: '{{provider.claude.model_sonnet}}',
+    ANTHROPIC_DEFAULT_HAIKU_MODEL: '{{provider.claude.model_haiku}}',
   }
 }
 

@@ -1,16 +1,19 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { FindingList, type FindingAction } from '@/components/FindingList'
-import { PromptDialog } from '@/components/PromptDialog'
+import { ExtractDialog } from '@/components/ExtractDialog'
 import {
   startImport,
   importFindings,
-  extractCredential,
+  extractKey,
+  matchProviderIn,
   removeDraftFile,
   publishConfigSet,
   validateConfigSet,
 } from '@/lib/api'
 import { reloadConfigSet } from '@/stores/configsets'
+import { $providers, subscribeProviders } from '@/stores/providers'
+import { useStore } from '@nanostores/react'
 import { navigate } from '@/router'
 import type { Finding, ValidateProblem } from '@/types/collections'
 import { pb } from '@/lib/pb'
@@ -43,6 +46,10 @@ export function ImportWizard({
   const [error, setError] = useState('')
   const [waiting, setWaiting] = useState(false)
   const [extractTarget, setExtractTarget] = useState<Finding | null>(null)
+  const [suggested, setSuggested] = useState<string | undefined>()
+  const providers = useStore($providers)
+
+  useEffect(() => subscribeProviders(), [])
 
   const loadDraft = useCallback(async (id: string) => {
     const rec = await pb.collection(COLLECTION_CONFIG_SETS).getOne<ConfigSetRecord>(id)
@@ -106,13 +113,13 @@ export function ImportWizard({
     }
   }
 
-  async function extractFinding(f: Finding, name: string) {
+  async function extractFinding(f: Finding, providerId: string, endpoint: 'claude' | 'openai') {
     if (!setId) return
     const key = `${f.path}:${f.location}`
     setBusy(true)
     setError('')
     try {
-      await extractCredential(setId, f.path, f.location, name)
+      await extractKey(setId, f.path, f.location, providerId, endpoint)
       setHandled((h) => new Set(h).add(key))
       setExtractTarget(null)
       await loadDraft(setId)
@@ -128,6 +135,14 @@ export function ImportWizard({
     const key = `${f.path}:${f.location}`
     if (action === 'extract') {
       setExtractTarget(f)
+      // 反查这个文件里的 base_url，命中就预选那条 provider（spec §5.5 第 2 步）。
+      // 反查失败不挡路：让用户自己选。
+      try {
+        const m = await matchProviderIn(setId, f.path)
+        setSuggested(m.kind === 'provider' ? m.provider_id : undefined)
+      } catch {
+        setSuggested(undefined)
+      }
       return
     }
     if (action === 'keep') {
@@ -324,13 +339,12 @@ export function ImportWizard({
       )}
 
       {extractTarget && (
-        <PromptDialog
-          title={t`抽取为凭据`}
-          label={t`凭据名称`}
-          defaultValue={extractTarget.suggested || extractTarget.key.toLowerCase()}
-          confirmLabel={t`抽取为凭据`}
+        <ExtractDialog
+          providers={providers}
+          suggestedProviderId={suggested}
+          masked={extractTarget.masked}
           busy={busy}
-          onSubmit={(name) => void extractFinding(extractTarget, name)}
+          onSubmit={(pid, ep) => void extractFinding(extractTarget, pid, ep)}
           onClose={() => setExtractTarget(null)}
         />
       )}

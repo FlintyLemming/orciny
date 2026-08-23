@@ -121,8 +121,11 @@ export function Inbox() {
   }
 
   /**
-   * 第二档：用预设新建服务配置（顺手把机器上手写的 key 抽成凭据），
-   * 建成后立刻回到第一档的动作——这就是 spec §6.3 说的「建成后回到上一行」。
+   * 第二档：用预设新建服务配置（顺手把机器上手写的 key 内联进它的 claude
+   * 端点），建成后立刻回到第一档的动作——这就是 M1.5 spec §6.3 说的
+   * 「建成后回到上一行」。
+   *
+   * 端点恒为 claude：漂移源只有 .claude/**（M1.6 spec §1.3）。
    */
   async function handleCreateProvider(
     eventID: string,
@@ -140,16 +143,23 @@ export function Inbox() {
       const { id } = await createProviderFromDrift({
         name: preset.name,
         preset: preset.id,
-        base_url: preset.base_url,
-        auth_field: preset.auth_field,
-        credential: '',
-        models: preset.models,
-        defaults: preset.defaults,
         note: t`从收件箱的绑定漂移创建`,
+        claude: {
+          base_url: preset.claude.base_url,
+          auth_field: preset.claude.auth_field,
+          models: preset.claude.models,
+          defaults: preset.claude.defaults,
+        },
+        openai: {
+          base_url: preset.openai.base_url,
+          auth_field: preset.openai.auth_field,
+          models: preset.openai.models,
+          default_model: preset.openai.default_model,
+        },
         from_drift: {
           event: eventID,
           location: keyLocation,
-          name: `${preset.id}_key`,
+          endpoint: 'claude',
         },
       })
       await reloadProviders()

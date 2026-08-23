@@ -17,18 +17,38 @@ const presets: ProviderPreset[] = [
   {
     id: 'zhipu',
     name: 'Zhipu GLM',
-    base_url: 'https://open.bigmodel.cn/api/anthropic',
-    auth_field: 'ANTHROPIC_AUTH_TOKEN',
-    models: ['glm-5.1', 'glm-4.7'],
-    defaults: { main: 'glm-5.1', opus: 'glm-5.1', sonnet: 'glm-5.1', haiku: 'glm-5.1' },
+    claude: {
+      base_url: 'https://open.bigmodel.cn/api/anthropic',
+      auth_field: 'ANTHROPIC_AUTH_TOKEN',
+      models: ['glm-5.2', 'glm-4.7'],
+      defaults: { main: 'glm-5.2', opus: 'glm-5.2', sonnet: 'glm-5.2', haiku: 'glm-4.7' },
+      default_model: '',
+    },
+    openai: {
+      base_url: 'https://open.bigmodel.cn/api/paas/v4',
+      auth_field: 'OPENAI_API_KEY',
+      models: ['glm-5.2'],
+      defaults: { main: '', opus: '', sonnet: '', haiku: '' },
+      default_model: 'glm-5.2',
+    },
   },
   {
     id: 'anthropic',
     name: 'Anthropic Official',
-    base_url: 'https://api.anthropic.com',
-    auth_field: 'ANTHROPIC_API_KEY',
-    models: ['claude-opus-5'],
-    defaults: { main: '', opus: '', sonnet: '', haiku: '' },
+    claude: {
+      base_url: 'https://api.anthropic.com',
+      auth_field: 'ANTHROPIC_API_KEY',
+      models: ['claude-opus-5'],
+      defaults: { main: '', opus: '', sonnet: '', haiku: '' },
+      default_model: '',
+    },
+    openai: {
+      base_url: '',
+      auth_field: 'OPENAI_API_KEY',
+      models: [],
+      defaults: { main: '', opus: '', sonnet: '', haiku: '' },
+      default_model: '',
+    },
   },
 ]
 
@@ -36,82 +56,161 @@ const editing: ProviderRecord = {
   id: 'p1',
   name: '智谱 GLM · 个人',
   preset: 'zhipu',
-  base_url: 'https://open.bigmodel.cn/api/anthropic',
-  auth_field: 'ANTHROPIC_AUTH_TOKEN',
-  credential: 'c1',
-  models: ['glm-5.1'],
-  defaults: presets[0].defaults,
   note: '',
+  key_last4: 'a1b2',
+  claude: {
+    base_url: 'https://open.bigmodel.cn/api/anthropic',
+    auth_field: 'ANTHROPIC_AUTH_TOKEN',
+    key_last4: 'a1b2',
+    models: ['glm-5.2'],
+    defaults: { main: 'glm-5.2', opus: 'glm-5.2', sonnet: 'glm-5.2', haiku: 'glm-4.7' },
+  },
+  openai: null,
   created: '',
   updated: '',
 }
 
 describe('ProviderDialog', () => {
-  it('选平台自动带出 base_url、auth_field 与模型清单', async () => {
-    render(
-      wrap(
-        <ProviderDialog
-          presets={presets}
-          credentials={[]}
-          onClose={vi.fn()}
-          onSaved={vi.fn()}
-        />,
-      ),
-    )
-    await userEvent.click(screen.getByRole('button', { name: /Zhipu GLM/ }))
+  it('选预设时两个端点一起带出', async () => {
+    render(wrap(<ProviderDialog presets={presets} onClose={vi.fn()} onSaved={vi.fn()} />))
+    await userEvent.click(screen.getByText('Zhipu GLM'))
 
-    expect(screen.getByLabelText('base_url')).toHaveValue(
+    expect(screen.getByLabelText('claude base_url')).toHaveValue(
       'https://open.bigmodel.cn/api/anthropic',
     )
-    expect(screen.getByLabelText('auth_field')).toHaveValue('ANTHROPIC_AUTH_TOKEN')
-    expect(screen.getByText('glm-5.1')).toBeInTheDocument()
-  })
-
-  it('选「自定义」时 base_url 留空、可自由填写', async () => {
-    render(
-      wrap(
-        <ProviderDialog
-          presets={presets}
-          credentials={[]}
-          onClose={vi.fn()}
-          onSaved={vi.fn()}
-        />,
-      ),
+    expect(screen.getByLabelText('openai base_url')).toHaveValue(
+      'https://open.bigmodel.cn/api/paas/v4',
     )
-    await userEvent.click(screen.getByRole('button', { name: /Zhipu GLM/ }))
-    await userEvent.click(screen.getByRole('button', { name: /自定义|Custom/ }))
-    expect(screen.getByLabelText('base_url')).toHaveValue('')
+    expect(screen.getByLabelText('openai auth_field')).toHaveValue('OPENAI_API_KEY')
   })
 
-  it('编辑既有服务配置时明确提示会立即重注入且不产生新版本', () => {
+  it('平台没有 openai 口时那一侧留空并说明', async () => {
+    render(wrap(<ProviderDialog presets={presets} onClose={vi.fn()} onSaved={vi.fn()} />))
+    await userEvent.click(screen.getByText('Anthropic Official'))
+
+    // openai 分区没配 base_url，默认折叠——先展开再看。
+    await userEvent.click(screen.getByRole('button', { name: /OpenAI 端点/ }))
+    expect(screen.getByLabelText('openai base_url')).toHaveValue('')
+    expect(screen.getByText(/该平台未提供 OpenAI 端点/)).toBeTruthy()
+  })
+
+  it('端点状态是显示不是开关：清空 base_url 即未配置', async () => {
+    render(wrap(<ProviderDialog presets={presets} onClose={vi.fn()} onSaved={vi.fn()} />))
+    await userEvent.click(screen.getByText('Zhipu GLM'))
+    expect(screen.getByTestId('openai-status')).toHaveTextContent('已配置')
+
+    await userEvent.clear(screen.getByLabelText('openai base_url'))
+    expect(screen.getByTestId('openai-status')).toHaveTextContent('未配置')
+
+    // 没有任何 checkbox / switch 可以单独开关端点
+    expect(screen.queryByRole('switch')).toBeNull()
+    expect(screen.queryByRole('checkbox')).toBeNull()
+  })
+
+  it('OpenAI 分区带「本期不产生注入」的说明', async () => {
+    render(wrap(<ProviderDialog presets={presets} onClose={vi.fn()} onSaved={vi.fn()} />))
+    await userEvent.click(screen.getByRole('button', { name: /OpenAI 端点/ }))
+    expect(screen.getByTestId('openai-inert-note')).toBeTruthy()
+  })
+
+  it('编辑态密码框为空，提示留空则不修改，右侧显示末四位', () => {
     render(
       wrap(
         <ProviderDialog
           presets={presets}
-          credentials={[]}
           editing={editing}
-          boundSetCount={3}
           onClose={vi.fn()}
           onSaved={vi.fn()}
         />,
       ),
     )
-    expect(screen.getByTestId('reinject-hint')).toHaveTextContent(/不产生新版本|new version/)
-    expect(screen.getByTestId('reinject-hint')).toHaveTextContent('3')
+    const key = screen.getByLabelText('API key')
+    expect(key).toHaveValue('')
+    expect(key).toHaveAttribute('placeholder', expect.stringContaining('留空则不修改'))
+    expect(screen.getAllByText('····a1b2').length).toBeGreaterThan(0)
   })
 
-  it('缺 base_url 或 凭据 时保存按钮禁用', async () => {
+  it('编辑态保存时不带 key 字段——留空 = 不修改', async () => {
+    const save = vi.fn().mockResolvedValue(undefined)
     render(
       wrap(
         <ProviderDialog
           presets={presets}
-          credentials={[]}
+          editing={editing}
+          onClose={vi.fn()}
+          onSaved={vi.fn()}
+          onSubmit={save}
+        />,
+      ),
+    )
+    await userEvent.click(screen.getByText('保存'))
+
+    const body = save.mock.calls[0][0]
+    expect('key' in body).toBe(false)
+    expect('key' in body.claude).toBe(false)
+  })
+
+  it('填了端点级 key 就带上它', async () => {
+    const save = vi.fn().mockResolvedValue(undefined)
+    render(
+      wrap(
+        <ProviderDialog
+          presets={presets}
+          editing={editing}
+          onClose={vi.fn()}
+          onSaved={vi.fn()}
+          onSubmit={save}
+        />,
+      ),
+    )
+    await userEvent.type(screen.getByLabelText('claude 单独的 key'), 'sk-claude-abcdef12')
+    await userEvent.click(screen.getByText('保存'))
+
+    expect(save.mock.calls[0][0].claude.key).toBe('sk-claude-abcdef12')
+  })
+
+  it('点「清除」把端点级 key 显式清空——留空是「不修改」，撤不掉已设的值', async () => {
+    const save = vi.fn().mockResolvedValue(undefined)
+    render(
+      wrap(
+        <ProviderDialog
+          presets={presets}
+          editing={editing}
+          onClose={vi.fn()}
+          onSaved={vi.fn()}
+          onSubmit={save}
+        />,
+      ),
+    )
+    await userEvent.click(screen.getAllByText('清除')[1])
+    await userEvent.click(screen.getByText('保存'))
+
+    expect(save.mock.calls[0][0].claude.key).toBe('')
+  })
+
+  it('新建时配了 base_url 却没有任何 key 则禁止保存', async () => {
+    render(wrap(<ProviderDialog presets={presets} onClose={vi.fn()} onSaved={vi.fn()} />))
+    await userEvent.click(screen.getByText('Zhipu GLM'))
+    await userEvent.type(screen.getByLabelText('名称'), '智谱个人')
+
+    expect(screen.getByText('保存')).toBeDisabled()
+
+    await userEvent.type(screen.getByLabelText('API key'), 'sk-zhipu-abcdef12')
+    expect(screen.getByText('保存')).not.toBeDisabled()
+  })
+
+  it('编辑态显示重注入提示', () => {
+    render(
+      wrap(
+        <ProviderDialog
+          presets={presets}
+          editing={editing}
+          boundSetCount={2}
           onClose={vi.fn()}
           onSaved={vi.fn()}
         />,
       ),
     )
-    await userEvent.click(screen.getByRole('button', { name: /Zhipu GLM/ }))
-    expect(screen.getByRole('button', { name: /^保存$|^Save$/ })).toBeDisabled()
+    expect(screen.getByTestId('reinject-hint')).toBeTruthy()
   })
 })

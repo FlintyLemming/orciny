@@ -7,7 +7,6 @@
 
 import { pb } from '@/lib/pb'
 import type {
-  AuthField,
   Binding,
   BindingMatchResult,
   FileEntry,
@@ -156,18 +155,6 @@ export function assignConfigSet(machine: string, config_set: string, mode: 'appl
   return postJSON('/api/orciny/assignments', { machine, config_set, mode })
 }
 
-export function createCredential(name: string, value: string, note = '') {
-  return postJSON('/api/orciny/credentials', { name, value, note })
-}
-
-export function rotateCredential(id: string, value: string) {
-  return postJSON(`/api/orciny/credentials/${id}/rotate`, { value })
-}
-
-export function deleteCredential(id: string) {
-  return deleteJSON(`/api/orciny/credentials/${id}`)
-}
-
 export function setMachineVariables(machineId: string, vars: Record<string, string>) {
   return putJSON(`/api/orciny/machines/${machineId}/variables`, vars)
 }
@@ -182,8 +169,27 @@ export function importFindings(setId: string) {
   return getJSON<Finding[]>(`/api/orciny/config-sets/${setId}/findings`)
 }
 
-export function extractCredential(setId: string, path: string, location: string, name: string) {
-  return postJSON(`/api/orciny/config-sets/${setId}/extract`, { path, location, name })
+/** 把草稿里某处的值抽成某个 provider 端点的 key（M1.6 spec §5.5）。 */
+export function extractKey(
+  setId: string,
+  path: string,
+  location: string,
+  provider: string,
+  endpoint: 'claude' | 'openai',
+) {
+  return postJSON(`/api/orciny/config-sets/${setId}/extract`, {
+    path,
+    location,
+    provider,
+    endpoint,
+  })
+}
+
+/** 反查文件里的 base_url，供抽取向导预选 provider。 */
+export function matchProviderIn(setId: string, path: string) {
+  return getJSON<ProviderMatch>(
+    `/api/orciny/config-sets/${setId}/provider-match?path=${encodeURIComponent(path)}`,
+  )
 }
 
 export function adoptDrift(events: string[], reviewed: string[] = []) {
@@ -207,15 +213,34 @@ export function clearDegraded(machineId: string) {
 
 // ---------- M1.5 AI 服务配置与绑定 ----------
 
+export interface EndpointBody {
+  base_url: string
+  auth_field?: string
+  models: string[]
+  /** 省略 = 不修改；'' = 清空；有值 = 替换（M1.6 spec §5.2） */
+  key?: string
+  defaults?: ModelSlots
+  default_model?: string
+}
+
 export interface ProviderBody {
   name: string
   preset: string
-  base_url: string
-  auth_field: AuthField
-  credential: string
-  models: string[]
-  defaults: ModelSlots
   note: string
+  /** 平台级 key，三态同 EndpointBody.key */
+  key?: string
+  claude: EndpointBody
+  openai: EndpointBody
+}
+
+/** providers.MatchBaseURL 的反查结果（M1.5 spec §6.3 的三档）。 */
+export interface ProviderMatch {
+  kind: 'provider' | 'preset' | 'none'
+  exact: boolean
+  provider_id?: string
+  provider_name?: string
+  preset_id?: string
+  preset_name?: string
 }
 
 export function listProviderPresets() {
@@ -255,7 +280,9 @@ export function rebindDrift(eventId: string, provider: string) {
 }
 
 export function createProviderFromDrift(
-  body: ProviderBody & { from_drift: { event: string; location: string; name: string } },
+  body: ProviderBody & {
+    from_drift: { event: string; location: string; endpoint: 'claude' | 'openai' }
+  },
 ) {
   return postJSON<{ id: string }>('/api/orciny/providers', body)
 }

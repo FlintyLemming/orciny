@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '@nanostores/react'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { $variables, subscribeVariables } from '@/stores/credentials'
+import { $variables, subscribeVariables } from '@/stores/variables'
 import { setMachineVariables } from '@/lib/api'
 
 export function VariablesEditor({ machineId }: { machineId: string }) {

@@ -44,6 +44,8 @@ export type EventKind =
   | 'drift.restored'
   | 'drift.ignored'
   | 'drift.superseded'
+  // 以下三个 kind 在 M1.6 之后不再产生，但历史事件仍带着它们，
+  // 留在联合类型里是为了让收件箱与事件流能把老记录渲染出来。
   | 'credential.created'
   | 'credential.rotated'
   | 'credential.deleted'
@@ -94,30 +96,52 @@ export interface Binding {
   models: ModelSlots
 }
 
+/** 一个协议端点。密文永不下发到前端——它是后端的 Hidden 字段。 */
+export interface EndpointRecord {
+  base_url: string
+  auth_field: string
+  /** 实际生效的那把 key 的末四位，UI 回显用 */
+  key_last4?: string
+  models: string[] | null
+}
+
+export interface ClaudeEndpointRecord extends EndpointRecord {
+  defaults: ModelSlots | null
+}
+
+export interface OpenAIEndpointRecord extends EndpointRecord {
+  default_model: string
+}
+
+/** 一条记录 = 一家平台，内含两个协议端点（M1.6 spec §2.1）。 */
 export interface ProviderRecord {
   id: string
   name: string
   preset: string
-  base_url: string
-  auth_field: AuthField
-  /** credentials 记录 id；key 本身永不下发到前端 */
-  credential: string
-  models: string[] | null
-  defaults: ModelSlots | null
   note: string
+  /** 平台级 key 的末四位 */
+  key_last4: string
+  claude: ClaudeEndpointRecord | null
+  openai: OpenAIEndpointRecord | null
   created: string
   updated: string
-  expand?: { credential?: CredentialRecord }
 }
 
-/** 内置预设。编译进 hub 二进制，只读（M1.5 spec §2.3）。 */
+/** 预设表里的一个协议端点。base_url 为空 = 该平台没有这个口。 */
+export interface PresetEndpoint {
+  base_url: string
+  auth_field: string
+  models: string[]
+  defaults: ModelSlots
+  default_model: string
+}
+
+/** 内置预设。一条平台两组端点（M1.6 spec §5.6）。 */
 export interface ProviderPreset {
   id: string
   name: string
-  base_url: string
-  auth_field: AuthField
-  models: string[]
-  defaults: ModelSlots
+  claude: PresetEndpoint
+  openai: PresetEndpoint
   website_url?: string
   api_key_url?: string
   icon?: string
@@ -128,7 +152,6 @@ export interface ProviderPreset {
 
 /** refs / draft_refs 的形状，与 Go 侧 configsets.Refs 一致。 */
 export interface RefsField {
-  creds: string[]
   vars: string[]
   provider_keys: string[]
 }
@@ -193,16 +216,6 @@ export interface AssignmentRecord {
     applied_revision?: RevisionRecord
     machine?: MachineRecord
   }
-}
-
-export interface CredentialRecord {
-  id: string
-  name: string
-  /** 永不下发明文；前端只能看见 last4 */
-  last4: string
-  note: string
-  created: string
-  updated: string
 }
 
 export interface VariableRecord {
@@ -291,7 +304,6 @@ export const COLLECTION_EVENTS = 'events'
 export const COLLECTION_CONFIG_SETS = 'config_sets'
 export const COLLECTION_REVISIONS = 'revisions'
 export const COLLECTION_ASSIGNMENTS = 'assignments'
-export const COLLECTION_CREDENTIALS = 'credentials'
 export const COLLECTION_VARIABLES = 'variables'
 export const COLLECTION_DRIFT_EVENTS = 'drift_events'
 export const COLLECTION_IGNORE_RULES = 'ignore_rules'

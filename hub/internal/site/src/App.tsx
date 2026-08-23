@@ -9,7 +9,6 @@ import { MachineDetail } from '@/pages/MachineDetail'
 import { Settings } from '@/pages/Settings'
 import { ConfigSets } from '@/pages/ConfigSets'
 import { ConfigSetDetail } from '@/pages/ConfigSetDetail'
-import { Credentials } from '@/pages/Credentials'
 import { Providers } from '@/pages/Providers'
 import { ImportWizard } from '@/pages/ImportWizard'
 import { Inbox } from '@/pages/Inbox'
@@ -25,7 +24,6 @@ export function App() {
       {route.key === 'settings' && <Settings />}
       {route.key === 'configsets' && (route.param ? <ConfigSetDetail id={route.param} /> : <ConfigSets />)}
       {route.key === 'providers' && <Providers />}
-      {route.key === 'credentials' && <Credentials />}
       {route.key === 'import' && <ImportWizard machineId={route.param} />}
       {route.key === 'inbox' && <Inbox />}
       {(route.key === 'overview' || route.key === 'usage' || route.key === 'subscriptions') && (

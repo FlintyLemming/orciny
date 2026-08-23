@@ -6,12 +6,12 @@ import { atom } from 'nanostores'
  */
 export type RouteKey =
   | 'overview' | 'machines' | 'configsets' | 'inbox'
-  | 'usage' | 'subscriptions' | 'providers' | 'credentials' | 'settings'
+  | 'usage' | 'subscriptions' | 'providers' | 'settings'
   | 'import'
 
 const known: RouteKey[] = [
   'overview', 'machines', 'configsets', 'inbox',
-  'usage', 'subscriptions', 'providers', 'credentials', 'settings', 'import',
+  'usage', 'subscriptions', 'providers', 'settings', 'import',
 ]
 
 function parseHash(): { key: RouteKey; param?: string } {

@@ -18,12 +18,35 @@ const provider: ProviderRecord = {
   id: 'p1',
   name: '智谱 GLM · 个人',
   preset: 'zhipu',
-  base_url: 'https://open.bigmodel.cn/api/anthropic',
-  auth_field: 'ANTHROPIC_AUTH_TOKEN',
-  credential: 'c1',
-  models: ['glm-5.1', 'glm-4.7'],
-  defaults: null,
   note: '',
+  key_last4: 'a1b2',
+  claude: {
+    base_url: 'https://open.bigmodel.cn/api/anthropic',
+    auth_field: 'ANTHROPIC_AUTH_TOKEN',
+    key_last4: 'a1b2',
+    models: ['glm-5.1', 'glm-4.7'],
+    defaults: null,
+  },
+  openai: null,
+  created: '',
+  updated: '',
+}
+
+/** 只配了 openai 端点：绑不上，下拉里要置灰（M1.6 spec §5.3）。 */
+const noClaude: ProviderRecord = {
+  id: 'p2',
+  name: '只有 OpenAI 的中转',
+  preset: '',
+  note: '',
+  key_last4: 'ffff',
+  claude: null,
+  openai: {
+    base_url: 'https://relay.example/v1',
+    auth_field: 'OPENAI_API_KEY',
+    key_last4: 'ffff',
+    models: ['gpt-5.2'],
+    default_model: 'gpt-5.2',
+  },
   created: '',
   updated: '',
 }
@@ -93,7 +116,7 @@ describe('BindingBar', () => {
         <BindingBar
           providers={[provider]}
           binding={{ provider: 'p1', models: fillAllSlots('glm-5.1') }}
-          settingsText='{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}"}}'
+          settingsText='{"env":{"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}"}}'
           onChange={vi.fn()}
           onInsertSnippet={vi.fn()}
         />,
@@ -134,5 +157,39 @@ describe('BindingBar', () => {
     await userEvent.click(screen.getByRole('button', { name: /高级|Advanced/ }))
     await userEvent.click(screen.getByLabelText(/透传模式|Passthrough/))
     expect(onChange).toHaveBeenCalledWith({ provider: 'p1', models: emptySlots() })
+  })
+})
+
+describe('BindingBar 的端点感知', () => {
+  it('没配 claude 端点的 provider 在下拉里置灰', () => {
+    render(
+      wrap(
+        <BindingBar
+          providers={[provider, noClaude]}
+          binding={null}
+          settingsText="{}"
+          onChange={vi.fn()}
+          onInsertSnippet={vi.fn()}
+        />,
+      ),
+    )
+    const opt = screen.getByRole('option', { name: /只有 OpenAI 的中转/ })
+    expect(opt).toBeDisabled()
+    expect(opt).toHaveAttribute('title', expect.stringContaining('还没有 Claude 端点'))
+  })
+
+  it('模型下拉取 claude 端点的模型清单', () => {
+    render(
+      wrap(
+        <BindingBar
+          providers={[provider]}
+          binding={{ provider: 'p1', models: emptySlots() }}
+          settingsText="{}"
+          onChange={vi.fn()}
+          onInsertSnippet={vi.fn()}
+        />,
+      ),
+    )
+    expect(screen.getByRole('option', { name: 'glm-5.1' })).toBeTruthy()
   })
 })

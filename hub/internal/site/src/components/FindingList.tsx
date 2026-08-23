@@ -44,7 +44,7 @@ export function FindingList({
               className="rounded bg-accent px-2 py-1 text-xs text-white"
               onClick={() => onAction('extract', f)}
             >
-              <Trans>抽取为凭据</Trans>
+              <Trans>抽成服务配置的 key</Trans>
             </button>
             <button
               type="button"
@@ -66,7 +66,7 @@ export function FindingList({
 
       {confirmKeep && (
         <ConfirmDialog
-          message={t`该值将进入不可变的版本历史。确定保留明文？`}
+          message={t`该值将进入不可变的版本历史。非 AI 平台的密钥没有加密去处——可以改用机器变量（不加密），或把这个文件移出纳管范围。确定保留明文？`}
           onConfirm={() => {
             onAction('keep', confirmKeep)
             setConfirmKeep(null)

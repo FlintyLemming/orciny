@@ -29,7 +29,8 @@ export function BindingBar({
   const [advanced, setAdvanced] = useState(false)
 
   const provider = providers.find((p) => p.id === binding?.provider)
-  const models = provider?.models ?? []
+  // 模型清单取 claude 端点：绑定本期恒指 claude（M1.6 spec §1.3）。
+  const models = provider?.claude?.models ?? []
   const slots = binding?.models ?? emptySlots()
 
   function setSlot(key: keyof ModelSlots, value: string) {
@@ -55,11 +56,22 @@ export function BindingBar({
           }}
         >
           <option value="">{t`未绑定`}</option>
-          {providers.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
+          {providers.map((p) => {
+            // 没配 claude 端点的 provider 绑不上：让不可能成功的操作在点下去
+            // 之前就说明原因，而不是点完弹一个发布校验错误（M1.6 spec §5.3）。
+            const usable = Boolean(p.claude?.base_url)
+            return (
+              <option
+                key={p.id}
+                value={p.id}
+                disabled={!usable}
+                title={usable ? undefined : t`这条服务配置还没有 Claude 端点`}
+              >
+                {p.name}
+                {usable ? '' : t` （无 Claude 端点）`}
+              </option>
+            )
+          })}
         </select>
 
         {binding && (

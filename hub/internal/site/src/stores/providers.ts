@@ -14,35 +14,38 @@ function byName(a: ProviderRecord, b: ProviderRecord) {
 }
 
 /**
- * 订阅事件里 expand 的 credential 可能带 cipher_value，
- * 照 stores/credentials.ts 的做法只留非敏感字段。
+ * 白名单式过滤：只把已知的非敏感字段放进 store。
+ *
+ * 密文本来就是后端的 Hidden 字段、PocketBase 不会下发；这里再挡一道，
+ * 是因为「有一天有人把 Hidden 摘了」的代价是把 key 的密文塞进浏览器内存。
  */
-function sanitize(raw: ProviderRecord): ProviderRecord {
-  const cred = raw.expand?.credential
+export function sanitizeProvider(raw: ProviderRecord): ProviderRecord {
   return {
     id: raw.id,
     name: raw.name,
     preset: raw.preset,
-    base_url: raw.base_url,
-    auth_field: raw.auth_field,
-    credential: raw.credential,
-    models: raw.models,
-    defaults: raw.defaults,
     note: raw.note,
+    key_last4: raw.key_last4 ?? '',
+    claude: raw.claude
+      ? {
+          base_url: raw.claude.base_url,
+          auth_field: raw.claude.auth_field,
+          key_last4: raw.claude.key_last4,
+          models: raw.claude.models,
+          defaults: raw.claude.defaults,
+        }
+      : null,
+    openai: raw.openai
+      ? {
+          base_url: raw.openai.base_url,
+          auth_field: raw.openai.auth_field,
+          key_last4: raw.openai.key_last4,
+          models: raw.openai.models,
+          default_model: raw.openai.default_model,
+        }
+      : null,
     created: raw.created,
     updated: raw.updated,
-    expand: cred
-      ? {
-          credential: {
-            id: cred.id,
-            name: cred.name,
-            last4: cred.last4,
-            note: cred.note,
-            created: cred.created,
-            updated: cred.updated,
-          },
-        }
-      : undefined,
   }
 }
 
@@ -50,9 +53,8 @@ async function loadProviders() {
   try {
     const list = await pb.collection(COLLECTION_PROVIDERS).getFullList<ProviderRecord>({
       sort: 'name',
-      expand: 'credential',
     })
-    $providers.set(list.map(sanitize).sort(byName))
+    $providers.set(list.map(sanitizeProvider).sort(byName))
     $providersError.set('')
   } catch (e) {
     $providersError.set(String(e))
@@ -71,7 +73,7 @@ export function subscribeProviders() {
         $providers.set(cur.filter((p) => p.id !== e.record.id))
         return
       }
-      const safe = sanitize(e.record)
+      const safe = sanitizeProvider(e.record)
       const idx = cur.findIndex((p) => p.id === safe.id)
       if (idx === -1) $providers.set([...cur, safe].sort(byName))
       else {

@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useStore } from '@nanostores/react'
 import { Trans } from '@lingui/react/macro'
 import {
-  Boxes, CreditCard, Gauge, Inbox, KeyRound, Layers, Plug, Server, Settings as Cog,
+  Boxes, CreditCard, Gauge, Inbox, Layers, Plug, Server, Settings as Cog,
 } from 'lucide-react'
 import { $route, navigate, type RouteKey } from '@/router'
 import { $openDriftCount, subscribeDrifts } from '@/stores/drift'
@@ -15,7 +15,6 @@ const items: { key: RouteKey; icon: typeof Server; label: React.ReactNode; miles
   { key: 'usage', icon: Boxes, label: <Trans>用量</Trans>, milestone: 'M2' },
   { key: 'subscriptions', icon: CreditCard, label: <Trans>订阅</Trans>, milestone: 'M2' },
   { key: 'providers', icon: Plug, label: <Trans>AI 服务</Trans> },
-  { key: 'credentials', icon: KeyRound, label: <Trans>凭据</Trans> },
   { key: 'settings', icon: Cog, label: <Trans>设置</Trans> },
 ]
 

@@ -10,7 +10,6 @@ import {
   subscribeProviders,
 } from '@/stores/providers'
 import { $configSets, subscribeConfigSets } from '@/stores/configsets'
-import { $credentials, subscribeCredentials } from '@/stores/credentials'
 import { ApiError, deleteProvider, listProviderPresets } from '@/lib/api'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { ProviderDialog } from '@/components/ProviderDialog'
@@ -22,7 +21,6 @@ export function Providers() {
   const loading = useStore($providersLoading)
   const error = useStore($providersError)
   const configSets = useStore($configSets)
-  const credentials = useStore($credentials)
 
   const [presets, setPresets] = useState<ProviderPreset[]>([])
   const [showDialog, setShowDialog] = useState(false)
@@ -32,7 +30,6 @@ export function Providers() {
 
   useEffect(() => subscribeProviders(), [])
   useEffect(() => subscribeConfigSets(), [])
-  useEffect(() => subscribeCredentials(), [])
   useEffect(() => {
     void listProviderPresets()
       .then(setPresets)
@@ -102,63 +99,23 @@ export function Providers() {
       )}
 
       <ul className="space-y-2">
-        {list.map((p) => {
-          const n = boundCount(p.id)
-          return (
-            <li
-              key={p.id}
-              className="flex items-center gap-3 rounded border border-line bg-surface px-4 py-3"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">{p.name}</span>
-                  {p.preset && (
-                    <span className="rounded bg-wash px-1.5 py-0.5 text-[10px] text-ink3">
-                      {p.preset}
-                    </span>
-                  )}
-                </div>
-                <div className="truncate font-mono text-xs text-ink3">{p.base_url}</div>
-                <div className="mt-1 flex items-center gap-2 text-[11px] text-ink3">
-                  <span className="font-mono">{p.auth_field}</span>
-                  {p.expand?.credential && (
-                    <span>
-                      {p.expand.credential.name} ····{p.expand.credential.last4}
-                    </span>
-                  )}
-                  <span>
-                    <Trans>被 {n} 个配置集引用</Trans>
-                  </span>
-                </div>
-              </div>
-              <button
-                type="button"
-                aria-label={t`编辑 ${p.name}`}
-                className="text-ink3 hover:text-ink"
-                onClick={() => {
-                  setEditing(p)
-                  setShowDialog(true)
-                }}
-              >
-                <Pencil size={14} />
-              </button>
-              <button
-                type="button"
-                aria-label={t`删除 ${p.name}`}
-                className="text-ink3 hover:text-red-500"
-                onClick={() => setPendingDelete(p)}
-              >
-                <Trash2 size={14} />
-              </button>
-            </li>
-          )
-        })}
+        {list.map((p) => (
+          <ProviderRow
+            key={p.id}
+            provider={p}
+            boundCount={boundCount(p.id)}
+            onEdit={() => {
+              setEditing(p)
+              setShowDialog(true)
+            }}
+            onDelete={() => setPendingDelete(p)}
+          />
+        ))}
       </ul>
 
       {showDialog && (
         <ProviderDialog
           presets={presets}
-          credentials={credentials}
           editing={editing}
           boundSetCount={editing ? boundCount(editing.id) : 0}
           onClose={() => setShowDialog(false)}
@@ -178,6 +135,118 @@ export function Providers() {
           onConfirm={() => void handleDelete()}
           onClose={() => setPendingDelete(null)}
         />
+      )}
+    </div>
+  )
+}
+
+/** 一条 = 一家平台，两个端点各一行（M1.6 spec §5.1）。 */
+export function ProviderRow({
+  provider: p,
+  boundCount,
+  onEdit,
+  onDelete,
+}: {
+  provider: ProviderRecord
+  boundCount: number
+  onEdit: () => void
+  onDelete: () => void
+}) {
+  const { t } = useLingui()
+  return (
+    <li className="flex items-start gap-3 rounded border border-line bg-surface px-4 py-3">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">{p.name}</span>
+          {p.preset && (
+            <span className="rounded bg-wash px-1.5 py-0.5 text-[10px] text-ink3">
+              {p.preset}
+            </span>
+          )}
+        </div>
+
+        <EndpointLine
+          testid="endpoint-claude"
+          label="Claude"
+          endpoint={p.claude}
+          detail={
+            p.claude && (
+              <>
+                <span className="font-mono">{p.claude.auth_field}</span>
+                {p.claude.key_last4 && <span> · ····{p.claude.key_last4}</span>}
+                <span> · {t`${p.claude.models?.length ?? 0} 个模型`}</span>
+              </>
+            )
+          }
+        />
+        <EndpointLine
+          testid="endpoint-openai"
+          label="OpenAI"
+          endpoint={p.openai}
+          detail={
+            p.openai && (
+              <>
+                <span className="font-mono">{p.openai.auth_field}</span>
+                {p.openai.key_last4 && <span> · ····{p.openai.key_last4}</span>}
+                <span> · {p.openai.default_model || t`未指定默认模型`}</span>
+              </>
+            )
+          }
+        />
+
+        <div className="mt-1 text-[11px] text-ink3">
+          <Trans>被 {boundCount} 个配置集引用</Trans>
+        </div>
+      </div>
+      <button
+        type="button"
+        aria-label={t`编辑 ${p.name}`}
+        className="text-ink3 hover:text-ink"
+        onClick={onEdit}
+      >
+        <Pencil size={14} />
+      </button>
+      <button
+        type="button"
+        aria-label={t`删除 ${p.name}`}
+        className="text-ink3 hover:text-red-500"
+        onClick={onDelete}
+      >
+        <Trash2 size={14} />
+      </button>
+    </li>
+  )
+}
+
+/**
+ * 未配置的端点显示为置灰的「未配置」行，而不是整行不显示——
+ * 用户要能一眼看出「这条还有另一个口没填」，那正是本期新增的可操作项
+ * （M1.6 spec §5.1）。
+ */
+function EndpointLine({
+  testid,
+  label,
+  endpoint,
+  detail,
+}: {
+  testid: string
+  label: string
+  endpoint: { base_url: string } | null
+  detail: React.ReactNode
+}) {
+  const configured = Boolean(endpoint?.base_url)
+  return (
+    <div data-testid={testid} className="mt-1 flex gap-2 text-xs">
+      <span className="w-14 shrink-0 text-ink3">{label}</span>
+      {configured ? (
+        <div className="min-w-0">
+          <div className="truncate font-mono text-ink3">{endpoint!.base_url}</div>
+          <div className="text-[11px] text-ink3">{detail}</div>
+        </div>
+      ) : (
+        <span className="text-ink3/50">
+          <Trans>未配置</Trans>
+        </span>
       )}
     </div>
   )

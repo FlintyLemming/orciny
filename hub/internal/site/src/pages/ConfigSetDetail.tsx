@@ -8,7 +8,6 @@ import {
   subscribeConfigSet,
   reloadConfigSet,
 } from '@/stores/configsets'
-import { $credentials, subscribeCredentials } from '@/stores/credentials'
 import { navigate } from '@/router'
 import { FileTree } from '@/components/FileTree'
 import { BindingBar } from '@/components/BindingBar'
@@ -30,13 +29,17 @@ import { $providers, subscribeProviders } from '@/stores/providers'
 import { setBinding } from '@/lib/api'
 import { SETTINGS_PATH } from '@/lib/binding'
 import { pb } from '@/lib/pb'
-import { COLLECTION_ASSIGNMENTS, type Binding, type FileEntry } from '@/types/collections'
+import {
+  COLLECTION_ASSIGNMENTS,
+  type AuthField,
+  type Binding,
+  type FileEntry,
+} from '@/types/collections'
 
 export function ConfigSetDetail({ id }: { id: string }) {
   const { t } = useLingui()
   const set = useStore($currentSet)
   const revisions = useStore($revisions)
-  const creds = useStore($credentials)
   const providers = useStore($providers)
 
   const [tab, setTab] = useState<'editor' | 'history'>('editor')
@@ -52,7 +55,6 @@ export function ConfigSetDetail({ id }: { id: string }) {
   const [affected, setAffected] = useState(0)
 
   useEffect(() => subscribeConfigSet(id), [id])
-  useEffect(() => subscribeCredentials(), [])
   useEffect(() => subscribeProviders(), [])
   // settings.json 的当前草稿文本，决定要不要显示「插入 env 片段」。
   const [settingsText, setSettingsText] = useState('')
@@ -67,14 +69,13 @@ export function ConfigSetDetail({ id }: { id: string }) {
   const selectedHash = selectedEntry?.hash ?? ''
   const unsaved = Boolean(selected) && content !== baseline
 
+  // 只剩机器变量：provider.* 的「已定义」由绑定与端点校验判定，
+  // machine.* 是内置值（M1.6 spec §4）。
   const knownRefs = useMemo(() => {
-    const refs = creds.map((c) => `cred.${c.name}`)
-    const draftRefs = set?.draft_refs
-    if (draftRefs?.vars) {
-      for (const v of draftRefs.vars) refs.push(`var.${v}`)
-    }
+    const refs: string[] = []
+    for (const v of set?.draft_refs?.vars ?? []) refs.push(`var.${v}`)
     return refs
-  }, [creds, set])
+  }, [set])
 
   useEffect(() => {
     void pb
@@ -156,7 +157,10 @@ export function ConfigSetDetail({ id }: { id: string }) {
     if (!provider) return
     setError('')
     try {
-      const next = insertEnvSnippet(settingsText || '{}', provider.auth_field)
+      const authField = provider.claude?.auth_field
+      // 没配 claude 端点，插不了片段（下拉里本来也是置灰的）。
+      if (!authField) return
+      const next = insertEnvSnippet(settingsText || '{}', authField as AuthField)
       await setDraftFile(set.id, SETTINGS_PATH, next, settingsEntry?.mode || 0o600,
         settingsEntry?.keys)
       setDraftState((s) => nextDraftState(s, { type: 'edit' }))
