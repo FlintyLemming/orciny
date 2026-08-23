@@ -10,12 +10,12 @@ import (
 
 	"github.com/FlintyLemming/orciny/hub/internal/blobs"
 	"github.com/FlintyLemming/orciny/hub/internal/configsets"
-	"github.com/FlintyLemming/orciny/hub/internal/credentials"
 	"github.com/FlintyLemming/orciny/hub/internal/drift"
 	"github.com/FlintyLemming/orciny/hub/internal/importer"
 	"github.com/FlintyLemming/orciny/hub/internal/machines"
 	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/hub/internal/revisions"
+	"github.com/FlintyLemming/orciny/hub/internal/secretbox"
 	"github.com/FlintyLemming/orciny/hub/internal/variables"
 	"github.com/FlintyLemming/orciny/internal/manifest"
 	"github.com/FlintyLemming/orciny/protocol"
@@ -27,9 +27,6 @@ type Admin interface {
 	AssignConfigSet(machineID, setID, mode string) error
 	PublishConfigSet(setID, note string) (string, error)
 	RollbackConfigSet(setID, revisionID string) (string, error)
-	CreateCredential(name, value, note string) error
-	RotateCredential(name, value string) error
-	DeleteCredential(name string) error
 	StartImport(machineID string) (string, string, error)
 	CloneConfigSet(setID, newName string) (string, error)
 	DeleteConfigSet(setID string) error
@@ -287,70 +284,6 @@ func (d Deps) assign(e *core.RequestEvent) error {
 	return e.NoContent(http.StatusNoContent)
 }
 
-// ---------- credentials ----------
-
-func (d Deps) createCredential(e *core.RequestEvent) error {
-	if d.Admin == nil {
-		return e.InternalServerError("管理服务未就绪", nil)
-	}
-	var req struct {
-		Name  string `json:"name"`
-		Value string `json:"value"`
-		Note  string `json:"note"`
-	}
-	if err := e.BindBody(&req); err != nil {
-		return e.BadRequestError("请求体格式错误", nil)
-	}
-	if err := d.Admin.CreateCredential(req.Name, req.Value, req.Note); err != nil {
-		return mapErr(e, err)
-	}
-	return e.NoContent(http.StatusNoContent)
-}
-
-func (d Deps) rotateCredential(e *core.RequestEvent) error {
-	if d.Admin == nil {
-		return e.InternalServerError("管理服务未就绪", nil)
-	}
-	var req struct {
-		Value string `json:"value"`
-	}
-	if err := e.BindBody(&req); err != nil {
-		return e.BadRequestError("请求体格式错误", nil)
-	}
-	name, err := d.credName(e, e.Request.PathValue("id"))
-	if err != nil {
-		return mapErr(e, err)
-	}
-	if err := d.Admin.RotateCredential(name, req.Value); err != nil {
-		return mapErr(e, err)
-	}
-	return e.NoContent(http.StatusNoContent)
-}
-
-func (d Deps) deleteCredential(e *core.RequestEvent) error {
-	if d.Admin == nil {
-		return e.InternalServerError("管理服务未就绪", nil)
-	}
-	name, err := d.credName(e, e.Request.PathValue("id"))
-	if err != nil {
-		return mapErr(e, err)
-	}
-	if err := d.Admin.DeleteCredential(name); err != nil {
-		return mapErr(e, err)
-	}
-	return e.NoContent(http.StatusNoContent)
-}
-
-// credName 接受 id 或 name。
-func (d Deps) credName(e *core.RequestEvent, idOrName string) (string, error) {
-	if d.Creds != nil {
-		if r, err := e.App.FindRecordById("credentials", idOrName); err == nil && r != nil {
-			return r.GetString("name"), nil
-		}
-	}
-	return idOrName, nil
-}
-
 // ---------- variables ----------
 
 func (d Deps) setVariables(e *core.RequestEvent) error {
@@ -542,7 +475,7 @@ func mapErr(e *core.RequestEvent, err error) error {
 	switch {
 	case err == nil:
 		return nil
-	case errors.Is(err, credentials.ErrInUse), errors.Is(err, providers.ErrInUse):
+	case errors.Is(err, providers.ErrInUse):
 		return e.JSON(http.StatusConflict, map[string]any{
 			"message": err.Error(),
 			"data":    map[string]any{},
@@ -567,12 +500,11 @@ func mapErr(e *core.RequestEvent, err error) error {
 		})
 	case errors.Is(err, drift.ErrMixedConfigSets):
 		return e.BadRequestError(err.Error(), nil)
-	case errors.Is(err, credentials.ErrShortValue),
-		errors.Is(err, credentials.ErrBadName),
+	case errors.Is(err, secretbox.ErrShortValue),
+		errors.Is(err, providers.ErrNoKey),
 		errors.Is(err, variables.ErrBadName):
 		return e.BadRequestError(err.Error(), nil)
-	case errors.Is(err, credentials.ErrNotFound),
-		errors.Is(err, providers.ErrNotFound),
+	case errors.Is(err, providers.ErrNotFound),
 		errors.Is(err, blobs.ErrNotFound),
 		errors.Is(err, configsets.ErrNoAssignment):
 		return e.NotFoundError(err.Error(), nil)

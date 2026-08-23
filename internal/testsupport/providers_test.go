@@ -112,3 +112,45 @@ func TestOldAgentGetsAttributableFailure(t *testing.T) {
 	_, err = os.Stat(filepath.Join(home, ".claude", "settings.json"))
 	require.True(t, os.IsNotExist(err))
 }
+
+// 双端点：claude 端点注入到 settings.json，openai 端点注入到另一个文件。
+// 本期 openai 端点没有消费者，但「记下来的配置」要能一路走通到落盘。
+func TestBothEndpointsReachDisk(t *testing.T) {
+	th := testsupport.NewTestHub(t)
+	home := t.TempDir()
+	ta := testsupport.NewTestAgent(t, th, home)
+
+	provID := th.SeedProviderWithOpenAI(t, "智谱 GLM · 个人",
+		"https://open.bigmodel.cn/api/anthropic", "sk-zhipu-abcdef123456",
+		"https://open.bigmodel.cn/api/paas/v4", "glm-5.2")
+
+	setID, _ := th.SeedConfigSet(t, "主力配置", map[string]string{
+		".claude/settings.json": `{"env":{` +
+			`"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}",` +
+			`"ANTHROPIC_AUTH_TOKEN":"{{provider.claude.auth_token}}"}}`,
+		".codex/config.toml": "base_url = \"{{provider.openai.base_url}}\"\n" +
+			"model = \"{{provider.openai.model}}\"\n",
+	})
+	revID := th.BindConfigSet(t, setID, provID, "glm-5.2")
+	require.NoError(t, th.Hub.AssignConfigSet(ta.MachineID, setID, "apply"))
+
+	_, err := agent.SyncOnce(context.Background(), agent.SyncOptions{Dir: ta.Dir})
+	require.NoError(t, err)
+
+	settings, err := os.ReadFile(filepath.Join(home, ".claude", "settings.json"))
+	require.NoError(t, err)
+	require.Contains(t, string(settings), "https://open.bigmodel.cn/api/anthropic")
+	require.Contains(t, string(settings), "sk-zhipu-abcdef123456")
+	require.NotContains(t, string(settings), "{{provider.")
+
+	codex, err := os.ReadFile(filepath.Join(home, ".codex", "config.toml"))
+	require.NoError(t, err)
+	require.Contains(t, string(codex), "https://open.bigmodel.cn/api/paas/v4")
+	require.Contains(t, string(codex), "glm-5.2")
+	require.NotContains(t, string(codex), "{{provider.")
+
+	// 库里仍然只有占位符——Revision 不可变，写进去就洗不掉。
+	blob := th.RevisionBlob(t, revID, ".claude/settings.json")
+	require.Contains(t, string(blob), "{{provider.claude.auth_token}}")
+	require.NotContains(t, string(blob), "sk-zhipu")
+}

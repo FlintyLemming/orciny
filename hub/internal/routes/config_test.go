@@ -12,7 +12,6 @@ import (
 	"github.com/pocketbase/pocketbase/tests"
 	"github.com/stretchr/testify/require"
 
-	"github.com/FlintyLemming/orciny/hub/internal/credentials"
 	"github.com/FlintyLemming/orciny/hub/internal/drift"
 	"github.com/FlintyLemming/orciny/hub/internal/importer"
 	_ "github.com/FlintyLemming/orciny/hub/internal/migrations"
@@ -52,9 +51,6 @@ func (f *fakeAdmin) PublishConfigSet(string, string) (string, error) { return "r
 func (f *fakeAdmin) RollbackConfigSet(string, string) (string, error) {
 	return "r2", nil
 }
-func (f *fakeAdmin) CreateCredential(string, string, string) error { return nil }
-func (f *fakeAdmin) RotateCredential(string, string) error         { return nil }
-func (f *fakeAdmin) DeleteCredential(string) error                 { return f.deleteErr }
 func (f *fakeAdmin) StartImport(string) (string, string, error)    { return "tok", "set1", nil }
 func (f *fakeAdmin) CloneConfigSet(string, string) (string, error) { return "new", nil }
 func (f *fakeAdmin) DeleteConfigSet(string) error                  { return nil }
@@ -189,7 +185,6 @@ func TestConfigRoutesRequireSuperuser(t *testing.T) {
 		{"POST", "/api/orciny/config-sets/abc/publish", `{"note":"x"}`},
 		{"POST", "/api/orciny/config-sets/abc/rollback", `{"revision":"r1"}`},
 		{"POST", "/api/orciny/assignments", `{"machine":"m","config_set":"s","mode":"apply"}`},
-		{"POST", "/api/orciny/credentials", `{"name":"k","value":"sk-12345678"}`},
 		{"POST", "/api/orciny/machines/m/import", `{}`},
 	} {
 		req := httptest.NewRequest(c.method, c.path, strings.NewReader(c.body))
@@ -211,10 +206,24 @@ func TestAssignRejectsMissingMode(t *testing.T) {
 }
 
 // 业务错误映射成 4xx，而不是 500 —— 前端要拿它做提示。
-func TestCredentialInUseMapsTo409(t *testing.T) {
-	admin := &fakeAdmin{deleteErr: credentials.ErrInUse}
+func TestProviderInUseMapsTo409(t *testing.T) {
+	admin := &fakeAdmin{providerDeleteErr: providers.ErrInUse}
 	srv := newRouterServer(t, routes.Deps{Admin: admin})
-	rec := doSuperuser(t, srv, "DELETE", "/api/orciny/credentials/k", "")
+	rec := doSuperuser(t, srv, "DELETE", "/api/orciny/providers/p1", "")
 	require.Equal(t, http.StatusConflict, rec.Code)
-	require.Contains(t, rec.Body.String(), "引用")
+	require.Contains(t, rec.Body.String(), "绑定")
+}
+
+// 三条凭据路由删除（M1.6 spec §3.5）。
+func TestCredentialRoutesAreGone(t *testing.T) {
+	srv := newRouterServer(t, routes.Deps{Admin: &fakeAdmin{}})
+	for _, c := range []struct{ method, path string }{
+		{"POST", "/api/orciny/credentials"},
+		{"POST", "/api/orciny/credentials/x/rotate"},
+		{"DELETE", "/api/orciny/credentials/x"},
+	} {
+		rec := doSuperuser(t, srv, c.method, c.path, `{}`)
+		require.Equal(t, http.StatusNotFound, rec.Code,
+			"%s %s 必须已删除", c.method, c.path)
+	}
 }

@@ -35,9 +35,9 @@ const (
 	KindDriftIgnored    = "drift.ignored"
 	KindDriftSuperseded = "drift.superseded"
 
-	KindCredentialCreated = "credential.created"
-	KindCredentialRotated = "credential.rotated"
-	KindCredentialDeleted = "credential.deleted"
+	// credential.created / .rotated / .deleted 三个 kind 随凭据实体一起废止
+	// （M1.6 spec §3.5）。Go 侧没有写入方了，但**历史 events 行留着**——
+	// 前端的 EventKind 联合类型仍保留这三个字符串，否则老事件渲染不出来。
 
 	KindImportCompleted = "import.completed"
 

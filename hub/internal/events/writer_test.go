@@ -90,9 +90,6 @@ func TestM1EventKinds(t *testing.T) {
 	require.Equal(t, "drift.restored", events.KindDriftRestored)
 	require.Equal(t, "drift.ignored", events.KindDriftIgnored)
 	require.Equal(t, "drift.superseded", events.KindDriftSuperseded)
-	require.Equal(t, "credential.created", events.KindCredentialCreated)
-	require.Equal(t, "credential.rotated", events.KindCredentialRotated)
-	require.Equal(t, "credential.deleted", events.KindCredentialDeleted)
 	require.Equal(t, "import.completed", events.KindImportCompleted)
 }
 

@@ -93,9 +93,11 @@ func TestEnrollTokensAndEventsFields(t *testing.T) {
 
 func TestM1CollectionsExist(t *testing.T) {
 	app := newApp(t)
+	// credentials 由 002 建、005 删（key 内联进 provider 了，M1.6 spec §1.1）。
+	// 「删掉了没有」归 TestMigration005DropsLegacyFieldsAndCollection 管。
 	for _, name := range []string{
 		"blobs", "config_sets", "revisions", "assignments",
-		"credentials", "variables", "drift_events", "ignore_rules",
+		"variables", "drift_events", "ignore_rules",
 	} {
 		c, err := app.FindCollectionByNameOrId(name)
 		require.NoError(t, err, "collection %s 必须存在", name)
@@ -221,36 +223,22 @@ func TestProvidersCollectionExists(t *testing.T) {
 	require.Nil(t, c.UpdateRule)
 	require.Nil(t, c.DeleteRule)
 
-	for _, f := range []string{
-		"name", "preset", "base_url", "auth_field", "credential",
-		"models", "defaults", "note", "created", "updated",
-	} {
+	// 003 立的字段里，base_url / auth_field / credential / models / defaults
+	// 在 005 被拆掉（内容已由 004 搬进端点子结构）。这里只断言活下来的那些；
+	// 「拆掉了没有」归 TestMigration005DropsLegacyFieldsAndCollection 管。
+	for _, f := range []string{"name", "preset", "note", "created", "updated"} {
 		require.NotNil(t, c.Fields.GetByName(f), "字段 %s 必须存在", f)
 	}
-
-	sel, ok := c.Fields.GetByName("auth_field").(*core.SelectField)
-	require.True(t, ok)
-	require.Equal(t, []string{"ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY"}, sel.Values)
-
-	rel, ok := c.Fields.GetByName("credential").(*core.RelationField)
-	require.True(t, ok)
-	// 必填由 003 立、004 撤（key 内联之后没有凭据可指了），
-	// 「必不必填」的断言归 TestProviderEndpointFieldsExist 管。
-	require.False(t, rel.CascadeDelete, "删凭据不得连带删掉服务配置")
 }
 
+// name 的唯一索引跨过 004/005 仍然有效（DoD 第 1 条）。
 func TestProviderNameIsUnique(t *testing.T) {
 	app := newApp(t)
-	credID := seedCredential(t, app, "zhipu_key")
-
 	c, err := app.FindCollectionByNameOrId("providers")
 	require.NoError(t, err)
 	mk := func() *core.Record {
 		r := core.NewRecord(c)
 		r.Set("name", "智谱 GLM · 个人")
-		r.Set("base_url", "https://open.bigmodel.cn/api/anthropic")
-		r.Set("auth_field", "ANTHROPIC_AUTH_TOKEN")
-		r.Set("credential", credID)
 		return r
 	}
 	require.NoError(t, app.Save(mk()))
@@ -275,19 +263,6 @@ func TestBindingFieldsExist(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, drifts.Fields.GetByName("binding_drift"))
 	require.NotNil(t, drifts.Fields.GetByName("binding_url"))
-}
-
-// seedCredential 建一条最小可用的凭据记录，返回 id。
-func seedCredential(t *testing.T, app core.App, name string) string {
-	t.Helper()
-	c, err := app.FindCollectionByNameOrId("credentials")
-	require.NoError(t, err)
-	r := core.NewRecord(c)
-	r.Set("name", name)
-	r.Set("cipher_value", "x")
-	r.Set("last4", "1234")
-	require.NoError(t, app.Save(r))
-	return r.Id
 }
 
 func TestProviderEndpointFieldsExist(t *testing.T) {
@@ -316,22 +291,16 @@ func TestProviderEndpointFieldsExist(t *testing.T) {
 	require.True(t, ok)
 	require.False(t, l4.Hidden)
 
-	// credential 在 004 之后必须是非必填，否则新建 provider 会被挡住。
-	rel, ok := c.Fields.GetByName("credential").(*core.RelationField)
-	require.True(t, ok)
-	require.False(t, rel.Required, "004 之后 credential 不再必填")
-
-	// base_url 同理：它搬进 claude 子结构之后没有写入方了，
-	// 留着必填会让 004 与 005 之间新建的 provider 存不进去。
-	bu, ok := c.Fields.GetByName("base_url").(*core.TextField)
-	require.True(t, ok)
-	require.False(t, bu.Required, "004 之后顶层 base_url 不再必填")
+	// 004 把 credential 与 base_url 转成非必填（005 之间新建 provider 要能存下），
+	// 005 再把它们整个拆掉。跑完全链之后它们应当不存在——
+	// 「转非必填」这一步由 TestBackfillOnLegacyShape 在重建的旧形状上验证。
 }
 
 // 密文**直接搬、不解密**：同一把主密钥、同一套 AES-GCM，secretbox 只是换了
 // 包名（M1.6 spec §6.1 第 2 步）。这条测试是这个前提的证明。
 func TestMigration004MovesCipherIntoProvider(t *testing.T) {
 	app := newApp(t)
+	restoreLegacyShape(t, app)
 
 	key, err := secretbox.LoadMasterKey(t.TempDir())
 	require.NoError(t, err)
@@ -383,6 +352,42 @@ func TestMigration004IsIdempotentOnEmptyProviderTable(t *testing.T) {
 
 // ---------- helpers ----------
 
+// restoreLegacyShape 在跑完全链的库上重建 M1.5 的形状：
+// credentials collection 与 providers 的四个旧字段 + credential relation。
+//
+// 为什么要重建：tests.NewTestApp 会把全部迁移跑完，005 之后旧形状就不存在了，
+// 而 004 的密文搬运是本期**最容易造成数据面损坏**的一步（搬漏了，全机队下次
+// 重注入拿到空 key），必须有测试真的搬一次、真的解一次密。
+func restoreLegacyShape(t *testing.T, app core.App) {
+	t.Helper()
+
+	creds := core.NewBaseCollection("credentials")
+	creds.Fields.Add(
+		&core.TextField{Name: "name", Required: true, Max: 200},
+		&core.TextField{Name: "cipher_value", Max: 8192},
+		&core.TextField{Name: "last4", Max: 8},
+		&core.TextField{Name: "note", Max: 2000},
+	)
+	require.NoError(t, app.Save(creds))
+
+	provs, err := app.FindCollectionByNameOrId("providers")
+	require.NoError(t, err)
+	provs.Fields.Add(
+		&core.TextField{Name: "base_url", Max: 2000},
+		&core.SelectField{Name: "auth_field", MaxSelect: 1, Values: []string{
+			"ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY",
+		}},
+		&core.RelationField{Name: "credential", CollectionId: creds.Id,
+			MaxSelect: 1, CascadeDelete: false},
+		&core.JSONField{Name: "models", MaxSize: 8192},
+		&core.JSONField{Name: "defaults", MaxSize: 2048},
+	)
+	// 旧记录还没搬过：把新结构清空，让 BackfillProviderEndpoints 认得出来。
+	provs.Fields.RemoveByName("claude")
+	provs.Fields.Add(&core.JSONField{Name: "claude", MaxSize: 16384})
+	require.NoError(t, app.Save(provs))
+}
+
 // runUp004 重跑 004 的数据搬运部分。字段已在 newApp 时加好，
 // 搬运对已搬过的记录是幂等的（见 up004 的实现）。
 func runUp004(t *testing.T, app core.App) error {
@@ -419,4 +424,63 @@ func seedLegacyProvider(t *testing.T, app core.App, name, baseURL, credID string
 	})
 	require.NoError(t, app.Save(r))
 	return r.Id
+}
+
+func TestMigration005DropsLegacyFieldsAndCollection(t *testing.T) {
+	app := newApp(t)
+
+	c, err := app.FindCollectionByNameOrId("providers")
+	require.NoError(t, err)
+	for _, f := range []string{"credential", "base_url", "auth_field", "models", "defaults"} {
+		require.Nil(t, c.Fields.GetByName(f), "providers.%s 必须已删除", f)
+	}
+
+	_, err = app.FindCollectionByNameOrId("credentials")
+	require.Error(t, err, "credentials collection 必须已删除")
+}
+
+// 新结构必须完好——005 只删旧的，不许碰新的。
+func TestMigration005KeepsEndpointFields(t *testing.T) {
+	app := newApp(t)
+	c, err := app.FindCollectionByNameOrId("providers")
+	require.NoError(t, err)
+	for _, f := range []string{
+		"name", "preset", "note", "key_cipher", "key_last4",
+		"claude_key_cipher", "openai_key_cipher", "claude", "openai",
+		"created", "updated",
+	} {
+		require.NotNil(t, c.Fields.GetByName(f), "providers.%s 不该被删", f)
+	}
+}
+
+// 004 + 005 跑完之后，搬过来的密文还解得开。这是整条迁移链的验收点。
+func TestCipherSurvivesFullMigrationChain(t *testing.T) {
+	key, err := secretbox.LoadMasterKey(t.TempDir())
+	require.NoError(t, err)
+	cipher, err := secretbox.Encrypt(key, "sk-zhipu-abcdef123456")
+	require.NoError(t, err)
+
+	app := newApp(t)
+	// 库里已经跑完全部迁移，credentials 表没了；直接把密文放进 provider 的
+	// 平台级字段，模拟 004 搬运的结果，再验证它仍然解得开。
+	c, err := app.FindCollectionByNameOrId("providers")
+	require.NoError(t, err)
+	r := core.NewRecord(c)
+	r.Set("name", "智谱 GLM")
+	r.Set("key_cipher", cipher)
+	r.Set("key_last4", "3456")
+	require.NoError(t, app.Save(r))
+
+	got, err := app.FindRecordById("providers", r.Id)
+	require.NoError(t, err)
+	pt, err := secretbox.Decrypt(key, got.GetString("key_cipher"))
+	require.NoError(t, err)
+	require.Equal(t, "sk-zhipu-abcdef123456", pt)
+}
+
+// down005 必须明确失败，而不是假装能回滚（spec §6.3）。
+func TestDown005Refuses(t *testing.T) {
+	app := newApp(t)
+	require.Error(t, migrations.Down005(app),
+		"凭据删了之后无处还原，假装能回滚比没有更危险")
 }

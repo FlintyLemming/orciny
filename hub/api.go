@@ -16,25 +16,6 @@ func (h *Hub) AssignConfigSet(machineID, setID, mode string) error {
 	return h.sync.NotifyMachine(machineID, protocol.ReasonAssigned)
 }
 
-// CreateCredential 新建凭据。
-func (h *Hub) CreateCredential(name, value, note string) error {
-	_, err := h.creds.Create(name, value, note)
-	return err
-}
-
-// RotateCredential 轮换凭据。
-//
-// **已废弃**：凭据实体在 M1.6 里被废止，key 内联到 provider 上，
-// 轮换走 UpdateProvider → NotifyProvider。本方法与它的路由在子计划 08 删除。
-func (h *Hub) RotateCredential(name, value string) error {
-	return h.creds.Rotate(name, value)
-}
-
-// DeleteCredential 删除凭据。被引用时拒绝。
-func (h *Hub) DeleteCredential(name string) error {
-	return h.creds.Delete(name)
-}
-
 // PublishConfigSet 发布草稿并通知全部指派机器。
 func (h *Hub) PublishConfigSet(setID, note string) (string, error) {
 	rev, err := h.revs.Publish(setID, note, "publish")

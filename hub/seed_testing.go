@@ -58,6 +58,31 @@ func (h *Hub) SeedProvider(t *testing.T, name, baseURL, key string) string {
 	return id
 }
 
+// SeedProviderWithOpenAI 建一条两个端点都配了的服务配置，返回 provider id。
+// 平台级一把 key，两个端点共用——这是最常见的情形（M1.6 spec §2.3）。
+func (h *Hub) SeedProviderWithOpenAI(
+	t *testing.T, name, claudeURL, key, openaiURL, openaiModel string,
+) string {
+	t.Helper()
+	id, err := h.CreateProvider(providers.Input{
+		Name: name,
+		Key:  &key,
+		Claude: providers.EndpointInput{
+			BaseURL:   claudeURL,
+			AuthField: providers.AuthToken,
+			Models:    []string{"glm-5.2", "glm-4.7"},
+		},
+		OpenAI: providers.EndpointInput{
+			BaseURL:      openaiURL,
+			AuthField:    providers.DefaultOpenAIAuthField,
+			Models:       []string{openaiModel},
+			DefaultModel: openaiModel,
+		},
+	})
+	require.NoError(t, err, "建双端点服务配置")
+	return id
+}
+
 // BindConfigSet 把配置集绑到给定 Provider（四槽同填 model）并发布一条新
 // Revision，返回新 revision id。
 func (h *Hub) BindConfigSet(t *testing.T, setID, providerID, model string) string {

@@ -35,10 +35,19 @@ func (h *TestHub) RequireAssignmentState(t *testing.T, machineID, want string) {
 
 // —— M1.5 服务绑定。同样只做转发，实现在 hub 公开包。——
 
-// SeedProvider 建一条凭据 + 一条 AI 服务配置，返回 provider id。
+// SeedProvider 建一条只配 claude 端点的 AI 服务配置，返回 provider id。
 func (h *TestHub) SeedProvider(t *testing.T, name, baseURL, key string) string {
 	t.Helper()
 	return h.Hub.SeedProvider(t, name, baseURL, key)
+}
+
+// SeedProviderWithOpenAI 转发到 hub.Hub 的同名方法。
+// internal/testsupport 够不到 hub/internal/*（Go 的 internal 规则）。
+func (h *TestHub) SeedProviderWithOpenAI(
+	t *testing.T, name, claudeURL, key, openaiURL, openaiModel string,
+) string {
+	t.Helper()
+	return h.Hub.SeedProviderWithOpenAI(t, name, claudeURL, key, openaiURL, openaiModel)
 }
 
 // BindConfigSet 绑定并发布一条新 Revision，返回新 revision id。
@@ -47,7 +56,7 @@ func (h *TestHub) BindConfigSet(t *testing.T, setID, providerID, model string) s
 	return h.Hub.BindConfigSet(t, setID, providerID, model)
 }
 
-// ProviderInputOf 读回一条 Provider 的当前值，只把 base_url 换成新的。
+// ProviderInputOf 读回一条 Provider 的当前值，只把 claude 端点的 base_url 换成新的。
 func (h *TestHub) ProviderInputOf(t *testing.T, providerID, baseURL string) hub.ProviderInput {
 	t.Helper()
 	return h.Hub.ProviderInputOf(t, providerID, baseURL)

@@ -12,7 +12,6 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/blobs"
 	"github.com/FlintyLemming/orciny/hub/internal/configsets"
 	"github.com/FlintyLemming/orciny/hub/internal/configsync"
-	"github.com/FlintyLemming/orciny/hub/internal/credentials"
 	"github.com/FlintyLemming/orciny/hub/internal/events"
 	_ "github.com/FlintyLemming/orciny/hub/internal/migrations"
 	"github.com/FlintyLemming/orciny/hub/internal/providers"
@@ -58,7 +57,6 @@ type rig struct {
 	app    *tests.TestApp
 	sets   *configsets.Service
 	revs   *revisions.Service
-	creds  *credentials.Store
 	vars   *variables.Store
 	provs  *providers.Store
 	sender *fakeSender
@@ -80,7 +78,6 @@ func newRig(t *testing.T) *rig {
 		app:    app,
 		sets:   configsets.NewService(app, b, ev),
 		revs:   revisions.NewService(app, b, ev),
-		creds:  credentials.NewStore(app, key, ev),
 		vars:   variables.NewStore(app),
 		provs:  providers.NewStore(app, key, ev),
 		sender: &fakeSender{online: map[string]bool{}},

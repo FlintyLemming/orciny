@@ -17,7 +17,6 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/blobs"
 	"github.com/FlintyLemming/orciny/hub/internal/configsets"
 	"github.com/FlintyLemming/orciny/hub/internal/configsync"
-	"github.com/FlintyLemming/orciny/hub/internal/credentials"
 	"github.com/FlintyLemming/orciny/hub/internal/drift"
 	"github.com/FlintyLemming/orciny/hub/internal/enroll"
 	"github.com/FlintyLemming/orciny/hub/internal/events"
@@ -48,7 +47,6 @@ type Hub struct {
 	enroll   *enroll.Service
 	machines *machines.Manager
 	ws       *ws.Handler
-	creds    *credentials.Store
 	vars     *variables.Store
 	blobs    *blobs.Store
 	sets     *configsets.Service
@@ -110,15 +108,12 @@ func Attach(app core.App, cfg Config) (*Hub, error) {
 
 		// 主密钥。必须排在 ws 之前：一台解不开自己 key 的 hub 不该接客
 		// ——它会把空值下发到全机队（M1.6 spec §2.6）。
+		// 自检的对象从 credentials 表改成 providers 的三处密文字段。
 		key, err := secretbox.LoadMasterKey(e.App.DataDir())
 		if err != nil {
 			return fmt.Errorf("加载主密钥: %w", err)
 		}
-		h.creds = credentials.NewStore(e.App, key, h.events)
 		h.vars = variables.NewStore(e.App)
-		if err := h.creds.VerifyAll(); err != nil {
-			return err
-		}
 
 		h.blobs = blobs.New(e.App)
 		h.provs = providers.NewStore(e.App, key, h.events)
@@ -176,7 +171,6 @@ func Attach(app core.App, cfg Config) (*Hub, error) {
 			Sets:         h.sets,
 			Revs:         h.revs,
 			Blobs:        h.blobs,
-			Creds:        h.creds,
 			Vars:         h.vars,
 		}); err != nil {
 			return fmt.Errorf("注册路由: %w", err)

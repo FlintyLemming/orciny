@@ -12,7 +12,6 @@ import (
 
 	"github.com/FlintyLemming/orciny/hub/internal/blobs"
 	"github.com/FlintyLemming/orciny/hub/internal/configsets"
-	"github.com/FlintyLemming/orciny/hub/internal/credentials"
 	"github.com/FlintyLemming/orciny/hub/internal/enroll"
 	"github.com/FlintyLemming/orciny/hub/internal/identity"
 	"github.com/FlintyLemming/orciny/hub/internal/revisions"
@@ -39,7 +38,6 @@ type Deps struct {
 	Sets  *configsets.Service
 	Revs  *revisions.Service
 	Blobs *blobs.Store
-	Creds *credentials.Store
 	Vars  *variables.Store
 }
 
@@ -80,9 +78,6 @@ func Register(e *core.ServeEvent, d Deps) error {
 	g.GET("/config-sets/{id}/provider-match", d.providerMatch).Bind(su)
 	g.GET("/blobs/{hash}", d.getBlob).Bind(su)
 	g.POST("/assignments", d.assign).Bind(su)
-	g.POST("/credentials", d.createCredential).Bind(su)
-	g.POST("/credentials/{id}/rotate", d.rotateCredential).Bind(su)
-	g.DELETE("/credentials/{id}", d.deleteCredential).Bind(su)
 	g.PUT("/machines/{id}/variables", d.setVariables).Bind(su)
 	g.POST("/machines/{id}/import", d.startImport).Bind(su)
 	g.POST("/machines/{id}/clear-degraded", d.clearDegraded).Bind(su)
