@@ -70,7 +70,7 @@ func TestDriftReportRoundTrip(t *testing.T) {
 	want := protocol.DriftReport{
 		Items: []protocol.DriftItem{
 			{Path: ".claude/CLAUDE.md", Kind: protocol.DriftModified, BaseHash: "aa",
-				Content: []byte("# 新内容 {{cred.k}}"), Mode: 0o644},
+				Content: []byte("# 新内容 {{var.k}}"), Mode: 0o644},
 			{Path: ".claude/skills/foo/SKILL.md", Kind: protocol.DriftAdded, Content: []byte("x"), Mode: 0o644},
 			{Path: ".claude/gone.md", Kind: protocol.DriftDeleted, BaseHash: "bb"},
 			{Path: ".claude/huge.md", Kind: protocol.DriftModified, Truncated: true, RestorePartial: true},

@@ -20,8 +20,10 @@ var ErrBadPlaceholder = errors.New("protocol: 占位符语法错误")
 
 type RefKind uint8
 
+// RefCred（原值 1）随 {{cred.*}} 一起废止（M1.6 spec §3.5）。
+// 编号 1 **退休不复用**：agent 与 hub 的存量数据里还有按老编号写下的东西，
+// 让新语义顶着旧编号是最难查的一类 bug。
 const (
-	RefCred     RefKind = 1
 	RefVar      RefKind = 2
 	RefMachine  RefKind = 3
 	RefProvider RefKind = 4
@@ -29,8 +31,6 @@ const (
 
 func (k RefKind) String() string {
 	switch k {
-	case RefCred:
-		return "cred"
 	case RefVar:
 		return "var"
 	case RefMachine:
@@ -46,13 +46,37 @@ func (k RefKind) String() string {
 // 收在这里是因为它属于「词法词汇表」：两侧必须认同同一组内置名。
 var MachineKeys = []string{"name", "hostname", "os", "arch"}
 
-// ProviderKeys 是 {{provider.*}} 允许的全部名字（M1.5 spec §3.1）。
+// ProviderKeys 是 {{provider.*}} 允许的全部名字（M1.6 spec §3.1）。
+//
+// 名字是**端点限定**的两段名：端点段 + 字段段。为什么是显式前缀而不是
+// 按文件路径推断（spec §3.2）：发布校验要能说出「这个文件引用了 claude
+// 端点」，隐式方案下 hub 得先有一套「路径属于哪个工具」的推断；而 agent
+// 的还原靠 key 名判断秘密档，两个端点的 key 不同时，同一个
+// provider.auth_token 在不同文件里会指向不同的密文。
 //
 // Ref.Name 是**字段名，不是 Provider 名**：绑定在配置集里唯一，不需要指名。
-// 与 MachineKeys 同理，它属于「词法词汇表」——两侧必须认同同一组内置名。
-// 顺序即 UI 展示顺序，不要重排。
+// 顺序即 UI 展示顺序，也是 agent 还原的 rankOf 定序依据，不要重排。
 var ProviderKeys = []string{
-	"base_url", "auth_token", "model", "model_opus", "model_sonnet", "model_haiku",
+	"claude.base_url", "claude.auth_token",
+	"claude.model", "claude.model_opus", "claude.model_sonnet", "claude.model_haiku",
+	"openai.base_url", "openai.api_key",
+	"openai.model",
+}
+
+// EndpointOf 取出端点限定名的端点段。
+// 不在 ProviderKeys 白名单里的一律返回空串——调用方据此判定「这不是一个
+// 端点限定名」，不必自己再切一次字符串。
+func EndpointOf(name string) string {
+	for _, k := range ProviderKeys {
+		if k != name {
+			continue
+		}
+		if i := strings.Index(name, "."); i > 0 {
+			return name[:i]
+		}
+		return ""
+	}
+	return ""
 }
 
 type Ref struct {
@@ -127,15 +151,18 @@ func parseRef(body string) (Ref, error) {
 	if !ok {
 		return Ref{}, fmt.Errorf("%w: %q 缺少 . 分隔", ErrBadPlaceholder, body)
 	}
-	if !validName(name) {
-		return Ref{}, fmt.Errorf("%w: %q 的名字非法（只允许 [A-Za-z0-9_-]+）", ErrBadPlaceholder, body)
-	}
 	switch prefix {
-	case "cred":
-		return Ref{Kind: RefCred, Name: name}, nil
 	case "var":
+		if !validName(name) {
+			return Ref{}, fmt.Errorf("%w: %q 的名字非法（只允许 [A-Za-z0-9_-]+）",
+				ErrBadPlaceholder, body)
+		}
 		return Ref{Kind: RefVar, Name: name}, nil
 	case "machine":
+		if !validName(name) {
+			return Ref{}, fmt.Errorf("%w: %q 的名字非法（只允许 [A-Za-z0-9_-]+）",
+				ErrBadPlaceholder, body)
+		}
 		for _, k := range MachineKeys {
 			if k == name {
 				return Ref{Kind: RefMachine, Name: name}, nil
@@ -143,6 +170,8 @@ func parseRef(body string) (Ref, error) {
 		}
 		return Ref{}, fmt.Errorf("%w: machine.%s 不是内置名（只有 %v）", ErrBadPlaceholder, name, MachineKeys)
 	case "provider":
+		// 不走 validName：端点限定名中间有点，字符集校验会把它拦下。
+		// 这是**收紧不是放宽**——白名单本来就比字符集严格（spec §3.3）。
 		for _, k := range ProviderKeys {
 			if k == name {
 				return Ref{Kind: RefProvider, Name: name}, nil
@@ -170,7 +199,7 @@ func validName(s string) bool {
 }
 
 // Refs 提取内容里出现的全部引用，去重并按 String() 升序。
-// 发布期把它存进 revisions.refs，下发时按它过滤凭据（spec §5.3）。
+// 发布期把它存进 revisions.refs，下发时按它裁剪 provider 的值（spec §5.3）。
 func Refs(content []byte) ([]Ref, error) {
 	segs, err := Parse(content)
 	if err != nil {
