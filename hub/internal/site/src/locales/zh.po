@@ -14,8 +14,17 @@ msgstr ""
 "Plural-Forms: \n"
 
 #: src/components/BindingBar.tsx
+msgid " （无 Claude 端点）"
+msgstr " （无 Claude 端点）"
+
+#: src/components/BindingBar.tsx
 msgid "（空）"
 msgstr "（空）"
+
+#. placeholder {0}: p.claude.models?.length ?? 0
+#: src/pages/Providers.tsx
+msgid "{0} 个模型"
+msgstr "{0} 个模型"
 
 #. placeholder {0}: e.path
 #: src/lib/inbox.ts
@@ -26,6 +35,10 @@ msgstr "{0} 内容未能安全脱敏，无法自动收编"
 #: src/lib/inbox.ts
 msgid "{0} 是服务绑定漂移：收编会把占位符拍平成硬编码地址，绑定会当场失效。请改用「改绑定」或「恢复」"
 msgstr "{0} 是服务绑定漂移：收编会把占位符拍平成硬编码地址，绑定会当场失效。请改用「改绑定」或「恢复」"
+
+#: src/components/ProviderDialog.tsx
+msgid "{label} 端点"
+msgstr "{label} 端点"
 
 #: src/components/ThreeWayCompare.tsx
 msgid "∅"
@@ -61,6 +74,10 @@ msgstr "agent 版本"
 msgid "AI 服务"
 msgstr "AI 服务"
 
+#: src/components/ProviderDialog.tsx
+msgid "API key"
+msgstr "API key"
+
 #: src/pages/MachineDetail.tsx
 msgid "apply 回执历史"
 msgstr "apply 回执历史"
@@ -70,9 +87,21 @@ msgstr "apply 回执历史"
 msgid "Claude Code"
 msgstr "Claude Code"
 
+#: src/components/ProviderDialog.tsx
+msgid "claude 默认模型"
+msgstr "claude 默认模型"
+
 #: src/pages/Settings.tsx
 msgid "hub 版本"
 msgstr "hub 版本"
+
+#: src/components/ProviderDialog.tsx
+msgid "OpenAI 端点本期只是「记下来的配置」：可以建、可以管，但还不会注入到任何机器。 受管范围目前只有 .claude/**。"
+msgstr "OpenAI 端点本期只是「记下来的配置」：可以建、可以管，但还不会注入到任何机器。 受管范围目前只有 .claude/**。"
+
+#: src/components/ProviderDialog.tsx
+msgid "openai 默认模型"
+msgstr "openai 默认模型"
 
 #. placeholder {0}: s.expand.head.seq
 #. placeholder {1}: s.note || '—'
@@ -109,6 +138,10 @@ msgstr "不写盘，差异进收件箱"
 #: src/lib/inbox.ts
 msgid "不能跨配置集收编：所选条目属于不同配置集"
 msgstr "不能跨配置集收编：所选条目属于不同配置集"
+
+#: src/components/ProviderDialog.tsx
+msgid "两个端点默认都用它"
+msgstr "两个端点默认都用它"
 
 #: src/pages/MachineDetail.tsx
 msgid "主机名"
@@ -178,6 +211,14 @@ msgstr "保存变量"
 msgid "保存后会立即重注入到绑定了这个服务配置的 {boundSetCount} 个配置集所属的机器，不产生新版本。"
 msgstr "保存后会立即重注入到绑定了这个服务配置的 {boundSetCount} 个配置集所属的机器，不产生新版本。"
 
+#: src/components/ProviderDialog.tsx
+msgid "保存后回落平台级。"
+msgstr "保存后回落平台级。"
+
+#: src/components/ProviderDialog.tsx
+msgid "保存后清空平台级 key。"
+msgstr "保存后清空平台级 key。"
+
 #: src/components/FindingList.tsx
 msgid "保留明文"
 msgstr "保留明文"
@@ -191,8 +232,12 @@ msgid "值"
 msgstr "值"
 
 #: src/pages/Credentials.tsx
-msgid "值（至少 {MIN_LEN} 字符）"
-msgstr "值（至少 {MIN_LEN} 字符）"
+#~ msgid "值（至少 {MIN_LEN} 字符）"
+#~ msgstr "值（至少 {MIN_LEN} 字符）"
+
+#: src/components/ExtractDialog.tsx
+msgid "先到「AI 服务」页建一条，再回来抽取。"
+msgstr "先到「AI 服务」页建一条，再回来抽取。"
 
 #: src/pages/MachineDetail.tsx
 msgid "先看看（survey）"
@@ -219,6 +264,7 @@ msgid "公钥指纹"
 msgstr "公钥指纹"
 
 #: src/components/AddMachineDialog.tsx
+#: src/components/ExtractDialog.tsx
 #: src/components/ProviderDialog.tsx
 #: src/pages/Inbox.tsx
 msgid "关闭"
@@ -232,24 +278,24 @@ msgstr "最后心跳"
 #: src/components/ProviderDialog.tsx
 #: src/components/Sidebar.tsx
 #: src/pages/Credentials.tsx
-msgid "凭据"
-msgstr "凭据"
+#~ msgid "凭据"
+#~ msgstr "凭据"
 
 #: src/components/ProviderDialog.tsx
-msgid "凭据值"
-msgstr "凭据值"
+#~ msgid "凭据值"
+#~ msgstr "凭据值"
 
 #: src/pages/Credentials.tsx
-msgid "凭据值至少 {MIN_LEN} 个字符"
-msgstr "凭据值至少 {MIN_LEN} 个字符"
+#~ msgid "凭据值至少 {MIN_LEN} 个字符"
+#~ msgstr "凭据值至少 {MIN_LEN} 个字符"
 
 #: src/components/ProviderDialog.tsx
-msgid "凭据名"
-msgstr "凭据名"
+#~ msgid "凭据名"
+#~ msgstr "凭据名"
 
 #: src/pages/ImportWizard.tsx
-msgid "凭据名称"
-msgstr "凭据名称"
+#~ msgid "凭据名称"
+#~ msgstr "凭据名称"
 
 #: src/pages/MachineDetail.tsx
 msgid "凭据已创建"
@@ -264,17 +310,15 @@ msgid "凭据已轮换"
 msgstr "凭据已轮换"
 
 #: src/pages/Credentials.tsx
-msgid "列表只显示末四位。值不会出现在版本历史或日志里。"
-msgstr "列表只显示末四位。值不会出现在版本历史或日志里。"
+#~ msgid "列表只显示末四位。值不会出现在版本历史或日志里。"
+#~ msgstr "列表只显示末四位。值不会出现在版本历史或日志里。"
 
 #: src/pages/ConfigSets.tsx
-#: src/pages/Credentials.tsx
 msgid "创建"
 msgstr "创建"
 
 #: src/components/DriftCard.tsx
 #: src/pages/ConfigSets.tsx
-#: src/pages/Credentials.tsx
 #: src/pages/Machines.tsx
 #: src/pages/Providers.tsx
 msgid "删除"
@@ -290,8 +334,8 @@ msgid "删除 AI 服务配置"
 msgstr "删除 AI 服务配置"
 
 #: src/pages/Credentials.tsx
-msgid "删除凭据"
-msgstr "删除凭据"
+#~ msgid "删除凭据"
+#~ msgstr "删除凭据"
 
 #: src/pages/Machines.tsx
 msgid "删除后该机器的 agent 会停止重试，需要重新 enroll。确定删除？"
@@ -307,7 +351,6 @@ msgstr "删除配置集"
 
 #: src/pages/ConfigSetDetail.tsx
 #: src/pages/ConfigSets.tsx
-#: src/pages/Credentials.tsx
 #: src/pages/Inbox.tsx
 #: src/pages/Machines.tsx
 #: src/pages/Providers.tsx
@@ -317,6 +360,10 @@ msgstr "加载中…"
 #: src/pages/ImportWizard.tsx
 msgid "勾选取消不想纳管的文件，然后继续。"
 msgstr "勾选取消不想纳管的文件，然后继续。"
+
+#: src/components/ProviderDialog.tsx
+msgid "单独的 key"
+msgstr "单独的 key"
 
 #: src/pages/MachineDetail.tsx
 msgid "去收件箱"
@@ -352,11 +399,11 @@ msgstr "发现 {conflictCount} 处两边改法不同的冲突行，请选定一�
 #: src/components/AssignDialog.tsx
 #: src/components/ConfirmDialog.tsx
 #: src/components/DegradedBanner.tsx
+#: src/components/ExtractDialog.tsx
 #: src/components/PromptDialog.tsx
 #: src/components/ProviderDialog.tsx
 #: src/components/PublishDialog.tsx
 #: src/pages/ConfigSets.tsx
-#: src/pages/Credentials.tsx
 #: src/pages/Inbox.tsx
 msgid "取消"
 msgstr "取消"
@@ -380,8 +427,8 @@ msgid "名称"
 msgstr "名称"
 
 #: src/pages/Credentials.tsx
-msgid "名称（字母数字_-）"
-msgstr "名称（字母数字_-）"
+#~ msgid "名称（字母数字_-）"
+#~ msgstr "名称（字母数字_-）"
 
 #: src/components/VersionHistory.tsx
 msgid "回滚"
@@ -427,8 +474,8 @@ msgid "备注"
 msgstr "备注"
 
 #: src/pages/Credentials.tsx
-msgid "备注（可选）"
-msgstr "备注（可选）"
+#~ msgid "备注（可选）"
+#~ msgstr "备注（可选）"
 
 #: src/components/AddMachineDialog.tsx
 msgid "复制安装命令"
@@ -538,8 +585,16 @@ msgid "已选 {0} 条"
 msgstr "已选 {0} 条"
 
 #: src/components/ProviderDialog.tsx
+msgid "已配置"
+msgstr "已配置"
+
+#: src/components/ProviderDialog.tsx
 msgid "平台"
 msgstr "平台"
+
+#: src/components/ProviderDialog.tsx
+msgid "平台级 key，两个端点默认都用它。"
+msgstr "平台级 key，两个端点默认都用它。"
 
 #: src/pages/MachineDetail.tsx
 msgid "应用"
@@ -591,10 +646,19 @@ msgstr "打开备份设置"
 msgid "找不到这台机器。"
 msgstr "找不到这台机器。"
 
+#: src/components/ExtractDialog.tsx
+msgid "抽取"
+msgstr "抽取"
+
 #: src/components/FindingList.tsx
 #: src/pages/ImportWizard.tsx
-msgid "抽取为凭据"
-msgstr "抽取为凭据"
+#~ msgid "抽取为凭据"
+#~ msgstr "抽取为凭据"
+
+#: src/components/ExtractDialog.tsx
+#: src/components/FindingList.tsx
+msgid "抽成服务配置的 key"
+msgstr "抽成服务配置的 key"
 
 #: src/pages/Machines.tsx
 msgid "持续在线"
@@ -654,15 +718,14 @@ msgid "文件路径"
 msgstr "文件路径"
 
 #: src/pages/Credentials.tsx
-msgid "新值（至少 {MIN_LEN} 字符）"
-msgstr "新值（至少 {MIN_LEN} 字符）"
+#~ msgid "新值（至少 {MIN_LEN} 字符）"
+#~ msgstr "新值（至少 {MIN_LEN} 字符）"
 
 #: src/components/DriftCard.tsx
 msgid "新增"
 msgstr "新增"
 
 #: src/pages/ConfigSets.tsx
-#: src/pages/Credentials.tsx
 #: src/pages/Providers.tsx
 msgid "新建"
 msgstr "新建"
@@ -672,8 +735,8 @@ msgid "新建 AI 服务"
 msgstr "新建 AI 服务"
 
 #: src/components/ProviderDialog.tsx
-msgid "新建凭据"
-msgstr "新建凭据"
+#~ msgid "新建凭据"
+#~ msgstr "新建凭据"
 
 #: src/components/BindingDriftActions.tsx
 msgid "新建服务配置"
@@ -732,6 +795,10 @@ msgstr "有未发布改动"
 msgid "服务绑定"
 msgstr "服务绑定"
 
+#: src/components/ExtractDialog.tsx
+msgid "服务配置"
+msgstr "服务配置"
+
 #: src/pages/Providers.tsx
 msgid "服务配置决定「用哪家的哪个模型」。配置集绑定它之后，settings.json 里只落占位符， 真实值在 agent 落盘时注入。"
 msgstr "服务配置决定「用哪家的哪个模型」。配置集绑定它之后，settings.json 里只落占位符， 真实值在 agent 落盘时注入。"
@@ -749,9 +816,22 @@ msgstr "未发布 · {0}"
 msgid "未处理"
 msgstr "未处理"
 
+#: src/components/ProviderDialog.tsx
+msgid "未指定"
+msgstr "未指定"
+
+#: src/pages/Providers.tsx
+msgid "未指定默认模型"
+msgstr "未指定默认模型"
+
 #: src/components/BindingBar.tsx
 msgid "未绑定"
 msgstr "未绑定"
+
+#: src/components/ProviderDialog.tsx
+#: src/pages/Providers.tsx
+msgid "未配置"
+msgstr "未配置"
 
 #: src/components/DegradedBanner.tsx
 msgid "本机处于降级状态"
@@ -855,8 +935,12 @@ msgid "添加机器"
 msgstr "添加机器"
 
 #: src/components/ProviderDialog.tsx
-msgid "添加模型"
-msgstr "添加模型"
+#~ msgid "添加模型"
+#~ msgstr "添加模型"
+
+#: src/components/ProviderDialog.tsx
+msgid "清除"
+msgstr "清除"
 
 #: src/pages/MachineDetail.tsx
 #~ msgid "漂移"
@@ -901,8 +985,24 @@ msgid "用量"
 msgstr "用量"
 
 #: src/components/ProviderDialog.tsx
-msgid "由 AI 服务配置创建"
-msgstr "由 AI 服务配置创建"
+#~ msgid "由 AI 服务配置创建"
+#~ msgstr "由 AI 服务配置创建"
+
+#: src/components/ProviderDialog.tsx
+msgid "留空则不修改"
+msgstr "留空则不修改"
+
+#: src/components/ProviderDialog.tsx
+msgid "留空则不修改，填写即替换"
+msgstr "留空则不修改，填写即替换"
+
+#: src/components/ProviderDialog.tsx
+msgid "留空则用平台级"
+msgstr "留空则用平台级"
+
+#: src/components/ProviderDialog.tsx
+msgid "留空则用平台级。"
+msgstr "留空则用平台级。"
 
 #: src/pages/Login.tsx
 msgid "登录"
@@ -928,8 +1028,8 @@ msgstr "确定删除「{0}」吗？被配置集绑定时无法删除。"
 
 #. placeholder {0}: pendingDelete.name
 #: src/pages/Credentials.tsx
-msgid "确定删除凭据 {0}？"
-msgstr "确定删除凭据 {0}？"
+#~ msgid "确定删除凭据 {0}？"
+#~ msgstr "确定删除凭据 {0}？"
 
 #: src/pages/Credentials.tsx
 #~ msgid "确定删除凭据 {credName}？"
@@ -952,8 +1052,8 @@ msgid "确认解除"
 msgstr "确认解除"
 
 #: src/pages/Credentials.tsx
-msgid "确认轮换"
-msgstr "确认轮换"
+#~ msgid "确认轮换"
+#~ msgstr "确认轮换"
 
 #: src/components/StatusDot.tsx
 msgid "离线"
@@ -982,6 +1082,10 @@ msgstr "稍后在编辑器里处理"
 #: src/pages/Settings.tsx
 msgid "站点信息"
 msgstr "站点信息"
+
+#: src/components/ExtractDialog.tsx
+msgid "端点"
+msgstr "端点"
 
 #: src/pages/ImportWizard.tsx
 msgid "等待采集超时，请确认机器在线后重试"
@@ -1023,12 +1127,16 @@ msgstr "草稿里已有该路径"
 
 #. placeholder {0}: usedBy.length
 #: src/pages/Credentials.tsx
-msgid "被 {0} 个 AI 服务配置引用"
-msgstr "被 {0} 个 AI 服务配置引用"
+#~ msgid "被 {0} 个 AI 服务配置引用"
+#~ msgstr "被 {0} 个 AI 服务配置引用"
 
 #: src/pages/Providers.tsx
-msgid "被 {n} 个配置集引用"
-msgstr "被 {n} 个配置集引用"
+msgid "被 {boundCount} 个配置集引用"
+msgstr "被 {boundCount} 个配置集引用"
+
+#: src/pages/Providers.tsx
+#~ msgid "被 {n} 个配置集引用"
+#~ msgstr "被 {n} 个配置集引用"
 
 #: src/components/DegradedBanner.tsx
 msgid "解除降级"
@@ -1057,16 +1165,24 @@ msgid "该 token 一次性使用，{0} 后过期。新机器上线后本窗口�
 msgstr "该 token 一次性使用，{0} 后过期。新机器上线后本窗口会自动关闭。"
 
 #: src/components/FindingList.tsx
-msgid "该值将进入不可变的版本历史。确定保留明文？"
-msgstr "该值将进入不可变的版本历史。确定保留明文？"
+#~ msgid "该值将进入不可变的版本历史。确定保留明文？"
+#~ msgstr "该值将进入不可变的版本历史。确定保留明文？"
+
+#: src/components/FindingList.tsx
+msgid "该值将进入不可变的版本历史。非 AI 平台的密钥没有加密去处——可以改用机器变量（不加密），或把这个文件移出纳管范围。确定保留明文？"
+msgstr "该值将进入不可变的版本历史。非 AI 平台的密钥没有加密去处——可以改用机器变量（不加密），或把这个文件移出纳管范围。确定保留明文？"
 
 #: src/pages/Credentials.tsx
-msgid "该凭据仍被配置集引用，请先去掉引用再删。"
-msgstr "该凭据仍被配置集引用，请先去掉引用再删。"
+#~ msgid "该凭据仍被配置集引用，请先去掉引用再删。"
+#~ msgstr "该凭据仍被配置集引用，请先去掉引用再删。"
 
 #: src/components/Placeholder.tsx
 msgid "该功能将在 {milestone} 提供"
 msgstr "该功能将在 {milestone} 提供"
+
+#: src/components/ProviderDialog.tsx
+msgid "该平台未提供 OpenAI 端点。你仍然可以手填一个。"
+msgstr "该平台未提供 OpenAI 端点。你仍然可以手填一个。"
 
 #: src/components/DriftCard.tsx
 msgid "该文件含未能安全脱敏的凭据，请在 Web 上手工处理"
@@ -1097,8 +1213,8 @@ msgid "请输入路径"
 msgstr "请输入路径"
 
 #: src/components/ProviderDialog.tsx
-msgid "请选择"
-msgstr "请选择"
+#~ msgid "请选择"
+#~ msgstr "请选择"
 
 #: src/components/ThemeToggle.tsx
 msgid "跟随系统"
@@ -1114,12 +1230,12 @@ msgid "路径相对于 HOME，例如 .claude/settings.json"
 msgstr "路径相对于 HOME，例如 .claude/settings.json"
 
 #: src/pages/Credentials.tsx
-msgid "轮换"
-msgstr "轮换"
+#~ msgid "轮换"
+#~ msgstr "轮换"
 
 #: src/pages/Credentials.tsx
-msgid "轮换凭据"
-msgstr "轮换凭据"
+#~ msgid "轮换凭据"
+#~ msgstr "轮换凭据"
 
 #: src/pages/ConfigSetDetail.tsx
 msgid "返回"
@@ -1134,8 +1250,8 @@ msgid "还没有任何 AI 服务配置。"
 msgstr "还没有任何 AI 服务配置。"
 
 #: src/pages/Credentials.tsx
-msgid "还没有凭据。"
-msgstr "还没有凭据。"
+#~ msgid "还没有凭据。"
+#~ msgstr "还没有凭据。"
 
 #: src/pages/Machines.tsx
 msgid "还没有机器。点「添加机器」拿到一行安装命令。"
@@ -1158,13 +1274,17 @@ msgstr "这台机器改用了别的 API 地址：<0>{0}</0>"
 msgid "这台机器用的地址可能是「{name}」。把配置集的绑定改成它？"
 msgstr "这台机器用的地址可能是「{name}」。把配置集的绑定改成它？"
 
+#: src/components/BindingBar.tsx
+msgid "这条服务配置还没有 Claude 端点"
+msgstr "这条服务配置还没有 Claude 端点"
+
 #: src/components/Shell.tsx
 msgid "退出"
 msgstr "退出"
 
 #: src/components/ProviderDialog.tsx
-msgid "选已有凭据"
-msgstr "选已有凭据"
+#~ msgid "选已有凭据"
+#~ msgstr "选已有凭据"
 
 #: src/pages/ConfigSetDetail.tsx
 msgid "选择左侧文件开始编辑"
@@ -1173,6 +1293,10 @@ msgstr "选择左侧文件开始编辑"
 #: src/components/BindingBar.tsx
 msgid "透传（不指定模型）"
 msgstr "透传（不指定模型）"
+
+#: src/components/ProviderDialog.tsx
+msgid "透传（不设模型变量）"
+msgstr "透传（不设模型变量）"
 
 #: src/components/BindingBar.tsx
 msgid "透传模式"
@@ -1236,3 +1360,11 @@ msgstr "需人工复核"
 #: src/components/BindingBar.tsx
 msgid "高级"
 msgstr "高级"
+
+#: src/components/ProviderDialog.tsx
+msgid "默认模型"
+msgstr "默认模型"
+
+#: src/components/ProviderDialog.tsx
+msgid "默认模型（四槽同填）"
+msgstr "默认模型（四槽同填）"
