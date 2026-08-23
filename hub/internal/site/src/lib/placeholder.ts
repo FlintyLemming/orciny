@@ -7,7 +7,7 @@
  * 例子来保证（转义、非法名、machine 白名单）。
  */
 
-export type RefKind = 'cred' | 'var' | 'machine' | 'provider'
+export type RefKind = 'var' | 'machine' | 'provider'
 
 export interface Ref {
   kind: RefKind
@@ -24,13 +24,23 @@ export const MACHINE_KEYS = ['name', 'hostname', 'os', 'arch'] as const
 
 /** {{provider.*}} 允许的全部名字，与 Go 侧 protocol.ProviderKeys 逐字符一致。 */
 export const PROVIDER_KEYS = [
-  'base_url',
-  'auth_token',
-  'model',
-  'model_opus',
-  'model_sonnet',
-  'model_haiku',
+  'claude.base_url',
+  'claude.auth_token',
+  'claude.model',
+  'claude.model_opus',
+  'claude.model_sonnet',
+  'claude.model_haiku',
+  'openai.base_url',
+  'openai.api_key',
+  'openai.model',
 ] as const
+
+/** 取出端点限定名的端点段。不在白名单里返回空串，与 Go 侧 EndpointOf 同义。 */
+export function endpointOf(name: string): string {
+  if (!(PROVIDER_KEYS as readonly string[]).includes(name)) return ''
+  const i = name.indexOf('.')
+  return i > 0 ? name.slice(0, i) : ''
+}
 
 const NAME_RE = /^[A-Za-z0-9_-]+$/
 
@@ -61,21 +71,22 @@ export function parsePlaceholders(text: string): ParseResult {
 
     if (dot < 0) {
       errors.push(`{{${body}}} 缺少 . 分隔`)
+    } else if (prefix === 'provider') {
+      // provider 走白名单，不走字符集——端点限定名中间有点。
+      if ((PROVIDER_KEYS as readonly string[]).includes(name)) {
+        push(refs, seen, { kind: 'provider', name })
+      } else {
+        errors.push(`provider.${name} 不是内置名（只有 ${PROVIDER_KEYS.join(' / ')}）`)
+      }
     } else if (!NAME_RE.test(name)) {
       errors.push(`{{${body}}} 的名字非法（只允许 [A-Za-z0-9_-]）`)
-    } else if (prefix === 'cred' || prefix === 'var') {
-      push(refs, seen, { kind: prefix, name })
+    } else if (prefix === 'var') {
+      push(refs, seen, { kind: 'var', name })
     } else if (prefix === 'machine') {
       if ((MACHINE_KEYS as readonly string[]).includes(name)) {
         push(refs, seen, { kind: 'machine', name })
       } else {
         errors.push(`machine.${name} 不是内置名（只有 ${MACHINE_KEYS.join(' / ')}）`)
-      }
-    } else if (prefix === 'provider') {
-      if ((PROVIDER_KEYS as readonly string[]).includes(name)) {
-        push(refs, seen, { kind: 'provider', name })
-      } else {
-        errors.push(`provider.${name} 不是内置名（只有 ${PROVIDER_KEYS.join(' / ')}）`)
       }
     } else {
       errors.push(`未知前缀 ${prefix}`)
@@ -93,20 +104,19 @@ function push(refs: Ref[], seen: Set<string>, r: Ref) {
 }
 
 /**
- * known 的元素形如 "cred.foo" / "var.bar"。
+ * known 的元素形如 "var.bar"。
  *
- * machine.* 是内置值；provider.* 的「已定义」由三条绑定校验判定
- * （M1.5 spec §7），不走未定义引用这条路——否则每个绑了服务的配置集
+ * machine.* 是内置值；provider.* 的「已定义」由绑定与端点校验判定
+ * （M1.6 spec §4），不走未定义引用这条路——否则每个绑了服务的配置集
  * 都会在编辑器里挂满假告警。
  */
 export function undefinedRefs(text: string, known: Set<string>): Ref[] {
   return parsePlaceholders(text).refs.filter(
-    (r) =>
-      r.kind !== 'machine' && r.kind !== 'provider' && !known.has(`${r.kind}.${r.name}`),
+    (r) => r.kind === 'var' && !known.has(`var.${r.name}`),
   )
 }
 
-/** 补全候选：已有的凭据与变量，加上内置的 machine.* 与 provider.*。 */
+/** 补全候选：已有的机器变量，加上内置的 machine.* 与 provider.*。 */
 export function completions(prefix: string, known: string[]): string[] {
   const all = [
     ...known,
