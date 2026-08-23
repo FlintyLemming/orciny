@@ -7,13 +7,8 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 
 	"github.com/FlintyLemming/orciny/hub/internal/events"
+	"github.com/FlintyLemming/orciny/hub/internal/secretbox"
 )
-
-// MinValueLen 是凭据值的长度下限（spec §6.4）。
-//
-// 理由不是安全强度，是**还原的可靠性**：一个 6 字符的「密钥」在文件里
-// 到处误匹配的风险，远大于它作为密钥的价值。
-const MinValueLen = 8
 
 var (
 	ErrNotFound   = errors.New("credentials: 凭据不存在")
@@ -50,10 +45,10 @@ func (s *Store) VerifyAll() error {
 		return fmt.Errorf("credentials: 读取凭据库: %w", err)
 	}
 	for _, r := range recs {
-		if _, err := Decrypt(s.key, r.GetString("cipher_value")); err != nil {
+		if _, err := secretbox.Decrypt(s.key, r.GetString("cipher_value")); err != nil {
 			return fmt.Errorf("credentials: 凭据 %q 解密失败——主密钥不匹配。"+
 				"若是从备份恢复，请把原机器的 %s 或 %s 一并带过来: %w",
-				r.GetString("name"), KeyFileName, EnvKeyName, err)
+				r.GetString("name"), secretbox.KeyFileName, secretbox.EnvKeyName, err)
 		}
 	}
 	return nil
@@ -63,10 +58,10 @@ func (s *Store) Create(name, value, note string) (*core.Record, error) {
 	if !validName(name) {
 		return nil, fmt.Errorf("%w: %q（只允许 [A-Za-z0-9_-]+）", ErrBadName, name)
 	}
-	if len(value) < MinValueLen {
-		return nil, fmt.Errorf("%w: 至少 %d 个字符", ErrShortValue, MinValueLen)
+	if len(value) < secretbox.MinValueLen {
+		return nil, fmt.Errorf("%w: 至少 %d 个字符", ErrShortValue, secretbox.MinValueLen)
 	}
-	enc, err := Encrypt(s.key, value)
+	enc, err := secretbox.Encrypt(s.key, value)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +72,7 @@ func (s *Store) Create(name, value, note string) (*core.Record, error) {
 	r := core.NewRecord(c)
 	r.Set("name", name)
 	r.Set("cipher_value", enc)
-	r.Set("last4", last4(value))
+	r.Set("last4", secretbox.Last4(value))
 	r.Set("note", note)
 	if err := s.app.Save(r); err != nil {
 		return nil, fmt.Errorf("credentials: 创建 %s: %w", name, err)
@@ -94,19 +89,19 @@ func (s *Store) Create(name, value, note string) (*core.Record, error) {
 // Rotate 换值。轮换**不产生新 Revision**（产品 §4.5 的硬要求），
 // 下发由调用方发一次 ConfigNotify 完成（spec §5.1）。
 func (s *Store) Rotate(name, value string) error {
-	if len(value) < MinValueLen {
-		return fmt.Errorf("%w: 至少 %d 个字符", ErrShortValue, MinValueLen)
+	if len(value) < secretbox.MinValueLen {
+		return fmt.Errorf("%w: 至少 %d 个字符", ErrShortValue, secretbox.MinValueLen)
 	}
 	r, err := s.find(name)
 	if err != nil {
 		return err
 	}
-	enc, err := Encrypt(s.key, value)
+	enc, err := secretbox.Encrypt(s.key, value)
 	if err != nil {
 		return err
 	}
 	r.Set("cipher_value", enc)
-	r.Set("last4", last4(value))
+	r.Set("last4", secretbox.Last4(value))
 	if err := s.app.Save(r); err != nil {
 		return fmt.Errorf("credentials: 轮换 %s: %w", name, err)
 	}
@@ -148,7 +143,7 @@ func (s *Store) Value(name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return Decrypt(s.key, r.GetString("cipher_value"))
+	return secretbox.Decrypt(s.key, r.GetString("cipher_value"))
 }
 
 // Values 批量取值。未知的名字直接跳过——调用方（configsync）拿到的是
@@ -237,7 +232,7 @@ func (s *Store) ValueByID(id string) (string, error) {
 	if err != nil || r == nil {
 		return "", fmt.Errorf("%w: id %s", ErrNotFound, id)
 	}
-	return Decrypt(s.key, r.GetString("cipher_value"))
+	return secretbox.Decrypt(s.key, r.GetString("cipher_value"))
 }
 
 func (s *Store) find(name string) (*core.Record, error) {
@@ -246,13 +241,6 @@ func (s *Store) find(name string) (*core.Record, error) {
 		return nil, fmt.Errorf("%w: %s", ErrNotFound, name)
 	}
 	return r, nil
-}
-
-func last4(v string) string {
-	if len(v) <= 4 {
-		return v
-	}
-	return v[len(v)-4:]
 }
 
 func contains(xs []string, x string) bool {

@@ -10,6 +10,7 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/credentials"
 	"github.com/FlintyLemming/orciny/hub/internal/events"
 	_ "github.com/FlintyLemming/orciny/hub/internal/migrations"
+	"github.com/FlintyLemming/orciny/hub/internal/secretbox"
 )
 
 func newStore(t *testing.T) (*tests.TestApp, *credentials.Store) {
@@ -18,7 +19,7 @@ func newStore(t *testing.T) (*tests.TestApp, *credentials.Store) {
 	require.NoError(t, err)
 	t.Cleanup(app.Cleanup)
 
-	key, err := credentials.LoadMasterKey(t.TempDir())
+	key, err := secretbox.LoadMasterKey(t.TempDir())
 	require.NoError(t, err)
 	return app, credentials.NewStore(app, key, events.NewWriter(app))
 }
@@ -139,7 +140,7 @@ func TestVerifyAllFailsOnWrongMasterKey(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, s.VerifyAll())
 
-	other, err := credentials.LoadMasterKey(t.TempDir())
+	other, err := secretbox.LoadMasterKey(t.TempDir())
 	require.NoError(t, err)
 	bad := credentials.NewStore(app, other, events.NewWriter(app))
 	require.Error(t, bad.VerifyAll(), "换了主密钥必须报错，不能静默把凭据当损坏数据")

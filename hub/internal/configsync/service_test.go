@@ -17,6 +17,7 @@ import (
 	_ "github.com/FlintyLemming/orciny/hub/internal/migrations"
 	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/hub/internal/revisions"
+	"github.com/FlintyLemming/orciny/hub/internal/secretbox"
 	"github.com/FlintyLemming/orciny/protocol"
 )
 
@@ -70,7 +71,7 @@ func newRig(t *testing.T) *rig {
 
 	b := blobs.New(app)
 	ev := events.NewWriter(app)
-	key, err := credentials.LoadMasterKey(t.TempDir())
+	key, err := secretbox.LoadMasterKey(t.TempDir())
 	require.NoError(t, err)
 
 	r := &rig{

@@ -28,6 +28,7 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/hub/internal/revisions"
 	"github.com/FlintyLemming/orciny/hub/internal/routes"
+	"github.com/FlintyLemming/orciny/hub/internal/secretbox"
 	"github.com/FlintyLemming/orciny/hub/internal/ws"
 
 	// 空 import 触发 init()，把初始迁移注册进 core.AppMigrations。
@@ -107,7 +108,7 @@ func Attach(app core.App, cfg Config) (*Hub, error) {
 
 		// 凭据主密钥。必须排在 ws 之前：一台解不开凭据的 hub 不该接客
 		// ——它会把空值下发到全机队（spec §6.6）。
-		key, err := credentials.LoadMasterKey(e.App.DataDir())
+		key, err := secretbox.LoadMasterKey(e.App.DataDir())
 		if err != nil {
 			return fmt.Errorf("加载凭据主密钥: %w", err)
 		}

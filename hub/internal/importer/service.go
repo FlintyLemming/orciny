@@ -13,6 +13,7 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/configsets"
 	"github.com/FlintyLemming/orciny/hub/internal/credentials"
 	"github.com/FlintyLemming/orciny/hub/internal/events"
+	"github.com/FlintyLemming/orciny/hub/internal/secretbox"
 	"github.com/FlintyLemming/orciny/internal/manifest"
 	"github.com/FlintyLemming/orciny/protocol"
 )
@@ -185,10 +186,10 @@ func (s *Service) Extract(setID, path, location, credName string) error {
 	if value == "" {
 		return fmt.Errorf("importer: %s 的 %s 取不到值", path, location)
 	}
-	if len(value) < credentials.MinValueLen {
+	if len(value) < secretbox.MinValueLen {
 		return fmt.Errorf("importer: %s 的值只有 %d 个字符，短于 %d，"+
 			"抽成凭据后还原时会到处误匹配；请保留明文或改用变量",
-			location, len(value), credentials.MinValueLen)
+			location, len(value), secretbox.MinValueLen)
 	}
 
 	if _, err := s.creds.Create(credName, value, "由导入向导从 "+path+" 抽取"); err != nil {

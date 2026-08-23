@@ -16,6 +16,7 @@ import (
 	"github.com/FlintyLemming/orciny/hub"
 	"github.com/FlintyLemming/orciny/hub/internal/credentials"
 	"github.com/FlintyLemming/orciny/hub/internal/events"
+	"github.com/FlintyLemming/orciny/hub/internal/secretbox"
 	"github.com/FlintyLemming/orciny/internal/clock"
 )
 
@@ -92,14 +93,14 @@ func TestServeFailsWhenMasterKeyDoesNotMatch(t *testing.T) {
 	t.Cleanup(app.Cleanup)
 
 	// 先用当前主密钥存一条凭据
-	key, err := credentials.LoadMasterKey(app.DataDir())
+	key, err := secretbox.LoadMasterKey(app.DataDir())
 	require.NoError(t, err)
 	store := credentials.NewStore(app, key, events.NewWriter(app))
 	_, err = store.Create("k", "sk-value-1234", "")
 	require.NoError(t, err)
 
 	// 再把主密钥换掉，模拟「恢复备份时忘了带密钥文件」
-	t.Setenv(credentials.EnvKeyName,
+	t.Setenv(secretbox.EnvKeyName,
 		base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{7}, 32)))
 
 	h, err := hub.Attach(app, hub.Config{})
