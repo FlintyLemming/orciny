@@ -1,9 +1,10 @@
 // Package secrets 读写 ~/.orciny/secrets.json（0600，spec §6.2）。
 //
-// 这里存的是**明文**的凭据与变量值。理由不是图省事，是三个功能的前提：
-//  1. 漂移 diff 不泄密：上报前要把磁盘里的真实值替回 {{cred.x}}，得有值才能替
+// 这里存的是**明文**的秘密与变量值。理由不是图省事，是三个功能的前提：
+//  1. 漂移 diff 不泄密：上报前要把磁盘里的真实值替回
+//     {{provider.claude.auth_token}} 一类的占位符，得有值才能替
 //  2. hub 离线时仍能自愈：重渲染基线、恢复、回滚都不必等 hub
-//  3. 对账不依赖网络：5 分钟一次的对账若每次都要向 hub 换凭据，hub 一断就瞎
+//  3. 对账不依赖网络：5 分钟一次的对账若每次都要向 hub 换秘密，hub 一断就瞎
 //
 // 安全上这不增加实质暴露面：这些值本来就以明文躺在同一台机器、同一个用户、
 // 同样权限的 ~/.claude/settings.json 里。真正的边界是「机器被攻陷」，
@@ -23,11 +24,13 @@ import (
 const FileName = "secrets.json"
 
 type File struct {
-	Creds   map[string]string `json:"creds"`
 	Vars    map[string]string `json:"vars"`
 	Machine map[string]string `json:"machine"`
-	// Provider 是服务绑定注入的六个内置名（M1.5 spec §3.1）。
-	// auth_token 是秘密，因此本文件仍然一律 0600。
+	// Provider 是服务绑定注入的端点限定名（M1.6 spec §3.1）。
+	// claude.auth_token 与 openai.api_key 都是秘密，因此本文件仍然一律 0600。
+	//
+	// 原 Creds 字段随 {{cred.*}} 一起删除。老 agent 写下的文件里多一个
+	// creds 键，反序列化自然忽略，不清洗（spec §3.5）。
 	Provider map[string]string `json:"provider"`
 }
 
@@ -38,8 +41,9 @@ func Load(dir string) (*File, error) {
 	b, err := os.ReadFile(Path(dir))
 	if os.IsNotExist(err) {
 		return &File{
-			Creds: map[string]string{}, Vars: map[string]string{},
-			Machine: map[string]string{}, Provider: map[string]string{},
+			Vars:     map[string]string{},
+			Machine:  map[string]string{},
+			Provider: map[string]string{},
 		}, nil
 	}
 	if err != nil {
@@ -48,9 +52,6 @@ func Load(dir string) (*File, error) {
 	var f File
 	if err := json.Unmarshal(b, &f); err != nil {
 		return nil, fmt.Errorf("secrets: %s 损坏: %w", FileName, err)
-	}
-	if f.Creds == nil {
-		f.Creds = map[string]string{}
 	}
 	if f.Vars == nil {
 		f.Vars = map[string]string{}
@@ -78,9 +79,6 @@ func (f *File) Lookup(r protocol.Ref) (string, bool) {
 		return "", false
 	}
 	switch r.Kind {
-	case protocol.RefCred:
-		v, ok := f.Creds[r.Name]
-		return v, ok
 	case protocol.RefVar:
 		v, ok := f.Vars[r.Name]
 		return v, ok
@@ -95,13 +93,13 @@ func (f *File) Lookup(r protocol.Ref) (string, bool) {
 	}
 }
 
-// Equal 用于检测凭据轮换：拉回来的快照 revision 没变但 secrets 变了，
+// Equal 用于检测 key 轮换：拉回来的快照 revision 没变但 secrets 变了，
 // 就只重渲染受影响的文件（spec §5.1）。
 func (f *File) Equal(o *File) bool {
 	if f == nil || o == nil {
 		return f == nil && o == nil
 	}
-	return sameMap(f.Creds, o.Creds) && sameMap(f.Vars, o.Vars) &&
+	return sameMap(f.Vars, o.Vars) &&
 		sameMap(f.Machine, o.Machine) && sameMap(f.Provider, o.Provider)
 }
 

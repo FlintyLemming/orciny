@@ -401,7 +401,7 @@ func (s *Syncer) contentFor(snap protocol.ConfigSnapshot) (map[string][]byte, er
 	return out, nil
 }
 
-// saveSecrets 把快照带来的凭据、变量与内置的 machine.* 一起落盘。
+// saveSecrets 把快照带来的秘密、变量与内置的 machine.* 一起落盘。
 func (s *Syncer) saveSecrets(snap protocol.ConfigSnapshot) error {
 	hostname, _ := os.Hostname()
 	name := s.d.MachineName
@@ -409,7 +409,6 @@ func (s *Syncer) saveSecrets(snap protocol.ConfigSnapshot) error {
 		name = hostname
 	}
 	f := &secrets.File{
-		Creds:    snap.Credentials,
 		Vars:     snap.Variables,
 		Provider: snap.Provider,
 		Machine: map[string]string{
@@ -418,9 +417,6 @@ func (s *Syncer) saveSecrets(snap protocol.ConfigSnapshot) error {
 			"os":       runtime.GOOS,
 			"arch":     runtime.GOARCH,
 		},
-	}
-	if f.Creds == nil {
-		f.Creds = map[string]string{}
 	}
 	if f.Vars == nil {
 		f.Vars = map[string]string{}

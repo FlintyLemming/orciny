@@ -14,26 +14,41 @@ import (
 // 每一个 1 都改掉，diff 变得完全不可读。宁可放弃还原并标记，让人来看。
 const MinVarLen = 4
 
-// authTokenKey 是 provider 里唯一走凭据档的键。
-const authTokenKey = "auth_token"
+// secretKeys 是 provider 里走秘密档的两个键。
+//
+// **两个都是**（M1.6 spec §3.4）。秘密档的语义是「必须还原，还原不了就拒绝
+// 上传」，尽力档是「尽力替回、替不掉也放行」（M1 spec §7）。一把 API key
+// 落进尽力档就等于有机会被明文上传，两个端点在这一点上没有区别。
+var secretKeys = []string{"claude.auth_token", "openai.api_key"}
+
+func isSecretKey(name string) bool {
+	for _, k := range secretKeys {
+		if k == name {
+			return true
+		}
+	}
+	return false
+}
 
 type RestoreResult struct {
 	Content []byte
 	// Partial 表示有变量未能还原。收编前 UI 强制人工复核这类条目——
 	// diff 里会显示 main vs {{var.workspace}}，用户看得懂，且不泄密。
 	Partial bool
-	// Safe 表示全部已知凭据值都已替出。为 false 时调用方**不得上报内容**，
+	// Safe 表示全部已知秘密值都已替出。为 false 时调用方**不得上报内容**，
 	// 只报路径并置 Truncated（spec §6.4）。
 	Safe bool
 }
 
 // Values 是还原时可用的全部值。
 //
-// provider 的六个值在这里被分派进已有的两档，不新增第三档（M1.5 spec §4.2）：
-// auth_token 是秘密，进凭据档（必须还原，失败即 Safe=false）；
-// base_url 与四个模型槽不是秘密，进变量档（尽力而为，受 MinVarLen 约束）。
+// provider 的九个值被分派进两档（M1.6 spec §3.4）：
+// claude.auth_token 与 openai.api_key 是秘密，进秘密档（必须还原，
+// 失败即 Safe=false）；base_url、四个模型槽与 openai.model 不是秘密，
+// 进变量档（尽力而为，受 MinVarLen 约束）。
+//
+// Creds 字段随 {{cred.*}} 一起删除。
 type Values struct {
-	Creds    map[string]string
 	Vars     map[string]string
 	Provider map[string]string
 }
@@ -99,7 +114,7 @@ func RestoreWithBase(content, base []byte, v Values) RestoreResult {
 	res.Content = []byte(out)
 
 	// 往返律是正确性支点（spec §6.1）：restore 的产物必须能被 render 回原内容。
-	// 典型反例是值恰好落在 "{" 后面，替换后变成 "{{{cred.x}}"，Parse 会挂；
+	// 典型反例是值恰好落在 "{" 后面，替换后变成 "{{{var.x}}"，Parse 会挂；
 	// 或 "{{" + 值 经 EscapeLiteral 后再替换，占位符边界错位。
 	// 对不上或解不动时丢弃内容（Safe=false），调用方只报路径。
 	if res.Safe {
@@ -111,27 +126,30 @@ func RestoreWithBase(content, base []byte, v Values) RestoreResult {
 	return res
 }
 
-// secretBucket 是必须还原的值：全部凭据，加上 provider.auth_token。
+// secretBucket 是必须还原的值：两个端点的 key。
 //
-// auth_token 顶着 provider. 前缀，但它是秘密，不能因为前缀就当成普通值
-// （M1.5 spec §3.2）。
+// 它们顶着 provider. 前缀，但都是秘密，不能因为前缀就当成普通值。
 func (v Values) secretBucket() []replacement {
-	out := replacements(v.Creds, protocol.RefCred)
-	if tok := v.Provider[authTokenKey]; tok != "" {
+	out := make([]replacement, 0, len(secretKeys))
+	for _, k := range secretKeys {
+		val := v.Provider[k]
+		if val == "" {
+			continue
+		}
 		out = append(out, replacement{
-			value: tok,
-			token: tokenOf(protocol.RefProvider, authTokenKey),
-			rank:  rankOf(protocol.RefProvider, authTokenKey),
+			value: val,
+			token: tokenOf(protocol.RefProvider, k),
+			rank:  rankOf(protocol.RefProvider, k),
 		})
 	}
 	return dedupeByValue(sortByValueLenDesc(out))
 }
 
-// varBucket 是尽力而为的值：全部变量，加上 provider 除 auth_token 外的五个。
+// varBucket 是尽力而为的值：全部机器变量，加上 provider 里除两把 key 之外的七个。
 func (v Values) varBucket() []replacement {
 	rest := make(map[string]string, len(v.Provider))
 	for k, val := range v.Provider {
-		if k != authTokenKey {
+		if !isSecretKey(k) {
 			rest[k] = val
 		}
 	}
@@ -140,14 +158,13 @@ func (v Values) varBucket() []replacement {
 	return dedupeByValue(sortByValueLenDesc(out))
 }
 
-// secretValues 是「还原后不允许再被搜到」的值集合（spec §6.4 的最后一道闸）。
+// secretValues 是「还原后不允许再被搜到」的值集合（M1 spec §6.4 的最后一道闸）。
 func (v Values) secretValues() []string {
-	out := make([]string, 0, len(v.Creds)+1)
-	for _, val := range v.Creds {
-		out = append(out, val)
-	}
-	if tok := v.Provider[authTokenKey]; tok != "" {
-		out = append(out, tok)
+	out := make([]string, 0, len(secretKeys))
+	for _, k := range secretKeys {
+		if val := v.Provider[k]; val != "" {
+			out = append(out, val)
+		}
 	}
 	return out
 }
@@ -155,9 +172,6 @@ func (v Values) secretValues() []string {
 func restoreLookup(v Values) func(protocol.Ref) (string, bool) {
 	return func(r protocol.Ref) (string, bool) {
 		switch r.Kind {
-		case protocol.RefCred:
-			s, ok := v.Creds[r.Name]
-			return s, ok
 		case protocol.RefVar:
 			s, ok := v.Vars[r.Name]
 			return s, ok
@@ -175,8 +189,8 @@ type replacement struct {
 	token string
 	// rank 是同值时的优先级，小者胜出。四个模型槽常常填同一个值，
 	// 光靠 token 的字典序决定谁留下会选中 model_haiku——因为 '_' < '}'，
-	// {{provider.model_haiku}} 排在 {{provider.model}} 前面。留下的应该是
-	// ProviderKeys 里靠前的那个（主模型槽），那是 UI 与语义上的主槽。
+	// {{provider.claude.model_haiku}} 排在 {{provider.claude.model}} 前面。
+	// 留下的应该是 ProviderKeys 里靠前的那个（主模型槽），那是 UI 与语义上的主槽。
 	rank int
 }
 
@@ -184,8 +198,11 @@ func tokenOf(kind protocol.RefKind, name string) string {
 	return "{{" + protocol.Ref{Kind: kind, Name: name}.String() + "}}"
 }
 
-// rankOf 给同值替换项定序：凭据与变量恒为 0，provider 按 ProviderKeys 的
-// 下标顺延。名字不在白名单里（不该发生）时排到最后。
+// rankOf 给同值替换项定序：变量恒为 0，provider 按 ProviderKeys 的下标顺延。
+// 名字不在白名单里（不该发生）时排到最后。
+//
+// 两处需要它：四个模型槽常常填同一个值（留下 claude.model，那是主槽）；
+// 两个端点共用同一把 key 时留下 claude.auth_token（它在 ProviderKeys 里靠前）。
 func rankOf(kind protocol.RefKind, name string) int {
 	if kind != protocol.RefProvider {
 		return 0

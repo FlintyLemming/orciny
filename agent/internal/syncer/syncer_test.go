@@ -158,11 +158,13 @@ func TestSnapshotUsesCacheWhenAvailable(t *testing.T) {
 	require.Len(t, r.out.of(protocol.KindApplyAck), 1)
 }
 
-// 凭据与变量随快照落进 secrets.json，供离线自愈与还原使用（spec §6.2）。
+// 秘密与变量随快照落进 secrets.json，供离线自愈与还原使用（spec §6.2）。
 func TestSecretsArePersisted(t *testing.T) {
 	r := newRig(t)
-	snap, blobs := snapshotOf(t, map[string]string{".claude/settings.json": `{"K":"{{cred.k}}"}`})
-	snap.Credentials = map[string]string{"k": "sk-real-1234"}
+	snap, blobs := snapshotOf(t, map[string]string{
+		".claude/settings.json": `{"K":"{{provider.claude.auth_token}}"}`,
+	})
+	snap.Provider = map[string]string{"claude.auth_token": "sk-real-1234"}
 	snap.Variables = map[string]string{"ws": "main"}
 
 	r.s.Handle(envelope(t, protocol.KindConfigSnapshot, snap))
@@ -172,7 +174,7 @@ func TestSecretsArePersisted(t *testing.T) {
 
 	sec, err := secrets.Load(r.dir)
 	require.NoError(t, err)
-	require.Equal(t, "sk-real-1234", sec.Creds["k"])
+	require.Equal(t, "sk-real-1234", sec.Provider["claude.auth_token"])
 	require.Equal(t, "main", sec.Vars["ws"])
 	require.Equal(t, "主力", sec.Machine["name"])
 	require.NotEmpty(t, sec.Machine["hostname"])
@@ -246,12 +248,12 @@ func writeManaged(t *testing.T, r *rig, rel, content string) {
 func TestSnapshotProviderLandsInSecrets(t *testing.T) {
 	r := newRig(t)
 	snap, blobs := snapshotOf(t, map[string]string{
-		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}",` +
-			`"ANTHROPIC_MODEL":"{{provider.model}}"}}`,
+		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}",` +
+			`"ANTHROPIC_MODEL":"{{provider.claude.model}}"}}`,
 	})
 	snap.Provider = map[string]string{
-		"base_url": "https://open.bigmodel.cn/api/anthropic",
-		"model":    "glm-5.1",
+		"claude.base_url": "https://open.bigmodel.cn/api/anthropic",
+		"claude.model":    "glm-5.1",
 	}
 
 	r.s.Handle(envelope(t, protocol.KindConfigSnapshot, snap))

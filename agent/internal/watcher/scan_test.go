@@ -33,9 +33,9 @@ func newFixture(t *testing.T) *fixture {
 		home: t.TempDir(),
 		clk:  clock.NewFake(time.Date(2026, 7, 31, 12, 0, 0, 0, time.UTC)),
 		sec: &secrets.File{
-			Creds:   map[string]string{"k": "sk-real-value-1234"},
-			Vars:    map[string]string{"ws": "workspace-main"},
-			Machine: map[string]string{},
+			Provider: map[string]string{"claude.auth_token": "sk-real-value-1234"},
+			Vars:     map[string]string{"ws": "workspace-main"},
+			Machine:  map[string]string{},
 		},
 	}
 	w, err := watcher.New(watcher.Options{
@@ -83,7 +83,7 @@ func render0(t *testing.T, disk string, sec *secrets.File) []byte {
 
 func renderRestore(disk string, sec *secrets.File) render.RestoreResult {
 	return render.Restore([]byte(disk), render.Values{
-		Creds: sec.Creds, Vars: sec.Vars, Provider: sec.Provider,
+		Vars: sec.Vars, Provider: sec.Provider,
 	})
 }
 
@@ -213,14 +213,14 @@ func TestScanRestoresCredentialsBeforeReporting(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 	require.NotContains(t, string(items[0].Content), "sk-real-value-1234")
-	require.Contains(t, string(items[0].Content), "{{cred.k}}")
+	require.Contains(t, string(items[0].Content), "{{provider.claude.auth_token}}")
 	require.False(t, items[0].Truncated)
 }
 
 // 还原不干净 → 只报路径，不带内容（spec §6.4）。
 func TestScanTruncatesWhenRestoreIsUnsafe(t *testing.T) {
 	fx := newFixture(t)
-	// 凭据值落在 "{" 后面时，替换后变成 "{{{cred.k}}"，Parse 挂掉，
+	// 秘密值落在 "{" 后面时，替换后变成 "{{{provider.claude.auth_token}}"，Parse 挂掉，
 	// roundtrip 失败 → Safe=false（restore.go 注释里的典型反例）。
 	fx.baseline(t, map[string]string{".claude/CLAUDE.md": "基线\n"})
 	fx.write(t, ".claude/CLAUDE.md", "{sk-real-value-1234\n")
@@ -332,8 +332,8 @@ func TestScanTruncatesOversizeFile(t *testing.T) {
 func TestScanRestoresProviderValues(t *testing.T) {
 	fx := newFixture(t)
 	fx.sec.Provider = map[string]string{
-		"base_url":   "https://open.bigmodel.cn/api/anthropic",
-		"auth_token": "sk-zhipu-abcdefghij",
+		"claude.base_url":   "https://open.bigmodel.cn/api/anthropic",
+		"claude.auth_token": "sk-zhipu-abcdefghij",
 	}
 	// 基线是渲染前的占位符形态；rig 的 baseline 会用同一份 sec 还原得到它。
 	fx.baseline(t, map[string]string{
@@ -349,8 +349,8 @@ func TestScanRestoresProviderValues(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 	require.Equal(t, ".claude/settings.json", items[0].Path)
-	require.Contains(t, string(items[0].Content), "{{provider.base_url}}")
-	require.Contains(t, string(items[0].Content), "{{provider.auth_token}}")
+	require.Contains(t, string(items[0].Content), "{{provider.claude.base_url}}")
+	require.Contains(t, string(items[0].Content), "{{provider.claude.auth_token}}")
 	require.NotContains(t, string(items[0].Content), "sk-zhipu")
 	require.False(t, items[0].Truncated)
 }

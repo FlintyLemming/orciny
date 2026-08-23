@@ -51,7 +51,7 @@ func TestDriftCommandOutputIsRedacted(t *testing.T) {
 	out, err := runCLIPublic(t, dir, "drift")
 	require.NoError(t, err)
 	require.NotContains(t, out, "sk-real-secret-9999", "终端输出也必须脱敏")
-	require.Contains(t, out, "{{cred.")
+	require.Contains(t, out, "{{provider.claude.auth_token}}")
 	require.Contains(t, out, ".claude/settings.json")
 }
 
@@ -104,7 +104,7 @@ func seedManagedBaselineWithSecret(t *testing.T, dir, home, secret string) {
 	// 磁盘上是明文，blob 里是占位符形态。
 	seedManagedBaselineWith(t, dir, home,
 		map[string]string{".claude/settings.json": baseline},
-		map[string]string{"k": secret},
+		map[string]string{"claude.auth_token": secret},
 		nil,
 	)
 }
@@ -113,7 +113,7 @@ func seedManagedBaselineWith(
 	t *testing.T,
 	dir, home string,
 	files map[string]string,
-	creds, vars map[string]string,
+	provider, vars map[string]string,
 ) {
 	t.Helper()
 	require.NoError(t, agent.SaveConfig(dir, &agent.Config{
@@ -122,13 +122,13 @@ func seedManagedBaselineWith(
 	_, err := identity.LoadOrCreate(filepath.Join(dir, identity.DirName))
 	require.NoError(t, err)
 
-	if creds == nil {
-		creds = map[string]string{}
+	if provider == nil {
+		provider = map[string]string{}
 	}
 	if vars == nil {
 		vars = map[string]string{}
 	}
-	sec := &secrets.File{Creds: creds, Vars: vars, Machine: map[string]string{}}
+	sec := &secrets.File{Provider: provider, Vars: vars, Machine: map[string]string{}}
 	require.NoError(t, secrets.Save(dir, sec))
 
 	mj, err := manifest.Default().JSON()
@@ -147,7 +147,7 @@ func seedManagedBaselineWith(
 		require.NoError(t, os.WriteFile(p, []byte(disk), 0o644))
 
 		// blob 存还原后的占位符形态（与 apply 落盘前一致）。
-		res := render.Restore([]byte(disk), render.Values{Creds: creds, Vars: vars})
+		res := render.Restore([]byte(disk), render.Values{Provider: provider, Vars: vars})
 		require.True(t, res.Safe, "seed 的基线必须能安全还原")
 		blob, err := cache.Put(res.Content)
 		require.NoError(t, err)

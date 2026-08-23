@@ -14,9 +14,9 @@ import (
 
 func sec() *secrets.File {
 	return &secrets.File{
-		Creds:   map[string]string{"k": "sk-real-value"},
-		Vars:    map[string]string{"ws": "main"},
-		Machine: map[string]string{"hostname": "mac", "os": "darwin", "arch": "arm64", "name": "主力"},
+		Provider: map[string]string{"claude.auth_token": "sk-real-value"},
+		Vars:     map[string]string{"ws": "main"},
+		Machine:  map[string]string{"hostname": "mac", "os": "darwin", "arch": "arm64", "name": "主力"},
 	}
 }
 
@@ -60,7 +60,7 @@ func TestPlanCreateWhenAbsent(t *testing.T) {
 }
 
 func TestPlanSkipWhenRenderedHashMatches(t *testing.T) {
-	content := []byte(`{"K":"{{cred.k}}"}`)
+	content := []byte(`{"K":"{{provider.claude.auth_token}}"}`)
 	snap, blobs := snapFor(map[string][]byte{".claude/settings.json": content},
 		map[string]uint32{".claude/settings.json": 0o600})
 
@@ -81,7 +81,7 @@ func TestPlanSkipWhenRenderedHashMatches(t *testing.T) {
 
 // 凭据轮换：blob 没变，但渲染后的内容变了 → 必须 overwrite（spec §5.1）。
 func TestPlanOverwriteAfterRotation(t *testing.T) {
-	content := []byte(`{"K":"{{cred.k}}"}`)
+	content := []byte(`{"K":"{{provider.claude.auth_token}}"}`)
 	snap, blobs := snapFor(map[string][]byte{".claude/settings.json": content},
 		map[string]uint32{".claude/settings.json": 0o600})
 
@@ -147,7 +147,7 @@ func TestPlanRespectsIgnorePaths(t *testing.T) {
 func TestPlanRefusesFileWithUndefinedRef(t *testing.T) {
 	snap, blobs := snapFor(map[string][]byte{
 		".claude/CLAUDE.md":     []byte("ok"),
-		".claude/settings.json": []byte(`{"K":"{{cred.deleted}}"}`),
+		".claude/settings.json": []byte(`{"K":"{{var.deleted}}"}`),
 	}, nil)
 	p, err := applier.BuildPlan(snap, nil, blobs, sec().Lookup)
 	require.NoError(t, err)
@@ -155,7 +155,7 @@ func TestPlanRefusesFileWithUndefinedRef(t *testing.T) {
 	require.Equal(t, ".claude/CLAUDE.md", p.Steps[0].Rel)
 	require.Len(t, p.Skip, 1)
 	require.Equal(t, ".claude/settings.json", p.Skip[0].Rel)
-	require.Contains(t, p.Skip[0].Reason, "cred.deleted")
+	require.Contains(t, p.Skip[0].Reason, "var.deleted")
 }
 
 // 缺内容就整体不动：宁可不 apply，也不能只写一半（spec §7.4）。

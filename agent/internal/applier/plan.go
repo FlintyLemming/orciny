@@ -130,14 +130,20 @@ func BuildPlan(
 }
 
 // modeOf 取权限位。快照给了就用快照的；没给（历史数据）就按
-// 「含 cred 引用则 0600，其余 0644」推导（spec §7.4）。
+// 「含秘密引用则 0600，其余 0644」推导（M1 spec §7.4）。
+//
+// 「秘密引用」在 M1.6 之后指两个端点的 key（M1.6 spec §3.4）——
+// 原来的判据是 {{cred.*}}，那个前缀已经废止。
 func modeOf(f protocol.FileEntry, raw []byte) os.FileMode {
 	if f.Mode != 0 {
 		return os.FileMode(f.Mode)
 	}
 	if refs, err := protocol.Refs(raw); err == nil {
 		for _, r := range refs {
-			if r.Kind == protocol.RefCred {
+			if r.Kind != protocol.RefProvider {
+				continue
+			}
+			if r.Name == "claude.auth_token" || r.Name == "openai.api_key" {
 				return 0o600
 			}
 		}

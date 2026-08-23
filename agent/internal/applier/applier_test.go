@@ -84,7 +84,7 @@ func TestApplyCreatesAndOverwrites(t *testing.T) {
 
 	snap, blobs := snapFor(map[string][]byte{
 		".claude/CLAUDE.md":     []byte("新内容"),
-		".claude/settings.json": []byte(`{"K":"{{cred.k}}"}`),
+		".claude/settings.json": []byte(`{"K":"{{provider.claude.auth_token}}"}`),
 	}, map[string]uint32{".claude/settings.json": 0o600})
 
 	st := &state.State{Files: map[string]state.FileState{
@@ -224,7 +224,7 @@ func TestSnapshotIsTakenBeforeWriting(t *testing.T) {
 	fx.write(t, ".claude/settings.json", `{"K":"sk-真实密钥"}`, 0o600)
 
 	snap, blobs := snapFor(map[string][]byte{
-		".claude/settings.json": []byte(`{"K":"{{cred.k}}"}`),
+		".claude/settings.json": []byte(`{"K":"{{provider.claude.auth_token}}"}`),
 	}, map[string]uint32{".claude/settings.json": 0o600})
 	st := &state.State{Files: map[string]state.FileState{
 		".claude/settings.json": {Blob: "x", Rendered: "old", Mode: 0o600},

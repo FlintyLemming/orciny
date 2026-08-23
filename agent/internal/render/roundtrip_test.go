@@ -13,29 +13,30 @@ import (
 
 // render(restore(x)) == x：对任意磁盘内容与任意值集合成立。
 //
-// 这是整个凭据机制的正确性支点（spec §6.1 / §10.1）。它保证：
+// 这是整个秘密注入机制的正确性支点（spec §6.1 / §10.1）。它保证：
 // 上报给 hub 的占位符内容，被任何一台机器渲染回来都与原磁盘内容一致，
 // 于是收编不会改变任何机器上的实际配置。
 func TestRenderRestoreRoundTripProperty(t *testing.T) {
 	rng := rand.New(rand.NewPCG(7, 11))
 
-	credValues := []string{"sk-ant-abcdefghij", "ghp_klmnopqrstuv", "AKIAIOSFODNN7EXAM"}
+	secretValues := []string{"sk-ant-abcdefghij", "ghp_klmnopqrstuv"}
 	varValues := []string{"main", "production", "workspace-1"}
 
-	creds := map[string]string{}
-	for i, v := range credValues {
-		creds[string(rune('a'+i))] = v
+	// 两个端点的 key 都是秘密档，正好各占一个。
+	provider := map[string]string{
+		"claude.auth_token": secretValues[0],
+		"openai.api_key":    secretValues[1],
 	}
 	vars := map[string]string{}
 	for i, v := range varValues {
 		vars["v"+string(rune('a'+i))] = v
 	}
 
-	sec := &secrets.File{Creds: creds, Vars: vars, Machine: map[string]string{}}
+	sec := &secrets.File{Vars: vars, Machine: map[string]string{}, Provider: provider}
 
 	alphabet := append([]string{
 		"普通文字", "\n", "{", "}", "{{", "}}", " ", `"`, ":", ",",
-	}, append(credValues, varValues...)...)
+	}, append(secretValues, varValues...)...)
 
 	for range 500 {
 		var sb strings.Builder
@@ -44,7 +45,7 @@ func TestRenderRestoreRoundTripProperty(t *testing.T) {
 		}
 		disk := sb.String()
 
-		res := render.Restore([]byte(disk), render.Values{Creds: creds, Vars: vars})
+		res := render.Restore([]byte(disk), render.Values{Vars: vars, Provider: provider})
 		if !res.Safe {
 			continue // 判定为不安全的内容不会被上报，往返律对它不适用
 		}
@@ -56,12 +57,12 @@ func TestRenderRestoreRoundTripProperty(t *testing.T) {
 
 // 变量被放弃还原时往返律仍要成立——只是内容里留着字面值而已。
 func TestRoundTripHoldsWithPartialRestore(t *testing.T) {
-	creds := map[string]string{"k": "sk-value-12345678"}
+	provider := map[string]string{"claude.auth_token": "sk-value-12345678"}
 	vars := map[string]string{"tier": "1"} // 太短，会被放弃
-	sec := &secrets.File{Creds: creds, Vars: vars, Machine: map[string]string{}}
+	sec := &secrets.File{Vars: vars, Machine: map[string]string{}, Provider: provider}
 
 	disk := `{"K":"sk-value-12345678","tier":"1"}`
-	res := render.Restore([]byte(disk), render.Values{Creds: creds, Vars: vars})
+	res := render.Restore([]byte(disk), render.Values{Vars: vars, Provider: provider})
 	require.True(t, res.Safe)
 
 	back, err := render.Render(res.Content, sec.Lookup)
@@ -74,28 +75,29 @@ func TestRoundTripWithProviderValues(t *testing.T) {
 	rng := rand.New(rand.NewPCG(13, 17))
 
 	provider := map[string]string{
-		"base_url":     "https://open.bigmodel.cn/api/anthropic",
-		"auth_token":   "sk-zhipu-abcdefghijklmn",
-		"model":        "glm-5.1",
-		"model_opus":   "glm-4.7",
-		"model_sonnet": "glm-4.6-air",
-		"model_haiku":  "glm-4.5-flash",
+		"claude.base_url":     "https://open.bigmodel.cn/api/anthropic",
+		"claude.auth_token":   "sk-zhipu-abcdefghijklmn",
+		"claude.model":        "glm-5.1",
+		"claude.model_opus":   "glm-4.7",
+		"claude.model_sonnet": "glm-4.6-air",
+		"claude.model_haiku":  "glm-4.5-flash",
+		"openai.base_url":     "https://open.bigmodel.cn/api/paas/v4",
+		"openai.api_key":      "sk-openai-zyxwvutsrq",
+		"openai.model":        "glm-4.7-openai",
 	}
 	vals := render.Values{
-		Creds:    map[string]string{"anthropic": "sk-ant-abcdefghij"},
 		Vars:     map[string]string{"ws": "production"},
 		Provider: provider,
 	}
 	sec := &secrets.File{
-		Creds: vals.Creds, Vars: vals.Vars,
-		Machine: map[string]string{}, Provider: provider,
+		Vars: vals.Vars, Machine: map[string]string{}, Provider: provider,
 	}
 
 	alphabet := []string{"普通文字", "\n", "{", "}", "{{", "}}", " ", `"`, ":", ","}
 	for _, v := range provider {
 		alphabet = append(alphabet, v)
 	}
-	alphabet = append(alphabet, "sk-ant-abcdefghij", "production")
+	alphabet = append(alphabet, "production")
 
 	for range 500 {
 		var sb strings.Builder

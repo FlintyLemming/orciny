@@ -33,9 +33,16 @@ func TestMinAgentVersionStaysAtM1(t *testing.T) {
 }
 
 func TestMinProviderAgentVersion(t *testing.T) {
-	require.Equal(t, "0.2.0", orciny.MinProviderAgentVersion.String())
 	require.False(t, orciny.MinProviderAgentVersion.LT(orciny.MinAgentVersion),
 		"定向门槛不该低于全局门槛")
 	require.False(t, orciny.MinProviderAgentVersion.GT(semver.MustParse(orciny.Version)),
 		"定向门槛不能高于当前版本，否则自带的 agent 会被自己拒绝")
+}
+
+func TestVersionsForM16(t *testing.T) {
+	require.Equal(t, "0.3.0", orciny.Version)
+	require.Equal(t, "0.3.0", orciny.MinProviderAgentVersion.String(),
+		"老 agent 认不得端点限定名，门槛要跟着抬一档")
+	require.Equal(t, "0.1.0", orciny.MinAgentVersion.String(),
+		"握手层门槛不动：一抬就把无关机器也挡在门外")
 }
