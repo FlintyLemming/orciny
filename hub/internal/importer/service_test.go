@@ -10,10 +10,10 @@ import (
 
 	"github.com/FlintyLemming/orciny/hub/internal/blobs"
 	"github.com/FlintyLemming/orciny/hub/internal/configsets"
-	"github.com/FlintyLemming/orciny/hub/internal/credentials"
 	"github.com/FlintyLemming/orciny/hub/internal/events"
 	"github.com/FlintyLemming/orciny/hub/internal/importer"
 	_ "github.com/FlintyLemming/orciny/hub/internal/migrations"
+	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/hub/internal/secretbox"
 	"github.com/FlintyLemming/orciny/protocol"
 )
@@ -33,7 +33,7 @@ func (f *fakeSender) Online(string) bool { return true }
 type rig struct {
 	app    *tests.TestApp
 	sets   *configsets.Service
-	creds  *credentials.Store
+	provs  *providers.Store
 	blobs  *blobs.Store
 	sender *fakeSender
 	svc    *importer.Service
@@ -54,10 +54,10 @@ func newRig(t *testing.T) *rig {
 	r := &rig{
 		app: app, blobs: b,
 		sets:   configsets.NewService(app, b, ev),
-		creds:  credentials.NewStore(app, key, ev),
+		provs:  providers.NewStore(app, key, ev),
 		sender: &fakeSender{},
 	}
-	r.svc = importer.NewService(app, b, r.sets, r.creds, ev, r.sender)
+	r.svc = importer.NewService(app, b, r.sets, r.provs, ev, r.sender)
 
 	mc, err := app.FindCollectionByNameOrId("machines")
 	require.NoError(t, err)
@@ -153,7 +153,8 @@ func TestFindingsScanDraft(t *testing.T) {
 	require.Equal(t, "anthropic_auth_token", found[0].Suggested)
 }
 
-// 抽取：建凭据 + 把值替成占位符 + 重写草稿。库里此后查不到明文。
+// 抽取：写进 provider 的端点 key + 把值替成占位符 + 重写草稿。
+// 库里此后查不到明文。
 func TestExtractReplacesValueWithPlaceholder(t *testing.T) {
 	r := newRig(t)
 	token, setID, err := r.svc.Start(r.m)
@@ -167,19 +168,23 @@ func TestExtractReplacesValueWithPlaceholder(t *testing.T) {
 		},
 	}))
 
+	provID := r.seedProvider(t, "智谱 GLM")
 	require.NoError(t, r.svc.Extract(setID, ".claude/settings.json",
-		"env.ANTHROPIC_AUTH_TOKEN", "anthropic_auth_token"))
+		"env.ANTHROPIC_AUTH_TOKEN", provID, providers.EndpointClaude))
 
 	draft, err := r.sets.Draft(setID)
 	require.NoError(t, err)
 	content, err := r.blobs.Get(draft[0].Hash)
 	require.NoError(t, err)
-	require.Contains(t, string(content), "{{cred.anthropic_auth_token}}")
+	require.Contains(t, string(content), "{{provider.claude.auth_token}}")
 	require.NotContains(t, string(content), secret)
 
-	v, err := r.creds.Value("anthropic_auth_token")
+	prov, err := r.provs.Get(provID)
+	require.NoError(t, err)
+	v, err := r.provs.Key(prov, providers.EndpointClaude)
 	require.NoError(t, err)
 	require.Equal(t, secret, v)
+	require.Equal(t, "mnop", providers.ClaudeOf(prov).KeyLast4)
 
 	// 抽取之后重扫，这一条不该再出现
 	found, err := r.svc.Findings(setID)
@@ -203,12 +208,141 @@ func TestExtractReplacesEveryOccurrence(t *testing.T) {
 		},
 	}))
 
-	require.NoError(t, r.svc.Extract(setID, ".claude/settings.json", "env.A", "k"))
+	provID := r.seedProvider(t, "智谱 GLM")
+	require.NoError(t, r.svc.Extract(setID, ".claude/settings.json", "env.A",
+		provID, providers.EndpointClaude))
 
 	draft, err := r.sets.Draft(setID)
 	require.NoError(t, err)
 	content, err := r.blobs.Get(draft[0].Hash)
 	require.NoError(t, err)
-	require.Equal(t, 2, strings.Count(string(content), "{{cred.k}}"))
+	require.Equal(t, 2,
+		strings.Count(string(content), "{{provider.claude.auth_token}}"),
+		"漏一处就等于没脱敏，而 Revision 写进去就洗不掉")
 	require.NotContains(t, string(content), secret)
+}
+
+// seedProvider 建一条只配了 claude 端点、还没有任何 key 的 provider。
+// 直接写记录：Store.Create 会拒绝这种状态，而它正是抽取向导要面对的入口
+// ——「刚认出平台、还没填 key」。
+func (r *rig) seedProvider(t *testing.T, name string) string {
+	t.Helper()
+	c, err := r.app.FindCollectionByNameOrId("providers")
+	require.NoError(t, err)
+	rec := core.NewRecord(c)
+	rec.Set("name", name)
+	rec.Set("claude", providers.ClaudeEndpoint{
+		Endpoint: providers.Endpoint{
+			BaseURL:   "https://open.bigmodel.cn/api/anthropic",
+			AuthField: providers.AuthToken,
+			Models:    []string{"glm-5.2"},
+		},
+	})
+	rec.Set("openai", providers.OpenAIEndpoint{
+		Endpoint: providers.Endpoint{
+			AuthField: providers.DefaultOpenAIAuthField,
+			Models:    []string{},
+		},
+	})
+	require.NoError(t, r.app.Save(rec))
+	return rec.Id
+}
+
+// openai 侧写的是另一个 key 名（spec §5.5 第 4 步）。
+func TestExtractIntoOpenAIEndpointUsesAPIKeyToken(t *testing.T) {
+	r := newRig(t)
+	token, setID, err := r.svc.Start(r.m)
+	require.NoError(t, err)
+	require.NoError(t, r.svc.HandleResult(r.m, protocol.CollectResult{
+		Token: token, Final: true,
+		Files: []protocol.CollectedFile{
+			{Path: ".claude/settings.json",
+				Content: []byte(`{"OPENAI_API_KEY":"sk-openai-zyxwvu654321"}`), Mode: 0o600},
+		},
+	}))
+
+	provID := r.seedProvider(t, "智谱 GLM")
+	require.NoError(t, r.svc.Extract(setID, ".claude/settings.json",
+		"OPENAI_API_KEY", provID, providers.EndpointOpenAI))
+
+	draft, err := r.sets.Draft(setID)
+	require.NoError(t, err)
+	content, err := r.blobs.Get(draft[0].Hash)
+	require.NoError(t, err)
+	require.Contains(t, string(content), "{{provider.openai.api_key}}")
+}
+
+// 长度下限不变：太短的值抽出来会在还原时到处误匹配。
+func TestExtractRejectsShortValue(t *testing.T) {
+	r := newRig(t)
+	token, setID, err := r.svc.Start(r.m)
+	require.NoError(t, err)
+	require.NoError(t, r.svc.HandleResult(r.m, protocol.CollectResult{
+		Token: token, Final: true,
+		Files: []protocol.CollectedFile{
+			{Path: ".claude/settings.json",
+				Content: []byte(`{"env":{"ANTHROPIC_AUTH_TOKEN":"short"}}`), Mode: 0o600},
+		},
+	}))
+
+	provID := r.seedProvider(t, "智谱 GLM")
+	err = r.svc.Extract(setID, ".claude/settings.json",
+		"env.ANTHROPIC_AUTH_TOKEN", provID, providers.EndpointClaude)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "短于")
+}
+
+func TestExtractRejectsUnknownProvider(t *testing.T) {
+	r := newRig(t)
+	token, setID, err := r.svc.Start(r.m)
+	require.NoError(t, err)
+	require.NoError(t, r.svc.HandleResult(r.m, protocol.CollectResult{
+		Token: token, Final: true,
+		Files: []protocol.CollectedFile{
+			{Path: ".claude/settings.json",
+				Content: []byte(`{"env":{"ANTHROPIC_AUTH_TOKEN":"sk-zhipu-abcdef123456"}}`),
+				Mode:    0o600},
+		},
+	}))
+
+	err = r.svc.Extract(setID, ".claude/settings.json",
+		"env.ANTHROPIC_AUTH_TOKEN", "nonexistent", providers.EndpointClaude)
+	require.ErrorIs(t, err, providers.ErrNotFound)
+}
+
+// 反查预选：文件里的 base_url 命中已有 provider 就把它报出来（spec §5.5 第 2 步）。
+func TestMatchProviderInFindsProviderByBaseURL(t *testing.T) {
+	r := newRig(t)
+	token, setID, err := r.svc.Start(r.m)
+	require.NoError(t, err)
+	require.NoError(t, r.svc.HandleResult(r.m, protocol.CollectResult{
+		Token: token, Final: true,
+		Files: []protocol.CollectedFile{
+			{Path: ".claude/settings.json", Mode: 0o600, Content: []byte(
+				`{"env":{"ANTHROPIC_BASE_URL":"https://open.bigmodel.cn/api/anthropic"}}`)},
+		},
+	}))
+	provID := r.seedProvider(t, "智谱 GLM")
+
+	m, err := r.svc.MatchProviderIn(setID, ".claude/settings.json")
+	require.NoError(t, err)
+	require.Equal(t, providers.MatchProvider, m.Kind)
+	require.True(t, m.Exact)
+	require.Equal(t, provID, m.ProviderID)
+}
+
+func TestMatchProviderInReturnsNoneWithoutBaseURL(t *testing.T) {
+	r := newRig(t)
+	token, setID, err := r.svc.Start(r.m)
+	require.NoError(t, err)
+	require.NoError(t, r.svc.HandleResult(r.m, protocol.CollectResult{
+		Token: token, Final: true,
+		Files: []protocol.CollectedFile{
+			{Path: ".claude/CLAUDE.md", Content: []byte("没有 base_url\n"), Mode: 0o644},
+		},
+	}))
+
+	m, err := r.svc.MatchProviderIn(setID, ".claude/CLAUDE.md")
+	require.NoError(t, err)
+	require.Equal(t, providers.MatchNone, m.Kind)
 }

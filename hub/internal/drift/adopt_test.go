@@ -203,24 +203,23 @@ func TestAdoptNotifiesAllAssignedMachinesIncludingSource(t *testing.T) {
 	require.Contains(t, notified, other)
 }
 
-// seedProviderFor 建一条最小可用 Provider，返回记录 id。
+// seedProviderFor 建一条只配了 claude 端点的 Provider，返回记录 id。
 func seedProviderFor(t *testing.T, r *rig, name string) string {
 	t.Helper()
-	creds, err := r.app.FindCollectionByNameOrId("credentials")
-	require.NoError(t, err)
-	cred := core.NewRecord(creds)
-	cred.Set("name", "zhipu_key")
-	cred.Set("cipher_value", "x")
-	cred.Set("last4", "1234")
-	require.NoError(t, r.app.Save(cred))
-
 	c, err := r.app.FindCollectionByNameOrId("providers")
 	require.NoError(t, err)
 	p := core.NewRecord(c)
 	p.Set("name", name)
-	p.Set("base_url", "https://open.bigmodel.cn/api/anthropic")
-	p.Set("auth_field", providers.AuthToken)
-	p.Set("credential", cred.Id)
+	p.Set("key_cipher", "x")
+	p.Set("key_last4", "1234")
+	p.Set("claude", providers.ClaudeEndpoint{
+		Endpoint: providers.Endpoint{
+			BaseURL:   "https://open.bigmodel.cn/api/anthropic",
+			AuthField: providers.AuthToken,
+			KeyLast4:  "1234",
+			Models:    []string{"glm-5.2"},
+		},
+	})
 	require.NoError(t, r.app.Save(p))
 	return p.Id
 }

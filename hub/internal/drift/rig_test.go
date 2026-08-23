@@ -12,7 +12,6 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/blobs"
 	"github.com/FlintyLemming/orciny/hub/internal/configsets"
 	"github.com/FlintyLemming/orciny/hub/internal/configsync"
-	"github.com/FlintyLemming/orciny/hub/internal/credentials"
 	"github.com/FlintyLemming/orciny/hub/internal/drift"
 	"github.com/FlintyLemming/orciny/hub/internal/events"
 	_ "github.com/FlintyLemming/orciny/hub/internal/migrations"
@@ -66,7 +65,6 @@ type rig struct {
 	sets      *configsets.Service
 	revs      *revisions.Service
 	events    *events.Writer
-	creds     *credentials.Store
 	provs     *providers.Store
 	sync      *configsync.Service
 	sender    *fakeSender
@@ -86,15 +84,14 @@ func newRig(t *testing.T) *rig {
 	ev := events.NewWriter(app)
 	key, err := secretbox.LoadMasterKey(t.TempDir())
 	require.NoError(t, err)
-	creds := credentials.NewStore(app, key, ev)
 	vars := variables.NewStore(app)
 
 	sender := &fakeSender{online: map[string]bool{}}
 	sets := configsets.NewService(app, b, ev)
 	revs := revisions.NewService(app, b, ev)
-	provs := providers.NewStore(app, ev)
+	provs := providers.NewStore(app, key, ev)
 	syncSvc := configsync.NewService(configsync.Deps{
-		App: app, Blobs: b, Sets: sets, Revs: revs, Creds: creds, Vars: vars,
+		App: app, Blobs: b, Sets: sets, Revs: revs, Vars: vars,
 		Providers: provs, Events: ev, Sender: sender,
 	})
 
@@ -104,14 +101,13 @@ func newRig(t *testing.T) *rig {
 		sets:   sets,
 		revs:   revs,
 		events: ev,
-		creds:  creds,
 		provs:  provs,
 		sync:   syncSvc,
 		sender: sender,
 	}
 	r.svc = drift.NewService(drift.Deps{
 		App: app, Blobs: b, Sets: r.sets, Revs: r.revs, Events: ev,
-		Sync: r.sync, Providers: provs, Creds: creds,
+		Sync: r.sync, Providers: provs,
 	})
 	r.sync.SetDrift(r.svc)
 

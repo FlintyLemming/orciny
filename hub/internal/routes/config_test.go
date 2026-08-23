@@ -34,7 +34,9 @@ type fakeAdmin struct {
 	plainCreateCalled bool
 	fromDriftEvent    string
 	fromDriftLocation string
-	fromDriftName     string
+	fromDriftEndpoint string
+	extractProvider   string
+	extractEndpoint   string
 	fromDriftInput    providers.Input
 }
 
@@ -59,8 +61,14 @@ func (f *fakeAdmin) DeleteConfigSet(string) error                  { return nil 
 func (f *fakeAdmin) ImportFindings(string) ([]importer.Finding, error) {
 	return nil, nil
 }
-func (f *fakeAdmin) ExtractCredential(string, string, string, string) error { return nil }
-func (f *fakeAdmin) AdoptDrift([]string) (string, error)                    { return "rev-adopt", nil }
+func (f *fakeAdmin) ExtractProviderKey(_, _, _, providerID, endpoint string) error {
+	f.extractProvider, f.extractEndpoint = providerID, endpoint
+	return nil
+}
+func (f *fakeAdmin) MatchProviderIn(string, string) (providers.Match, error) {
+	return providers.Match{Kind: providers.MatchNone}, nil
+}
+func (f *fakeAdmin) AdoptDrift([]string) (string, error) { return "rev-adopt", nil }
 func (f *fakeAdmin) AdoptDriftReviewed([]string, []string) (string, error) {
 	return "rev-adopt", nil
 }
@@ -87,11 +95,11 @@ func (f *fakeAdmin) MatchBindingDrift(string) (drift.BindingMatch, error) {
 }
 func (f *fakeAdmin) RebindFromDrift(string, string) (string, error) { return "rev-rebind", nil }
 func (f *fakeAdmin) CreateProviderFromDrift(
-	eventID, location, credName string, in providers.Input,
+	eventID, location, endpoint string, in providers.Input,
 ) (string, error) {
 	f.fromDriftEvent = eventID
 	f.fromDriftLocation = location
-	f.fromDriftName = credName
+	f.fromDriftEndpoint = endpoint
 	f.fromDriftInput = in
 	return "p-from-drift", nil
 }

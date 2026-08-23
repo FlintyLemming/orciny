@@ -129,7 +129,7 @@ func Attach(app core.App, cfg Config) (*Hub, error) {
 		h.revs = revisions.NewService(e.App, h.blobs, h.events)
 		// 先建 importer（它要 Sender = h.machines），再建 configsync（它要 Importer）。
 		// 两者互相需要，但依赖方向是单向的，不存在真正的循环。
-		h.importer = importer.NewService(e.App, h.blobs, h.sets, h.creds, h.events, h.machines)
+		h.importer = importer.NewService(e.App, h.blobs, h.sets, h.provs, h.events, h.machines)
 		h.sync = configsync.NewService(configsync.Deps{
 			App: e.App, Blobs: h.blobs, Sets: h.sets, Revs: h.revs,
 			Vars: h.vars, Providers: h.provs, Events: h.events, Sender: h.machines,
@@ -140,7 +140,7 @@ func Attach(app core.App, cfg Config) (*Hub, error) {
 		h.drift = drift.NewService(drift.Deps{
 			App: e.App, Blobs: h.blobs, Sets: h.sets, Revs: h.revs,
 			Events: h.events, Sync: h.sync,
-			Providers: h.provs, Creds: h.creds, Logger: e.App.Logger(),
+			Providers: h.provs, Logger: e.App.Logger(),
 		})
 		h.sync.SetDrift(h.drift)
 		// 离线补发：agent 一上线就无条件通知一次，幂等保证它在无事可做时

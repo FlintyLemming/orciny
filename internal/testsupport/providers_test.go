@@ -27,9 +27,9 @@ func TestProviderBindingEndToEnd(t *testing.T) {
 
 	setID, _ := th.SeedConfigSet(t, "主力配置", map[string]string{
 		".claude/settings.json": `{"env":{` +
-			`"ANTHROPIC_BASE_URL":"{{provider.base_url}}",` +
-			`"ANTHROPIC_AUTH_TOKEN":"{{provider.auth_token}}",` +
-			`"ANTHROPIC_MODEL":"{{provider.model}}"}}`,
+			`"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}",` +
+			`"ANTHROPIC_AUTH_TOKEN":"{{provider.claude.auth_token}}",` +
+			`"ANTHROPIC_MODEL":"{{provider.claude.model}}"}}`,
 	})
 	// SeedConfigSet 发的 v1 还没有绑定，绑上再发 v2。
 	revID := th.BindConfigSet(t, setID, provID, "glm-5.1")
@@ -48,7 +48,7 @@ func TestProviderBindingEndToEnd(t *testing.T) {
 
 	// blob 里必须仍然只有占位符——Revision 不可变，写进去就洗不掉。
 	blob := th.RevisionBlob(t, revID, ".claude/settings.json")
-	require.Contains(t, string(blob), "{{provider.auth_token}}")
+	require.Contains(t, string(blob), "{{provider.claude.auth_token}}")
 	require.NotContains(t, string(blob), "sk-zhipu")
 
 	// —— 改 Provider 的 base_url ——
@@ -95,7 +95,7 @@ func TestOldAgentGetsAttributableFailure(t *testing.T) {
 	provID := th.SeedProvider(t, "智谱 GLM · 个人",
 		"https://open.bigmodel.cn/api/anthropic", "sk-zhipu-abcdefghij")
 	setID, _ := th.SeedConfigSet(t, "主力配置", map[string]string{
-		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.base_url}}"}}`,
+		".claude/settings.json": `{"env":{"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}"}}`,
 	})
 	th.BindConfigSet(t, setID, provID, "glm-5.1")
 	require.NoError(t, th.Hub.AssignConfigSet(ta.MachineID, setID, "apply"))

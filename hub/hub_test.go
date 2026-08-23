@@ -16,6 +16,7 @@ import (
 	"github.com/FlintyLemming/orciny/hub"
 	"github.com/FlintyLemming/orciny/hub/internal/credentials"
 	"github.com/FlintyLemming/orciny/hub/internal/events"
+	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/hub/internal/secretbox"
 	"github.com/FlintyLemming/orciny/internal/clock"
 )
@@ -117,4 +118,58 @@ func TestServeFailsWhenMasterKeyDoesNotMatch(t *testing.T) {
 	err = app.OnServe().Trigger(se, func(*core.ServeEvent) error { return nil })
 	require.Error(t, err, "主密钥不匹配必须让 serve 失败")
 	require.ErrorContains(t, err, "主密钥")
+}
+
+// 启动自检必须覆盖 provider 的三处密文（M1.6 spec §2.6）。
+//
+// 它防的是「从备份恢复到新机器时忘了带 secret.key」——最可能的翻车场景。
+// 宁可开不了机，也不能让用户以为一切正常，然后把空值下发到全机队。
+func TestServeFailsWhenProviderKeyDoesNotDecrypt(t *testing.T) {
+	app, err := tests.NewTestApp(t.TempDir())
+	require.NoError(t, err)
+	t.Cleanup(app.Cleanup)
+
+	// 用当前主密钥存一条 provider（直接写记录，绕开 Store 的校验）。
+	key, err := secretbox.LoadMasterKey(app.DataDir())
+	require.NoError(t, err)
+	cipher, err := secretbox.Encrypt(key, "sk-zhipu-abcdef123456")
+	require.NoError(t, err)
+
+	c, err := app.FindCollectionByNameOrId("providers")
+	require.NoError(t, err)
+	rec := core.NewRecord(c)
+	rec.Set("name", "智谱 GLM")
+	rec.Set("claude_key_cipher", cipher)
+	rec.Set("claude", providers.ClaudeEndpoint{
+		Endpoint: providers.Endpoint{
+			BaseURL:   "https://open.bigmodel.cn/api/anthropic",
+			AuthField: providers.AuthToken,
+			KeyLast4:  "3456",
+			Models:    []string{"glm-5.2"},
+		},
+	})
+	require.NoError(t, app.Save(rec))
+
+	// 换一把主密钥再起：必须失败，且错误信息能指名是谁、是哪个端点。
+	t.Setenv(secretbox.EnvKeyName,
+		base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{9}, 32)))
+
+	h, err := hub.Attach(app, hub.Config{})
+	require.NoError(t, err)
+	t.Cleanup(h.Shutdown)
+
+	se := new(core.ServeEvent)
+	se.App = app
+	router, err := apis.NewRouter(app)
+	require.NoError(t, err)
+	se.Router = router
+	se.Server = &http.Server{}
+
+	err = app.OnServe().Trigger(se, func(*core.ServeEvent) error { return nil })
+	require.Error(t, err, "解不开自己 key 的 hub 不该接客")
+	require.ErrorContains(t, err, "智谱 GLM")
+	require.ErrorContains(t, err, "claude 端点")
+	require.ErrorContains(t, err, secretbox.KeyFileName,
+		"错误信息里要有备份提示，指名 secret.key")
+	require.ErrorContains(t, err, secretbox.EnvKeyName)
 }

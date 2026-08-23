@@ -13,8 +13,8 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/routes"
 )
 
-const providerReqBody = `{"name":"x","base_url":"https://a.test",` +
-	`"auth_field":"ANTHROPIC_AUTH_TOKEN","credential":"c1"}`
+const providerReqBody = `{"name":"x","key":"sk-abcdef123456",` +
+	`"claude":{"base_url":"https://a.test","auth_field":"ANTHROPIC_AUTH_TOKEN"}}`
 
 // 全部管理端点必须要求 superuser（M0 spec §5.3 的纪律）。
 func TestProviderRoutesRequireSuperuser(t *testing.T) {
@@ -44,7 +44,7 @@ func TestProviderPresetsReturnsSeed(t *testing.T) {
 	var got []providers.Preset
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
 	require.Len(t, got, len(providers.Presets()))
-	require.NotEmpty(t, got[0].BaseURL)
+	require.NotEmpty(t, got[0].Claude.BaseURL)
 }
 
 func TestCreateProviderReturnsID(t *testing.T) {
@@ -108,21 +108,22 @@ func TestBindingDriftRoutesRequireSuperuser(t *testing.T) {
 	}
 }
 
-// 建服务配置时带 from_drift → 先抽 key 成凭据，再用它建。
+// 建服务配置时带 from_drift → 先把漂移里的 key 内联进 Input，再一次建成。
 func TestCreateProviderWithFromDrift(t *testing.T) {
 	admin := &fakeAdmin{}
 	srv := newRouterServer(t, routes.Deps{Admin: admin})
 	body := `{"name":"Kimi 官方","preset":"kimi",` +
-		`"base_url":"https://api.moonshot.cn/anthropic",` +
-		`"auth_field":"ANTHROPIC_AUTH_TOKEN",` +
-		`"from_drift":{"event":"e1","location":"env.ANTHROPIC_AUTH_TOKEN","name":"kimi_key"}}`
+		`"claude":{"base_url":"https://api.moonshot.cn/anthropic",` +
+		`"auth_field":"ANTHROPIC_AUTH_TOKEN"},` +
+		`"from_drift":{"event":"e1","location":"env.ANTHROPIC_AUTH_TOKEN",` +
+		`"endpoint":"claude"}}`
 
 	rec := doSuperuser(t, srv, "POST", "/api/orciny/providers", body)
 	require.Equal(t, http.StatusOK, rec.Code)
 
 	require.Equal(t, "e1", admin.fromDriftEvent)
 	require.Equal(t, "env.ANTHROPIC_AUTH_TOKEN", admin.fromDriftLocation)
-	require.Equal(t, "kimi_key", admin.fromDriftName)
+	require.Equal(t, "claude", admin.fromDriftEndpoint)
 	require.Equal(t, "Kimi 官方", admin.fromDriftInput.Name)
 	require.False(t, admin.plainCreateCalled, "带 from_drift 时不走普通的 CreateProvider")
 }

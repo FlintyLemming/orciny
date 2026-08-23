@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/FlintyLemming/orciny/hub/internal/importer"
+	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/protocol"
 )
 
@@ -105,9 +106,15 @@ func (h *Hub) ImportFindings(setID string) ([]importer.Finding, error) {
 	return h.importer.Findings(setID)
 }
 
-// ExtractCredential 把草稿里某处的值抽成凭据。
-func (h *Hub) ExtractCredential(setID, path, location, name string) error {
-	return h.importer.Extract(setID, path, location, name)
+// ExtractProviderKey 把草稿里某处的值抽成 provider 某个端点的 key
+// （M1.6 spec §5.5）。
+func (h *Hub) ExtractProviderKey(setID, path, location, providerID, endpoint string) error {
+	return h.importer.Extract(setID, path, location, providerID, endpoint)
+}
+
+// MatchProviderIn 对草稿里某个文件的 base_url 做一次反查，供抽取向导预选。
+func (h *Hub) MatchProviderIn(setID, path string) (providers.Match, error) {
+	return h.importer.MatchProviderIn(setID, path)
 }
 
 // AdoptDrift 收编选中的 open 漂移为新版本，并通知全部指派机器。

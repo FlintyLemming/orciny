@@ -1,7 +1,6 @@
 package drift_test
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/pocketbase/pocketbase/core"
@@ -262,16 +261,22 @@ func (r *rig) seedProviderWithDefaults(
 	t *testing.T, name, baseURL, key string, defaults providers.ModelSlots,
 ) string {
 	t.Helper()
-	// 凭据名只允许 [A-Za-z0-9_-]+，不能直接用中文显示名。
-	credName := fmt.Sprintf("cred_%d", len(name)*31+len(baseURL))
-	_, err := r.creds.Create(credName, key, "")
-	require.NoError(t, err)
-	cred, err := r.app.FindFirstRecordByData("credentials", "name", credName)
-	require.NoError(t, err)
-
+	models := []string{}
+	if defaults.Main != "" {
+		models = append(models, defaults.Main)
+	}
+	if defaults.Haiku != "" && defaults.Haiku != defaults.Main {
+		models = append(models, defaults.Haiku)
+	}
 	rec, err := r.provs.Create(providers.Input{
-		Name: name, BaseURL: baseURL, AuthField: providers.AuthToken,
-		Credential: cred.Id, Models: []string{defaults.Main}, Defaults: defaults,
+		Name: name,
+		Key:  &key,
+		Claude: providers.EndpointInput{
+			BaseURL:   baseURL,
+			AuthField: providers.AuthToken,
+			Models:    models,
+			Defaults:  defaults,
+		},
 	})
 	require.NoError(t, err)
 	return rec.Id
@@ -293,7 +298,7 @@ func (r *rig) seedBindingDrift(t *testing.T, path, url, key string) string {
 	t.Helper()
 	r.assignWith(t, map[string]string{
 		path: `{"env":{"ANTHROPIC_BASE_URL":"{{provider.claude.base_url}}",` +
-			`"ANTHROPIC_AUTH_TOKEN":"{{provider.auth_token}}"}}`,
+			`"ANTHROPIC_AUTH_TOKEN":"{{provider.claude.auth_token}}"}}`,
 	})
 	return r.reportBindingDriftWithKey(t, path, url, key)
 }
@@ -392,26 +397,34 @@ func TestMatchBindingRejectsNonBindingDrift(t *testing.T) {
 	require.Contains(t, err.Error(), "不是绑定漂移")
 }
 
-func TestExtractKeyCreatesCredential(t *testing.T) {
+// 抽取的去处从「建一条凭据」改成「写进 provider 的端点 key」（M1.6 spec §5.5）。
+func TestExtractKeyWritesIntoProviderEndpoint(t *testing.T) {
 	r := newRig(t)
+	provID := r.seedProvider(t, "KimiOfficial",
+		"https://api.moonshot.cn/anthropic", "sk-kimi-placeholder-0000")
 	eventID := r.seedBindingDrift(t, ".claude/settings.json",
 		"https://api.moonshot.cn/anthropic", "sk-kimi-QWERTYUIOPasdfghjkl1234")
 
-	credID, err := r.svc.ExtractKey(eventID, "env.ANTHROPIC_AUTH_TOKEN", "kimi_key")
-	require.NoError(t, err)
+	require.NoError(t, r.svc.ExtractKey(eventID,
+		"env.ANTHROPIC_AUTH_TOKEN", provID, providers.EndpointClaude))
 
-	v, err := r.creds.ValueByID(credID)
+	prov, err := r.provs.Get(provID)
 	require.NoError(t, err)
-	require.Equal(t, "sk-kimi-QWERTYUIOPasdfghjkl1234", v)
+	got, err := r.provs.Key(prov, providers.EndpointClaude)
+	require.NoError(t, err)
+	require.Equal(t, "sk-kimi-QWERTYUIOPasdfghjkl1234", got,
+		"端点级 key 覆盖平台级")
 }
 
-// 太短的值抽成凭据会在还原时到处误匹配（M1 spec §6.4），一律拒绝。
+// 太短的值抽出来会在还原时到处误匹配（M1 spec §6.4），一律拒绝。
 func TestExtractKeyRejectsShortValue(t *testing.T) {
 	r := newRig(t)
+	provID := r.seedProvider(t, "KimiOfficial",
+		"https://api.moonshot.cn/anthropic", "sk-kimi-placeholder-0000")
 	eventID := r.seedBindingDrift(t, ".claude/settings.json",
 		"https://api.moonshot.cn/anthropic", "abc")
-	_, err := r.svc.ExtractKey(eventID, "env.ANTHROPIC_AUTH_TOKEN", "kimi_key")
-	require.Error(t, err)
+	require.Error(t, r.svc.ExtractKey(eventID,
+		"env.ANTHROPIC_AUTH_TOKEN", provID, providers.EndpointClaude))
 }
 
 // ---------- Rebind ----------
@@ -532,4 +545,25 @@ func TestDetectBindingDriftIgnoresOldToken(t *testing.T) {
 	cur := []byte(`{"env":{"ANTHROPIC_BASE_URL":"https://relay.example/anthropic"}}`)
 	_, ok := drift.DetectBindingDrift(base, cur)
 	require.False(t, ok)
+}
+
+// 改绑时模型槽取新 Provider 的 claude 端点 defaults：换了家供应商，
+// 旧供应商的模型 id 在新 endpoint 上没有意义（M1.5 spec §6.3 第一档）。
+func TestRebindTakesDefaultsFromClaudeEndpoint(t *testing.T) {
+	r := newRig(t)
+	provID := r.seedProviderWithDefaults(t, "新中转", "https://relay.example/anthropic",
+		"sk-relay-abcdef123456", providers.ModelSlots{
+			Main: "relay-max", Opus: "relay-max",
+			Sonnet: "relay-max", Haiku: "relay-mini",
+		})
+	eventID := r.seedBindingDrift(t, ".claude/settings.json",
+		"https://relay.example/anthropic", "")
+
+	rev, err := r.svc.Rebind(eventID, provID)
+	require.NoError(t, err)
+
+	var b providers.Binding
+	require.NoError(t, rev.UnmarshalJSONField("binding", &b))
+	require.Equal(t, provID, b.Provider)
+	require.Equal(t, "relay-mini", b.Models.Haiku)
 }

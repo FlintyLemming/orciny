@@ -34,7 +34,8 @@ type Admin interface {
 	CloneConfigSet(setID, newName string) (string, error)
 	DeleteConfigSet(setID string) error
 	ImportFindings(setID string) ([]importer.Finding, error)
-	ExtractCredential(setID, path, location, name string) error
+	ExtractProviderKey(setID, path, location, providerID, endpoint string) error
+	MatchProviderIn(setID, path string) (providers.Match, error)
 	AdoptDrift(eventIDs []string) (string, error)
 	AdoptDriftReviewed(eventIDs, reviewed []string) (string, error)
 	RestoreDrift(eventIDs []string) error
@@ -382,22 +383,42 @@ func (d Deps) startImport(e *core.RequestEvent) error {
 	return e.JSON(http.StatusOK, map[string]any{"token": token, "config_set": setID})
 }
 
-func (d Deps) extractCredential(e *core.RequestEvent) error {
+// extractProviderKey 把草稿里某处的值抽进 provider 的端点 key（M1.6 spec §5.5）。
+func (d Deps) extractProviderKey(e *core.RequestEvent) error {
 	if d.Admin == nil {
 		return e.InternalServerError("管理服务未就绪", nil)
 	}
 	var req struct {
 		Path     string `json:"path"`
 		Location string `json:"location"`
-		Name     string `json:"name"`
+		Provider string `json:"provider"`
+		Endpoint string `json:"endpoint"`
 	}
-	if err := e.BindBody(&req); err != nil || req.Path == "" || req.Location == "" || req.Name == "" {
-		return e.BadRequestError("需要 path、location、name", nil)
+	if err := e.BindBody(&req); err != nil ||
+		req.Path == "" || req.Location == "" || req.Provider == "" || req.Endpoint == "" {
+		return e.BadRequestError("需要 path、location、provider、endpoint", nil)
 	}
-	if err := d.Admin.ExtractCredential(e.Request.PathValue("id"), req.Path, req.Location, req.Name); err != nil {
+	if err := d.Admin.ExtractProviderKey(
+		e.Request.PathValue("id"), req.Path, req.Location, req.Provider, req.Endpoint); err != nil {
 		return mapErr(e, err)
 	}
 	return e.NoContent(http.StatusNoContent)
+}
+
+// providerMatch 反查草稿里某个文件的 base_url，供抽取向导预选 provider。
+func (d Deps) providerMatch(e *core.RequestEvent) error {
+	if d.Admin == nil {
+		return e.InternalServerError("管理服务未就绪", nil)
+	}
+	path := e.Request.URL.Query().Get("path")
+	if path == "" {
+		return e.BadRequestError("需要 path", nil)
+	}
+	m, err := d.Admin.MatchProviderIn(e.Request.PathValue("id"), path)
+	if err != nil {
+		return mapErr(e, err)
+	}
+	return e.JSON(http.StatusOK, m)
 }
 
 func (d Deps) importFindings(e *core.RequestEvent) error {

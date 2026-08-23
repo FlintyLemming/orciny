@@ -11,8 +11,8 @@ import (
 
 	"github.com/FlintyLemming/orciny/hub/internal/blobs"
 	"github.com/FlintyLemming/orciny/hub/internal/configsets"
-	"github.com/FlintyLemming/orciny/hub/internal/credentials"
 	"github.com/FlintyLemming/orciny/hub/internal/events"
+	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/hub/internal/secretbox"
 	"github.com/FlintyLemming/orciny/internal/manifest"
 	"github.com/FlintyLemming/orciny/protocol"
@@ -29,7 +29,7 @@ type Service struct {
 	app    core.App
 	blobs  *blobs.Store
 	sets   *configsets.Service
-	creds  *credentials.Store
+	provs  *providers.Store
 	ev     *events.Writer
 	sender Sender
 
@@ -45,9 +45,9 @@ type session struct {
 }
 
 func NewService(app core.App, b *blobs.Store, sets *configsets.Service,
-	creds *credentials.Store, ev *events.Writer, sender Sender) *Service {
+	provs *providers.Store, ev *events.Writer, sender Sender) *Service {
 	return &Service{
-		app: app, blobs: b, sets: sets, creds: creds, ev: ev, sender: sender,
+		app: app, blobs: b, sets: sets, provs: provs, ev: ev, sender: sender,
 		pending: map[string]session{},
 	}
 }
@@ -157,12 +157,26 @@ func (s *Service) Findings(setID string) ([]Finding, error) {
 	return out, nil
 }
 
-// Extract 把某处的值抽成凭据：建凭据 → 把该文件里**每一处**该值替成占位符
-// → 重写草稿。
+// Extract 把某处的值抽成 provider 某个端点的 key：写进 provider →
+// 把该文件里**每一处**该值替成该端点的 key 占位符 → 重写草稿。
 //
-// 「每一处」是要紧的：同一个 key 常常同时出现在 env 与某段说明文字里，
-// 漏一处就等于没脱敏，而 Revision 是不可变的，写进去就洗不掉（spec §1.4）。
-func (s *Service) Extract(setID, path, location, credName string) error {
+// 「每一处」是要紧的（M1 spec §1.4）：同一个 key 常常同时出现在 env 与
+// 某段说明文字里，漏一处就等于没脱敏，而 Revision 是不可变的，
+// 写进去就洗不掉。
+//
+// 与 M1 的区别只在去处：值从「建一条凭据」改成「写进 provider 的端点 key」
+// （M1.6 spec §5.5）。凭据实体提供的加密落库、末四位回显 provider 自己完全
+// 能承担；而「起个名再回来选它」这一步的心智负担被去掉了。
+func (s *Service) Extract(setID, path, location, providerID, endpoint string) error {
+	token, err := keyTokenOf(endpoint)
+	if err != nil {
+		return err
+	}
+	prov, err := s.provs.Get(providerID)
+	if err != nil {
+		return err
+	}
+
 	draft, err := s.sets.Draft(setID)
 	if err != nil {
 		return err
@@ -188,20 +202,58 @@ func (s *Service) Extract(setID, path, location, credName string) error {
 	}
 	if len(value) < secretbox.MinValueLen {
 		return fmt.Errorf("importer: %s 的值只有 %d 个字符，短于 %d，"+
-			"抽成凭据后还原时会到处误匹配；请保留明文或改用变量",
+			"抽出来之后还原时会到处误匹配；请保留明文或改用机器变量",
 			location, len(value), secretbox.MinValueLen)
 	}
 
-	if _, err := s.creds.Create(credName, value, "由导入向导从 "+path+" 抽取"); err != nil {
+	if err := s.provs.SetEndpointKey(prov, endpoint, value); err != nil {
 		return err
 	}
 
-	replaced := strings.ReplaceAll(string(content), value,
-		"{{cred."+credName+"}}")
+	replaced := strings.ReplaceAll(string(content), value, token)
 	if _, err := s.sets.SetDraftFile(setID, path, []byte(replaced), entry.Mode, entry.Keys); err != nil {
 		return err
 	}
 	return nil
+}
+
+// keyTokenOf 给出某端点承载 key 的占位符字面形态。
+// 两侧的 key 名不同（claude.auth_token vs openai.api_key，spec §3.1），
+// 不能拿一个常量套两边。
+func keyTokenOf(endpoint string) (string, error) {
+	switch endpoint {
+	case providers.EndpointClaude:
+		return "{{provider.claude.auth_token}}", nil
+	case providers.EndpointOpenAI:
+		return "{{provider.openai.api_key}}", nil
+	default:
+		return "", fmt.Errorf("importer: 未知端点 %q", endpoint)
+	}
+}
+
+// MatchProviderIn 对文件里的 base_url 做一次反查，供抽取向导预选 provider
+// （M1.6 spec §5.5 第 2 步）。找不到 base_url 或反查不中都返回 MatchNone，
+// 不是错误——那只是「让用户自己选」。
+func (s *Service) MatchProviderIn(setID, path string) (providers.Match, error) {
+	draft, err := s.sets.Draft(setID)
+	if err != nil {
+		return providers.Match{}, err
+	}
+	for _, f := range draft {
+		if f.Path != path {
+			continue
+		}
+		content, err := s.blobs.Get(f.Hash)
+		if err != nil {
+			return providers.Match{}, err
+		}
+		url := gjson.GetBytes(content, "env.ANTHROPIC_BASE_URL").String()
+		if url == "" {
+			return providers.Match{Kind: providers.MatchNone}, nil
+		}
+		return s.provs.MatchBaseURL(url)
+	}
+	return providers.Match{Kind: providers.MatchNone}, nil
 }
 
 // keysFor 给 .claude.json 补上 keys 模式的受管键（spec §3.1）。

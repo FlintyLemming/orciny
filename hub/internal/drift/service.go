@@ -10,7 +10,6 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/blobs"
 	"github.com/FlintyLemming/orciny/hub/internal/configsets"
 	"github.com/FlintyLemming/orciny/hub/internal/configsync"
-	"github.com/FlintyLemming/orciny/hub/internal/credentials"
 	"github.com/FlintyLemming/orciny/hub/internal/events"
 	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/hub/internal/revisions"
@@ -27,9 +26,7 @@ type Deps struct {
 	Sync   *configsync.Service // 子计划 14 发 DriftCommand 用；HandleReport 暂不需要
 	// Providers 供绑定漂移的反查（M1.5 spec §6.3）。
 	Providers *providers.Store
-	// Creds 供把机器上手写的 key 抽成凭据（M1.5 spec §6.3 第二档）。
-	Creds  *credentials.Store
-	Logger *slog.Logger
+	Logger    *slog.Logger
 }
 
 // Service 是收件箱：漂移落库与后续的收编 / 恢复 / 忽略。
