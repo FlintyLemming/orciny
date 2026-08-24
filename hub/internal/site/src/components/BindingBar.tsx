@@ -43,9 +43,23 @@ export function BindingBar({
   const slots = binding?.models ?? emptySlots()
   // [1m] 是槽位上的声明而不是独立模型：下拉一律列基名，标记单独一个复选框，
   // 否则同一个模型会在下拉里并排出现两次。
-  const modelOptions = [...new Set(models.map(stripOneM))]
+  const modelOptions = [...new Set(models.map((m) => m.name))]
   const mainBase = stripOneM(slots.main)
   const oneM = hasOneM(slots.main)
+
+  function getModelOneMDisabled(modelName: string): { disabled: boolean; title?: string } {
+    if (!modelName) return { disabled: true }
+    const found = models.find((m) => m.name === modelName)
+    if (found && !found.one_m) {
+      return {
+        disabled: true,
+        title: t`该模型未标记支持 1M 上下文，可在 AI 服务页修改`,
+      }
+    }
+    return { disabled: false }
+  }
+
+  const mainAbility = getModelOneMDisabled(mainBase)
 
   function setSlot(key: keyof ModelSlots, value: string) {
     if (!binding) return
@@ -94,9 +108,12 @@ export function BindingBar({
               aria-label={t`主模型`}
               className="rounded border border-line bg-wash px-2 py-1 font-mono text-sm"
               value={mainBase}
-              onChange={(e) =>
-                onChange({ ...binding, models: fillAllSlots(setOneM(e.target.value, oneM)) })
-              }
+              onChange={(e) => {
+                const val = e.target.value
+                const found = models.find((m) => m.name === val)
+                const targetOneM = Boolean(found?.one_m)
+                onChange({ ...binding, models: fillAllSlots(setOneM(val, targetOneM)) })
+              }}
             >
               <option value="">{t`透传（不指定模型）`}</option>
               {modelOptions.map((m) => (
@@ -106,12 +123,15 @@ export function BindingBar({
               ))}
             </select>
 
-            <label className="flex items-center gap-1 text-xs text-ink3">
+            <label
+              className="flex items-center gap-1 text-xs text-ink3"
+              title={mainAbility.title}
+            >
               <input
                 type="checkbox"
                 aria-label={t`声明 1M 上下文`}
                 checked={oneM}
-                disabled={mainBase === ''}
+                disabled={mainAbility.disabled}
                 onChange={(e) =>
                   onChange({ ...binding, models: setSlotsOneM(slots, mainBase, e.target.checked) })
                 }
@@ -150,7 +170,12 @@ export function BindingBar({
                 aria-label={k}
                 className="rounded border border-line bg-wash px-2 py-1 font-mono text-sm"
                 value={stripOneM(slots[k])}
-                onChange={(e) => setSlot(k, setOneM(e.target.value, hasOneM(slots[k])))}
+                onChange={(e) => {
+                  const val = e.target.value
+                  const found = models.find((m) => m.name === val)
+                  const targetOneM = Boolean(found?.one_m)
+                  setSlot(k, setOneM(val, targetOneM))
+                }}
               >
                 <option value="">{t`（空）`}</option>
                 {modelOptions.map((m) => (

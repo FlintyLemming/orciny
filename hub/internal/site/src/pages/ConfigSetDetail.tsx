@@ -22,11 +22,15 @@ import {
   setDraftFile,
   removeDraftFile,
   normalizeFileEntry,
+  setBinding,
+  publishConfigSet,
+  rollbackConfigSet,
+  validateConfigSet,
 } from '@/lib/api'
 import { diffAgainstHead, nextDraftState, type DraftState } from '@/lib/draftState'
 import { insertEnvSnippet } from '@/lib/binding'
 import { $providers, subscribeProviders } from '@/stores/providers'
-import { setBinding } from '@/lib/api'
+import { showToast } from '@/stores/toast'
 import { SETTINGS_PATH } from '@/lib/binding'
 import { pb } from '@/lib/pb'
 import {
@@ -217,12 +221,42 @@ export function ConfigSetDetail({ id }: { id: string }) {
   }
 
   async function openPublish() {
+    if (!set) return
     setError('')
     setSaving(true)
     try {
       // 发布冻结的是服务端草稿；编辑器本地改动若不先 flush，
       // 会把「新建空文件 + 只在前端写过内容」发成空文件。
       await flushUnsaved()
+
+      const diff = diffAgainstHead(set)
+      if (!diff.files && diff.binding) {
+        const problems = await validateConfigSet(set.id)
+        const hasBlocking = problems.some((p) => !p.warning)
+        if (hasBlocking) {
+          setShowPublish(true)
+          return
+        }
+
+        const headBefore = set.head
+        const mainModel = set.draft_binding?.models?.main || t`透传`
+        const note = t`切换模型至 ${mainModel}`
+        await publishConfigSet(set.id, note)
+        setDraftState('clean')
+        await reloadConfigSet(set.id)
+        showToast(
+          t`已切到 ${mainModel} · 影响 ${affected} 台`,
+          headBefore
+            ? async () => {
+                await rollbackConfigSet(set.id, headBefore)
+                await reloadConfigSet(set.id)
+              }
+            : undefined,
+          8000,
+        )
+        return
+      }
+
       setShowPublish(true)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))

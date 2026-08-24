@@ -24,7 +24,10 @@ const provider: ProviderRecord = {
     base_url: 'https://open.bigmodel.cn/api/anthropic',
     auth_field: 'ANTHROPIC_AUTH_TOKEN',
     key_last4: 'a1b2',
-    models: ['glm-5.1', 'glm-4.7'],
+    models: [
+      { name: 'glm-5.1', one_m: true },
+      { name: 'glm-4.7', one_m: false },
+    ],
     defaults: null,
   },
   openai: null,
@@ -52,7 +55,7 @@ const noClaude: ProviderRecord = {
 }
 
 describe('BindingBar', () => {
-  it('选主模型时四槽同填', async () => {
+  it('选主模型时四槽同填，且按模型能力决定 1M 声明', async () => {
     const onChange = vi.fn()
     render(
       wrap(
@@ -66,10 +69,18 @@ describe('BindingBar', () => {
       ),
     )
 
+    // glm-5.1 支持 1M -> 自动带上 [1m]
     await userEvent.selectOptions(screen.getByLabelText(/主模型|Main model/), 'glm-5.1')
     expect(onChange).toHaveBeenCalledWith({
       provider: 'p1',
-      models: { main: 'glm-5.1', opus: 'glm-5.1', sonnet: 'glm-5.1', haiku: 'glm-5.1' },
+      models: { main: 'glm-5.1[1m]', opus: 'glm-5.1[1m]', sonnet: 'glm-5.1[1m]', haiku: 'glm-5.1[1m]' },
+    })
+
+    // glm-4.7 不支持 1M -> 不带 [1m]
+    await userEvent.selectOptions(screen.getByLabelText(/主模型|Main model/), 'glm-4.7')
+    expect(onChange).toHaveBeenCalledWith({
+      provider: 'p1',
+      models: { main: 'glm-4.7', opus: 'glm-4.7', sonnet: 'glm-4.7', haiku: 'glm-4.7' },
     })
   })
 
@@ -79,7 +90,7 @@ describe('BindingBar', () => {
       wrap(
         <BindingBar
           providers={[provider]}
-          binding={{ provider: 'p1', models: fillAllSlots('glm-5.1') }}
+          binding={{ provider: 'p1', models: fillAllSlots('glm-5.1[1m]') }}
           settingsText="{}"
           onChange={onChange}
           onInsertSnippet={vi.fn()}
@@ -91,7 +102,7 @@ describe('BindingBar', () => {
     await userEvent.selectOptions(screen.getByLabelText(/haiku/i), 'glm-4.7')
     expect(onChange).toHaveBeenCalledWith({
       provider: 'p1',
-      models: { main: 'glm-5.1', opus: 'glm-5.1', sonnet: 'glm-5.1', haiku: 'glm-4.7' },
+      models: { main: 'glm-5.1[1m]', opus: 'glm-5.1[1m]', sonnet: 'glm-5.1[1m]', haiku: 'glm-4.7' },
     })
   })
 
@@ -211,6 +222,42 @@ describe('BindingBar 的 1M 上下文声明', () => {
     )
     expect(screen.getByLabelText('主模型')).toHaveValue('glm-5.1')
     expect(screen.getByRole('checkbox', { name: '声明 1M 上下文' })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: '声明 1M 上下文' })).not.toBeDisabled()
+  })
+
+  it('选中不支持 1M 的模型时复选框禁用且有 title 提示', () => {
+    const unsupp = { provider: 'p1', models: fillAllSlots('glm-4.7') }
+    render(
+      wrap(
+        <BindingBar
+          providers={[provider]}
+          binding={unsupp}
+          settingsText=""
+          onChange={vi.fn()}
+          onInsertSnippet={vi.fn()}
+        />,
+      ),
+    )
+    const cb = screen.getByRole('checkbox', { name: '声明 1M 上下文' })
+    expect(cb).toBeDisabled()
+    expect(cb.closest('label')).toHaveAttribute('title', expect.stringContaining('未标记支持 1M'))
+  })
+
+  it('模型不在清单中时不禁用复选框', () => {
+    const custom = { provider: 'p1', models: fillAllSlots('custom-model') }
+    render(
+      wrap(
+        <BindingBar
+          providers={[provider]}
+          binding={custom}
+          settingsText=""
+          onChange={vi.fn()}
+          onInsertSnippet={vi.fn()}
+        />,
+      ),
+    )
+    const cb = screen.getByRole('checkbox', { name: '声明 1M 上下文' })
+    expect(cb).not.toBeDisabled()
   })
 
   it('取消 1M 只影响基名相同的槽', async () => {
@@ -238,25 +285,5 @@ describe('BindingBar 的 1M 上下文声明', () => {
       sonnet: 'glm-5.1',
       haiku: 'glm-4.7',
     })
-  })
-
-  it('高级里的分槽下拉保留各槽自己的声明', async () => {
-    const onChange = vi.fn()
-    render(
-      wrap(
-        <BindingBar
-          providers={[provider]}
-          binding={binding}
-          settingsText=""
-          onChange={onChange}
-          onInsertSnippet={vi.fn()}
-        />,
-      ),
-    )
-    await userEvent.click(screen.getByRole('button', { name: /高级/ }))
-    expect(screen.getByLabelText('haiku')).toHaveValue('glm-5.1')
-
-    await userEvent.selectOptions(screen.getByLabelText('haiku'), 'glm-4.7')
-    expect(onChange.mock.calls[0][0].models.haiku).toBe('glm-4.7[1m]')
   })
 })
