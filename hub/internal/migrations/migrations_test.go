@@ -1,6 +1,7 @@
 package migrations_test
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/pocketbase/pocketbase/core"
@@ -8,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/FlintyLemming/orciny/hub/internal/migrations"
+	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/hub/internal/secretbox"
 )
 
@@ -484,3 +486,82 @@ func TestDown005Refuses(t *testing.T) {
 	require.Error(t, migrations.Down005(app),
 		"凭据删了之后无处还原，假装能回滚比没有更危险")
 }
+
+func TestMigration006InfersOneMCapability(t *testing.T) {
+	app := newApp(t)
+	c, err := app.FindCollectionByNameOrId("providers")
+	require.NoError(t, err)
+
+	r := core.NewRecord(c)
+	r.Set("name", "测试 GLM")
+	r.Set("claude", json.RawMessage(`{
+		"base_url":"https://open.bigmodel.cn/api/anthropic",
+		"auth_field":"ANTHROPIC_AUTH_TOKEN",
+		"models":["glm-5.2","glm-4.7"],
+		"defaults":{"main":"glm-5.2[1m]","opus":"glm-5.2[1m]","sonnet":"glm-5.2[1m]","haiku":"glm-4.7"}
+	}`))
+	r.Set("openai", json.RawMessage(`{
+		"base_url":"https://open.bigmodel.cn/api/paas/v4",
+		"auth_field":"OPENAI_API_KEY",
+		"models":["glm-5.2","glm-4.7"],
+		"default_model":"glm-5.2"
+	}`))
+	require.NoError(t, app.Save(r))
+
+	require.NoError(t, migrations.BackfillClaudeModels(app))
+
+	got, err := app.FindRecordById("providers", r.Id)
+	require.NoError(t, err)
+
+	var cl struct {
+		Models []struct {
+			Name string `json:"name"`
+			OneM bool   `json:"one_m"`
+		} `json:"models"`
+	}
+	require.NoError(t, got.UnmarshalJSONField("claude", &cl))
+	require.Len(t, cl.Models, 2)
+	require.Equal(t, "glm-5.2", cl.Models[0].Name)
+	require.True(t, cl.Models[0].OneM)
+	require.Equal(t, "glm-4.7", cl.Models[1].Name)
+	require.False(t, cl.Models[1].OneM)
+
+	var oa struct {
+		Models []string `json:"models"`
+	}
+	require.NoError(t, got.UnmarshalJSONField("openai", &oa))
+	require.Equal(t, []string{"glm-5.2", "glm-4.7"}, oa.Models)
+}
+
+func TestMigration006PreservesRenderedKeys(t *testing.T) {
+	app := newApp(t)
+	c, err := app.FindCollectionByNameOrId("providers")
+	require.NoError(t, err)
+
+	r := core.NewRecord(c)
+	r.Set("name", "测试 GLM 2")
+	r.Set("claude", json.RawMessage(`{
+		"base_url":"https://open.bigmodel.cn/api/anthropic",
+		"auth_field":"ANTHROPIC_AUTH_TOKEN",
+		"models":["glm-5.2"],
+		"defaults":{"main":"glm-5.2[1m]","opus":"glm-5.2[1m]","sonnet":"glm-5.2[1m]","haiku":"glm-5.2[1m]"}
+	}`))
+	require.NoError(t, app.Save(r))
+
+	require.NoError(t, migrations.BackfillClaudeModels(app))
+
+	got, err := app.FindRecordById("providers", r.Id)
+	require.NoError(t, err)
+
+	cl := providers.ClaudeOf(got)
+	require.Equal(t, "glm-5.2[1m]", cl.Defaults.Main)
+	require.Len(t, cl.Models, 1)
+	require.Equal(t, "glm-5.2", cl.Models[0].Name)
+	require.True(t, cl.Models[0].OneM)
+}
+
+func TestDown006Refuses(t *testing.T) {
+	app := newApp(t)
+	require.Error(t, migrations.Down006(app))
+}
+
