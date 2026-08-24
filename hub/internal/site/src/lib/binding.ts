@@ -71,6 +71,19 @@ export function isPassthrough(s: ModelSlots): boolean {
   return !s.main && !s.opus && !s.sonnet && !s.haiku
 }
 
+/**
+ * 四槽是否分设：去 [1m] 后四个基名不全相同。
+ * 护栏 §5.2：已分设的配置集快切让路，避免 fillAllSlots 把分设抹平。
+ */
+export function isSlotsSplit(s: ModelSlots | null | undefined): boolean {
+  if (!s) return false
+  const main = stripOneM(s.main)
+  const opus = stripOneM(s.opus)
+  const sonnet = stripOneM(s.sonnet)
+  const haiku = stripOneM(s.haiku)
+  return main !== opus || main !== sonnet || main !== haiku
+}
+
 /** 内容里是否已经有 {{provider.*}} 引用（转义的不算）。 */
 export function hasProviderRefs(text: string): boolean {
   return parsePlaceholders(text).refs.some((r) => r.kind === 'provider')

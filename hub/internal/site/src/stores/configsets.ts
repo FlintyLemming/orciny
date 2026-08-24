@@ -1,6 +1,7 @@
 import { atom } from 'nanostores'
 import { pb } from '@/lib/pb'
 import {
+  COLLECTION_ASSIGNMENTS,
   COLLECTION_CONFIG_SETS,
   COLLECTION_REVISIONS,
   type ConfigSetRecord,
@@ -10,6 +11,7 @@ import {
 export const $configSets = atom<ConfigSetRecord[]>([])
 export const $configSetsLoading = atom(true)
 export const $configSetsError = atom('')
+export const $assignmentCounts = atom<Record<string, number>>({})
 
 export const $currentSet = atom<ConfigSetRecord | null>(null)
 export const $revisions = atom<RevisionRecord[]>([])
@@ -23,10 +25,25 @@ function byName(a: ConfigSetRecord, b: ConfigSetRecord) {
 
 async function loadList() {
   try {
-    const list = await pb.collection(COLLECTION_CONFIG_SETS).getFullList<ConfigSetRecord>({
-      sort: 'name',
-      expand: 'head',
-    })
+    const [list, assigns] = await Promise.all([
+      pb.collection(COLLECTION_CONFIG_SETS).getFullList<ConfigSetRecord>({
+        sort: 'name',
+        expand: 'head,head_provider',
+      }),
+      pb
+        .collection(COLLECTION_ASSIGNMENTS)
+        .getFullList<{ config_set: string }>({
+          fields: 'config_set',
+        })
+        .catch(() => []),
+    ])
+    const counts: Record<string, number> = {}
+    for (const a of assigns) {
+      if (a.config_set) {
+        counts[a.config_set] = (counts[a.config_set] || 0) + 1
+      }
+    }
+    $assignmentCounts.set(counts)
     $configSets.set(list.sort(byName))
     $configSetsError.set('')
   } catch (e) {
@@ -34,6 +51,10 @@ async function loadList() {
   } finally {
     $configSetsLoading.set(false)
   }
+}
+
+export async function reloadConfigSets() {
+  await loadList()
 }
 
 /** 订阅配置集列表。多个组件共用一份订阅。 */

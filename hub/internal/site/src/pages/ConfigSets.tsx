@@ -3,30 +3,40 @@ import { useStore } from '@nanostores/react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Plus, Copy, Trash2 } from 'lucide-react'
 import {
+  $assignmentCounts,
   $configSets,
   $configSetsLoading,
   $configSetsError,
   subscribeConfigSets,
   setConfigSetPaused,
+  reloadConfigSets,
 } from '@/stores/configsets'
+import { $providers, subscribeProviders } from '@/stores/providers'
 import { createConfigSet, cloneConfigSet, deleteConfigSet } from '@/lib/api'
 import { navigate } from '@/router'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { PromptDialog } from '@/components/PromptDialog'
+import { PublishDialog } from '@/components/PublishDialog'
+import { ModelQuickSwitch } from '@/components/ModelQuickSwitch'
 
 export function ConfigSets() {
   const { t } = useLingui()
   const sets = useStore($configSets)
   const loading = useStore($configSetsLoading)
   const error = useStore($configSetsError)
+  const providers = useStore($providers)
+  const assignmentCounts = useStore($assignmentCounts)
+
   const [creating, setCreating] = useState(false)
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [cloneTarget, setCloneTarget] = useState<{ id: string; name: string } | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const [publishTarget, setPublishTarget] = useState<string | null>(null)
 
   useEffect(() => subscribeConfigSets(), [])
+  useEffect(() => subscribeProviders(), [])
 
   async function handleCreate() {
     if (!name.trim()) return
@@ -140,6 +150,12 @@ export function ConfigSets() {
                 )}
               </div>
             </button>
+            <ModelQuickSwitch
+              set={s}
+              providers={providers}
+              affectedMachines={assignmentCounts[s.id] || 0}
+              onOpenPublishDialog={() => setPublishTarget(s.id)}
+            />
             <label className="flex items-center gap-1.5 text-xs text-ink2">
               <input
                 type="checkbox"
@@ -170,6 +186,19 @@ export function ConfigSets() {
           </li>
         ))}
       </ul>
+
+      {publishTarget && (
+        <PublishDialog
+          setId={publishTarget}
+          draftState="dirty"
+          affectedMachines={assignmentCounts[publishTarget] || 0}
+          onClose={() => setPublishTarget(null)}
+          onPublished={() => {
+            setPublishTarget(null)
+            void reloadConfigSets()
+          }}
+        />
+      )}
 
       {cloneTarget && (
         <PromptDialog

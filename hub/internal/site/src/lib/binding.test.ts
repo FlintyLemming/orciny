@@ -6,6 +6,7 @@ import {
   hasProviderRefs,
   insertEnvSnippet,
   isPassthrough,
+  isSlotsSplit,
   setOneM,
   setSlotsOneM,
   stripOneM,
@@ -114,3 +115,23 @@ describe('1M 上下文声明', () => {
     expect(setSlotsOneM(emptySlots(), '', true)).toEqual(emptySlots())
   })
 })
+
+describe('isSlotsSplit', () => {
+  it('四槽同填或全空不算分设', () => {
+    expect(isSlotsSplit(emptySlots())).toBe(false)
+    expect(isSlotsSplit(fillAllSlots('glm-5.2'))).toBe(false)
+    expect(isSlotsSplit(fillAllSlots('glm-5.2[1m]'))).toBe(false)
+  })
+
+  it('四槽基名不同算分设', () => {
+    expect(
+      isSlotsSplit({
+        main: 'glm-5.2[1m]',
+        opus: 'glm-5.2[1m]',
+        sonnet: 'glm-5.2[1m]',
+        haiku: 'glm-4.7',
+      }),
+    ).toBe(true)
+  })
+})
+
