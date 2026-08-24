@@ -113,11 +113,16 @@ func (s *Service) AdoptReviewed(eventIDs, reviewed []string) (*core.Record, erro
 		byPath[f.Path] = f
 	}
 
+	// adopted 记下每条漂移落成的最终形态，发布后照样往草稿上盖一遍。
+	// nil 表示该路径被删掉。
+	adopted := map[string]*protocol.FileEntry{}
+
 	for _, rec := range recs {
 		path := rec.GetString("path")
 		switch rec.GetString("kind") {
 		case "deleted":
 			delete(byPath, path)
+			adopted[path] = nil
 		default:
 			blobRec, err := s.d.App.FindRecordById("blobs", rec.GetString("current_blob"))
 			if err != nil {
@@ -136,6 +141,8 @@ func (s *Service) AdoptReviewed(eventIDs, reviewed []string) (*core.Record, erro
 				Path: path, Hash: hash, Size: uint32(len(content)),
 				Mode: mode, Keys: byPath[path].Keys,
 			}
+			entry := byPath[path]
+			adopted[path] = &entry
 		}
 	}
 
@@ -158,6 +165,13 @@ func (s *Service) AdoptReviewed(eventIDs, reviewed []string) (*core.Record, erro
 	note := adoptNote(s.d.App, machines, len(recs))
 	rev, err := s.d.Revs.PublishFiles(setID, merged, binding, note, "adopt")
 	if err != nil {
+		return nil, err
+	}
+
+	// 草稿必须跟着走。面板的「配置」页读的是草稿：不同步就是收编了却看不见，
+	// 而且用户下一次发布会拿旧草稿把刚收编的内容悄悄推回去，漂移原地复活。
+	// 只盖收编涉及的路径，别的路径上没发布完的编辑照旧留着（同 Rebind 的取舍）。
+	if err := s.syncDraft(setID, adopted); err != nil {
 		return nil, err
 	}
 
@@ -184,6 +198,37 @@ func (s *Service) AdoptReviewed(eventIDs, reviewed []string) (*core.Record, erro
 		}
 	}
 	return rev, nil
+}
+
+// syncDraft 把收编的每条路径盖到草稿上：changed 里 nil 表示删除。
+// 草稿里该路径原有的 Keys 沿用草稿自己的，草稿与 head 可能本就不同。
+func (s *Service) syncDraft(setID string, changed map[string]*protocol.FileEntry) error {
+	if len(changed) == 0 {
+		return nil
+	}
+	draft, err := s.d.Sets.Draft(setID)
+	if err != nil {
+		return err
+	}
+	byPath := map[string]protocol.FileEntry{}
+	for _, f := range draft {
+		byPath[f.Path] = f
+	}
+	for path, entry := range changed {
+		if entry == nil {
+			delete(byPath, path)
+			continue
+		}
+		next := *entry
+		next.Keys = byPath[path].Keys
+		byPath[path] = next
+	}
+	out := make([]protocol.FileEntry, 0, len(byPath))
+	for _, f := range byPath {
+		out = append(out, f)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Path < out[j].Path })
+	return s.d.Sets.SetDraft(setID, out)
 }
 
 func adoptNote(app core.App, machines map[string]bool, n int) string {

@@ -678,8 +678,9 @@ hub: 回执落库，assignment.state 更新，写 events
 1. 选中 N 条 open drift（可跨文件；可跨机器，但必须同一配置集）
 2. 以 head Revision 为基，逐条把 `current_blob` 覆盖进清单（`added` → 新增条目，`deleted` → 移除条目）
 3. 生成新 Revision（`source=adopt`），note 自动填「收编自 `<machine>` 的 N 项改动」
-4. 这些 drift_event 置 `adopted`，记 `resolved_revision`
-5. 向指派该配置集的**所有**机器发 `ConfigNotify`，**包括来源机器**——它 apply 后 rendered hash 与磁盘一致，plan 全是 skip，天然幂等。不给来源机器开特例，就少一条会腐烂的分支
+4. 把同样的逐条覆盖再落一遍到 `config_sets.draft`——面板的「配置」页读的是草稿，草稿不跟着走就是「收编了却看不见」，而且用户下一次发布会拿旧草稿把刚收编的内容推回去，漂移原地复活。只盖收编涉及的路径，草稿里别的路径上未发布的编辑照旧保留（与 §M1.5 改绑定同一取舍）
+5. 这些 drift_event 置 `adopted`，记 `resolved_revision`
+6. 向指派该配置集的**所有**机器发 `ConfigNotify`，**包括来源机器**——它 apply 后 rendered hash 与磁盘一致，plan 全是 skip，天然幂等。不给来源机器开特例，就少一条会腐烂的分支
 
 **冲突**：若选中的多条 drift 来自不同机器且路径相同，UI 直接阻止提交，要求先看三方对比（基线 / 机器 A / 机器 B）再选一个。产品 §4.4 要求「必须显式警告」，这里做成硬阻止而不是警告——两台机器对同一文件的改动，静默取其一是最容易让人丢工作成果的操作。
 

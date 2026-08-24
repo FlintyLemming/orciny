@@ -266,3 +266,68 @@ func TestAdoptKeepsHeadBinding(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, provID, reloaded.GetString("head_provider"))
 }
+
+// 收编后草稿必须跟上 head：面板的「配置」页读的是草稿，草稿不跟就等于
+// 收编了但看不见，而且下一次发布会把收编悄悄回滚。
+func TestAdoptSyncsDraft(t *testing.T) {
+	r := newRig(t)
+	r.assign(t)
+	r.report(t, protocol.DriftItem{
+		Path: ".claude/CLAUDE.md", Kind: protocol.DriftModified,
+		Content: []byte("# 改过的规矩\n"), Mode: 0o644,
+	})
+
+	rev, err := r.svc.Adopt([]string{r.openDrifts(t)[0].Id})
+	require.NoError(t, err)
+
+	head, err := r.revs.Files(rev.Id)
+	require.NoError(t, err)
+	draft, err := r.sets.Draft(r.setID)
+	require.NoError(t, err)
+	require.Equal(t, head, draft, "收编后草稿应与新 head 一致")
+}
+
+// 收编只盖被收编的路径：草稿里别的文件上没发布的编辑要留着。
+func TestAdoptKeepsUnrelatedDraftEdits(t *testing.T) {
+	r := newRig(t)
+	r.assign(t)
+	_, err := r.sets.SetDraftFile(r.setID, ".claude/settings.json",
+		[]byte("{\"草稿\":1}\n"), 0o644, nil)
+	require.NoError(t, err)
+
+	r.report(t, protocol.DriftItem{
+		Path: ".claude/CLAUDE.md", Kind: protocol.DriftModified,
+		Content: []byte("# 改过的规矩\n"), Mode: 0o644,
+	})
+	_, err = r.svc.Adopt([]string{r.openDrifts(t)[0].Id})
+	require.NoError(t, err)
+
+	draft, err := r.sets.Draft(r.setID)
+	require.NoError(t, err)
+	byPath := map[string]protocol.FileEntry{}
+	for _, f := range draft {
+		byPath[f.Path] = f
+	}
+	require.Contains(t, byPath, ".claude/settings.json", "未收编的草稿编辑不该被抹掉")
+	content, err := r.blobs.Get(byPath[".claude/CLAUDE.md"].Hash)
+	require.NoError(t, err)
+	require.Equal(t, "# 改过的规矩\n", string(content))
+}
+
+// deleted 收编后草稿里也要消失，否则下一次发布会把文件又推回去。
+func TestAdoptDeletionSyncsDraft(t *testing.T) {
+	r := newRig(t)
+	r.assign(t)
+	r.report(t, protocol.DriftItem{
+		Path: ".claude/CLAUDE.md", Kind: protocol.DriftDeleted,
+	})
+
+	_, err := r.svc.Adopt([]string{r.openDrifts(t)[0].Id})
+	require.NoError(t, err)
+
+	draft, err := r.sets.Draft(r.setID)
+	require.NoError(t, err)
+	for _, f := range draft {
+		require.NotEqual(t, ".claude/CLAUDE.md", f.Path, "收编删除后草稿里不该还留着")
+	}
+}
