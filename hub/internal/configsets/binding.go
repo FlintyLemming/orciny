@@ -133,7 +133,6 @@ func (s *Service) validateBinding(setID string, files []protocol.FileEntry) ([]P
 			Detail: "已绑定服务配置，但没有任何文件用到 {{provider.claude.*}}。" +
 				"用「插入 env 片段」把它写进 settings.json。",
 		})
-		return out, nil
 	}
 
 	prov, err := s.provs.Get(binding.Provider)
@@ -182,6 +181,41 @@ func (s *Service) validateBinding(setID string, files []protocol.FileEntry) ([]P
 				path, ep, prov.GetString("name"), label),
 		})
 	}
+
+	// 5. one_m_unsupported: 绑定声明了 [1m]，但 provider 标记不支持 (spec §6)
+	claudeModels := providers.ClaudeOf(prov).Models
+	modelCapability := make(map[string]bool, len(claudeModels))
+	for _, m := range claudeModels {
+		modelCapability[m.Name] = m.OneM
+	}
+
+	slotChecks := []struct {
+		name  string
+		value string
+	}{
+		{"main 槽", binding.Models.Main},
+		{"opus 槽", binding.Models.Opus},
+		{"sonnet 槽", binding.Models.Sonnet},
+		{"haiku 槽", binding.Models.Haiku},
+	}
+
+	for _, sc := range slotChecks {
+		if !providers.HasOneM(sc.value) {
+			continue
+		}
+		base := providers.StripOneM(sc.value)
+		oneM, inList := modelCapability[base]
+		if inList && !oneM {
+			out = append(out, Problem{
+				Kind:    ProblemOneMUnsupported,
+				Warning: true,
+				Detail: fmt.Sprintf(
+					"绑定的 %s 声明了 1M 上下文，但 %s 的模型清单里 %s 标记为不支持",
+					sc.name, prov.GetString("name"), base),
+			})
+		}
+	}
+
 	return out, nil
 }
 

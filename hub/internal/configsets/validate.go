@@ -40,6 +40,9 @@ const (
 
 	// M1.6：双端点（spec §4.3）
 	ProblemEndpointMissing = "endpoint_missing"
+
+	// M1.7：模型能力（spec §6）
+	ProblemOneMUnsupported = "one_m_unsupported"
 )
 
 // SettingsPath 是 settings.json 的受管相对路径。manifest 的根是 HOME。

@@ -377,3 +377,103 @@ func plantDraft(t *testing.T, app core.App, setID, path string, body []byte, mod
 	}})
 	require.NoError(t, app.Save(rec))
 }
+
+func seedProviderWithModels(t *testing.T, app core.App, name string, models []providers.ClaudeModel) string {
+	t.Helper()
+	c, err := app.FindCollectionByNameOrId("providers")
+	require.NoError(t, err)
+	p := core.NewRecord(c)
+	p.Set("name", name)
+	p.Set("key_cipher", "x")
+	p.Set("key_last4", "1234")
+	p.Set("claude", providers.ClaudeEndpoint{
+		Endpoint: providers.Endpoint{
+			BaseURL:   "https://open.bigmodel.cn/api/anthropic",
+			AuthField: providers.AuthToken,
+			KeyLast4:  "1234",
+		},
+		Models: models,
+	})
+	p.Set("openai", providers.OpenAIEndpoint{
+		Endpoint: providers.Endpoint{
+			AuthField: providers.DefaultOpenAIAuthField,
+		},
+		Models: []string{},
+	})
+	require.NoError(t, app.Save(p))
+	return p.Id
+}
+
+func TestValidateOneMUnsupportedWhenMarkedFalse(t *testing.T) {
+	app, s := newService(t)
+	set, err := s.Create("主力配置", "")
+	require.NoError(t, err)
+
+	provID := seedProviderWithModels(t, app, "智谱 GLM", []providers.ClaudeModel{
+		{Name: "glm-5.2", OneM: true},
+		{Name: "glm-4.7", OneM: false},
+	})
+
+	require.NoError(t, s.SetDraftBinding(set.Id, &providers.Binding{
+		Provider: provID,
+		Models: providers.ModelSlots{
+			Main: "glm-4.7[1m]", Opus: "glm-4.7[1m]", Sonnet: "glm-4.7[1m]", Haiku: "glm-4.7",
+		},
+	}))
+
+	problems, err := s.Validate(set.Id)
+	require.NoError(t, err)
+
+	hit := findProblem(problems, configsets.ProblemOneMUnsupported)
+	require.NotNil(t, hit, "必须报 one_m_unsupported")
+	require.True(t, hit.Warning, "必须是警告")
+	require.Contains(t, hit.Detail, "glm-4.7")
+	require.Contains(t, hit.Detail, "智谱 GLM")
+}
+
+func TestValidateOneMUnsupportedQuietWhenNotInList(t *testing.T) {
+	app, s := newService(t)
+	set, err := s.Create("主力配置", "")
+	require.NoError(t, err)
+
+	provID := seedProviderWithModels(t, app, "智谱 GLM", []providers.ClaudeModel{
+		{Name: "glm-5.2", OneM: true},
+	})
+
+	require.NoError(t, s.SetDraftBinding(set.Id, &providers.Binding{
+		Provider: provID,
+		Models: providers.ModelSlots{
+			Main: "custom-model[1m]", Opus: "custom-model[1m]", Sonnet: "custom-model[1m]", Haiku: "custom-model[1m]",
+		},
+	}))
+
+	problems, err := s.Validate(set.Id)
+	require.NoError(t, err)
+
+	hit := findProblem(problems, configsets.ProblemOneMUnsupported)
+	require.Nil(t, hit, "不在列表中的自定义模型静默放行，不报 one_m_unsupported")
+}
+
+func TestValidateOneMUnsupportedQuietWhenSupported(t *testing.T) {
+	app, s := newService(t)
+	set, err := s.Create("主力配置", "")
+	require.NoError(t, err)
+
+	provID := seedProviderWithModels(t, app, "智谱 GLM", []providers.ClaudeModel{
+		{Name: "glm-5.2", OneM: true},
+	})
+
+	require.NoError(t, s.SetDraftBinding(set.Id, &providers.Binding{
+		Provider: provID,
+		Models: providers.ModelSlots{
+			Main: "glm-5.2[1m]", Opus: "glm-5.2[1m]", Sonnet: "glm-5.2[1m]", Haiku: "glm-5.2[1m]",
+		},
+	}))
+
+	problems, err := s.Validate(set.Id)
+	require.NoError(t, err)
+
+	hit := findProblem(problems, configsets.ProblemOneMUnsupported)
+	require.Nil(t, hit, "支持 1M 的模型不报警告")
+}
+
