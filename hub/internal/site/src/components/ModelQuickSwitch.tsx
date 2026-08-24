@@ -104,7 +104,7 @@ export function ModelQuickSwitch({
       const headBefore = set.head
       const note = modelVal ? t`快切模型至 ${modelVal}` : t`快切模型至 透传`
       await publishConfigSet(set.id, note)
-      await reloadConfigSets()
+      void reloadConfigSets()
 
       showToast(
         modelVal
@@ -113,7 +113,7 @@ export function ModelQuickSwitch({
         headBefore
           ? async () => {
               await rollbackConfigSet(set.id, headBefore)
-              await reloadConfigSets()
+              void reloadConfigSets()
             }
           : undefined,
         8000,

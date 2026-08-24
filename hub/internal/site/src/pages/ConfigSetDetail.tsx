@@ -243,13 +243,13 @@ export function ConfigSetDetail({ id }: { id: string }) {
         const note = t`切换模型至 ${mainModel}`
         await publishConfigSet(set.id, note)
         setDraftState('clean')
-        await reloadConfigSet(set.id)
+        void reloadConfigSet(set.id)
         showToast(
           t`已切到 ${mainModel} · 影响 ${affected} 台`,
           headBefore
             ? async () => {
                 await rollbackConfigSet(set.id, headBefore)
-                await reloadConfigSet(set.id)
+                void reloadConfigSet(set.id)
               }
             : undefined,
           8000,
