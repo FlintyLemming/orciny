@@ -37,6 +37,8 @@ type fakeAdmin struct {
 	extractProvider   string
 	extractEndpoint   string
 	fromDriftInput    providers.Input
+	lastCreateInput   providers.Input
+	lastUpdateInput   providers.Input
 }
 
 type assignCall struct {
@@ -72,11 +74,15 @@ func (f *fakeAdmin) RestoreDrift([]string) error      { return nil }
 func (f *fakeAdmin) IgnoreDrift([]string, bool) error { return nil }
 func (f *fakeAdmin) ClearDegraded(string) error       { return nil }
 
-func (f *fakeAdmin) CreateProvider(providers.Input) (string, error) {
+func (f *fakeAdmin) CreateProvider(in providers.Input) (string, error) {
 	f.plainCreateCalled = true
+	f.lastCreateInput = in
 	return "p1", nil
 }
-func (f *fakeAdmin) UpdateProvider(string, providers.Input) error { return nil }
+func (f *fakeAdmin) UpdateProvider(_ string, in providers.Input) error {
+	f.lastUpdateInput = in
+	return nil
+}
 func (f *fakeAdmin) DeleteProvider(string) error                  { return f.providerDeleteErr }
 func (f *fakeAdmin) SetBinding(_ string, b *providers.Binding) error {
 	f.bindingCalls++

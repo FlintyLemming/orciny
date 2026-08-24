@@ -212,3 +212,48 @@ func TestProbeEndpointRejectsBadBaseURL(t *testing.T) {
 		require.Equal(t, http.StatusBadRequest, rec.Code, "body=%s", body)
 	}
 }
+
+func TestCreateProviderWithClaudeModelPayload(t *testing.T) {
+	admin := &fakeAdmin{}
+	srv := newRouterServer(t, routes.Deps{Admin: admin})
+	body := `{"name":"智谱 GLM","claude":{"base_url":"https://open.bigmodel.cn/api/anthropic",` +
+		`"auth_field":"ANTHROPIC_AUTH_TOKEN","models":[{"name":"glm-5.2","one_m":true},{"name":"glm-4.7"}]}}`
+
+	rec := doSuperuser(t, srv, "POST", "/api/orciny/providers", body)
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.True(t, admin.plainCreateCalled)
+	require.Len(t, admin.lastCreateInput.Claude.Models, 2)
+	require.Equal(t, "glm-5.2", admin.lastCreateInput.Claude.Models[0].Name)
+	require.True(t, admin.lastCreateInput.Claude.Models[0].OneM)
+	require.Equal(t, "glm-4.7", admin.lastCreateInput.Claude.Models[1].Name)
+	require.False(t, admin.lastCreateInput.Claude.Models[1].OneM)
+}
+
+func TestProviderPresetsOutputsClaudeModels(t *testing.T) {
+	srv := newRouterServer(t, routes.Deps{Admin: &fakeAdmin{}})
+	rec := doSuperuser(t, srv, "GET", "/api/orciny/provider-presets", "")
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var got []struct {
+		ID     string `json:"id"`
+		Claude struct {
+			Models []struct {
+				Name string `json:"name"`
+				OneM bool   `json:"one_m"`
+			} `json:"models"`
+		} `json:"claude"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
+
+	var zhipuFound bool
+	for _, p := range got {
+		if p.ID == "zhipu" {
+			zhipuFound = true
+			require.NotEmpty(t, p.Claude.Models)
+			require.Equal(t, "glm-5.2", p.Claude.Models[0].Name)
+			require.True(t, p.Claude.Models[0].OneM)
+		}
+	}
+	require.True(t, zhipuFound)
+}
+

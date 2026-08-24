@@ -8,34 +8,46 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/providers"
 )
 
-// endpointBody 是请求体里的一个协议端点。
-//
-// Key 用 *string 承载三态（M1.6 spec §5.2）：JSON 里字段缺席 = 不修改，
-// 显式的 "" = 清空，非空 = 替换。两种意图在 wire 上就分得开。
-type endpointBody struct {
-	BaseURL      string               `json:"base_url"`
-	AuthField    string               `json:"auth_field"`
-	Models       []string             `json:"models"`
-	Key          *string              `json:"key"`
-	Defaults     providers.ModelSlots `json:"defaults"`
-	DefaultModel string               `json:"default_model"`
+// claudeEndpointBody 是请求体里的 Claude 协议端点。
+type claudeEndpointBody struct {
+	BaseURL   string                  `json:"base_url"`
+	AuthField string                  `json:"auth_field"`
+	Models    []providers.ClaudeModel `json:"models"`
+	Key       *string                 `json:"key"`
+	Defaults  providers.ModelSlots    `json:"defaults"`
 }
 
-func (b endpointBody) input() providers.EndpointInput {
-	return providers.EndpointInput{
+func (b claudeEndpointBody) input() providers.ClaudeEndpointInput {
+	return providers.ClaudeEndpointInput{
 		BaseURL: b.BaseURL, AuthField: b.AuthField, Models: b.Models,
-		Key: b.Key, Defaults: b.Defaults, DefaultModel: b.DefaultModel,
+		Key: b.Key, Defaults: b.Defaults,
+	}
+}
+
+// openAIEndpointBody 是请求体里的 OpenAI 协议端点。
+type openAIEndpointBody struct {
+	BaseURL      string   `json:"base_url"`
+	AuthField    string   `json:"auth_field"`
+	Models       []string `json:"models"`
+	Key          *string  `json:"key"`
+	DefaultModel string   `json:"default_model"`
+}
+
+func (b openAIEndpointBody) input() providers.OpenAIEndpointInput {
+	return providers.OpenAIEndpointInput{
+		BaseURL: b.BaseURL, AuthField: b.AuthField, Models: b.Models,
+		Key: b.Key, DefaultModel: b.DefaultModel,
 	}
 }
 
 // providerBody 是新建 / 更新服务配置的请求体。
 type providerBody struct {
-	Name   string       `json:"name"`
-	Preset string       `json:"preset"`
-	Note   string       `json:"note"`
-	Key    *string      `json:"key"` // 平台级，三态同 endpointBody.Key
-	Claude endpointBody `json:"claude"`
-	OpenAI endpointBody `json:"openai"`
+	Name   string             `json:"name"`
+	Preset string             `json:"preset"`
+	Note   string             `json:"note"`
+	Key    *string            `json:"key"` // 平台级，三态同 endpointBody.Key
+	Claude claudeEndpointBody `json:"claude"`
+	OpenAI openAIEndpointBody `json:"openai"`
 
 	// FromDrift 非空时先把漂移里的 key 取出来内联进 provider（M1.6 spec §5.5）。
 	FromDrift *struct {
