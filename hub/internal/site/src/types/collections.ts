@@ -96,20 +96,26 @@ export interface Binding {
   models: ModelSlots
 }
 
+export interface ClaudeModel {
+  name: string
+  one_m?: boolean
+}
+
 /** 一个协议端点。密文永不下发到前端——它是后端的 Hidden 字段。 */
 export interface EndpointRecord {
   base_url: string
   auth_field: string
   /** 实际生效的那把 key 的末四位，UI 回显用 */
   key_last4?: string
-  models: string[] | null
 }
 
 export interface ClaudeEndpointRecord extends EndpointRecord {
+  models: ClaudeModel[] | null
   defaults: ModelSlots | null
 }
 
 export interface OpenAIEndpointRecord extends EndpointRecord {
+  models: string[] | null
   default_model: string
 }
 
@@ -127,12 +133,19 @@ export interface ProviderRecord {
   updated: string
 }
 
-/** 预设表里的一个协议端点。base_url 为空 = 该平台没有这个口。 */
-export interface PresetEndpoint {
+/** 预设表里的 Claude 协议端点。 */
+export interface PresetClaudeEndpoint {
+  base_url: string
+  auth_field: string
+  models: ClaudeModel[]
+  defaults: ModelSlots
+}
+
+/** 预设表里的 OpenAI 协议端点。 */
+export interface PresetOpenAIEndpoint {
   base_url: string
   auth_field: string
   models: string[]
-  defaults: ModelSlots
   default_model: string
 }
 
@@ -140,8 +153,8 @@ export interface PresetEndpoint {
 export interface ProviderPreset {
   id: string
   name: string
-  claude: PresetEndpoint
-  openai: PresetEndpoint
+  claude: PresetClaudeEndpoint
+  openai: PresetOpenAIEndpoint
   website_url?: string
   api_key_url?: string
   icon?: string

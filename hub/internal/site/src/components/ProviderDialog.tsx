@@ -21,27 +21,34 @@ import {
 } from '@/lib/binding'
 import type {
   ClaudeEndpointRecord,
+  ClaudeModel,
   ModelSlots,
   OpenAIEndpointRecord,
-  PresetEndpoint,
+  PresetClaudeEndpoint,
+  PresetOpenAIEndpoint,
   ProviderPreset,
   ProviderRecord,
 } from '@/types/collections'
 
-/** 一个端点分区的编辑状态。两个端点共用这一个结构，字段各取所需。 */
-interface EndpointDraft {
+interface ClaudeEndpointDraft {
+  baseURL: string
+  authField: string
+  models: ClaudeModel[]
+  key: string
+  cleared: boolean
+  defaults: ModelSlots
+}
+
+interface OpenAIEndpointDraft {
   baseURL: string
   authField: string
   models: string[]
-  /** '' = 没填（编辑态即「不修改」） */
   key: string
-  /** 用户点过「清除」→ 提交 key: '' */
   cleared: boolean
-  defaults: ModelSlots // 仅 claude
-  defaultModel: string // 仅 openai
+  defaultModel: string
 }
 
-function draftOfClaude(e: ClaudeEndpointRecord | null | undefined): EndpointDraft {
+function draftOfClaude(e: ClaudeEndpointRecord | null | undefined): ClaudeEndpointDraft {
   return {
     baseURL: e?.base_url ?? '',
     authField: e?.auth_field || 'ANTHROPIC_AUTH_TOKEN',
@@ -49,23 +56,21 @@ function draftOfClaude(e: ClaudeEndpointRecord | null | undefined): EndpointDraf
     key: '',
     cleared: false,
     defaults: e?.defaults ?? emptySlots(),
-    defaultModel: '',
   }
 }
 
-function draftOfOpenAI(e: OpenAIEndpointRecord | null | undefined): EndpointDraft {
+function draftOfOpenAI(e: OpenAIEndpointRecord | null | undefined): OpenAIEndpointDraft {
   return {
     baseURL: e?.base_url ?? '',
     authField: e?.auth_field || 'OPENAI_API_KEY',
     models: e?.models ?? [],
     key: '',
     cleared: false,
-    defaults: emptySlots(),
     defaultModel: e?.default_model ?? '',
   }
 }
 
-function draftOfPreset(e: PresetEndpoint, fallbackAuth: string): EndpointDraft {
+function draftOfPresetClaude(e: PresetClaudeEndpoint, fallbackAuth: string): ClaudeEndpointDraft {
   return {
     baseURL: e.base_url,
     authField: e.auth_field || fallbackAuth,
@@ -73,6 +78,16 @@ function draftOfPreset(e: PresetEndpoint, fallbackAuth: string): EndpointDraft {
     key: '',
     cleared: false,
     defaults: e.defaults ?? emptySlots(),
+  }
+}
+
+function draftOfPresetOpenAI(e: PresetOpenAIEndpoint, fallbackAuth: string): OpenAIEndpointDraft {
+  return {
+    baseURL: e.base_url,
+    authField: e.auth_field || fallbackAuth,
+    models: e.models ?? [],
+    key: '',
+    cleared: false,
     defaultModel: e.default_model ?? '',
   }
 }
@@ -121,8 +136,8 @@ export function ProviderDialog({
   const [platformKey, setPlatformKey] = useState('')
   const [platformCleared, setPlatformCleared] = useState(false)
 
-  const [claude, setClaude] = useState<EndpointDraft>(() => draftOfClaude(editing?.claude))
-  const [openai, setOpenai] = useState<EndpointDraft>(() => draftOfOpenAI(editing?.openai))
+  const [claude, setClaude] = useState<ClaudeEndpointDraft>(() => draftOfClaude(editing?.claude))
+  const [openai, setOpenai] = useState<OpenAIEndpointDraft>(() => draftOfOpenAI(editing?.openai))
   // 选了预设但该平台没有 openai 口时，给一行说明。
   const [presetHasNoOpenAI, setPresetHasNoOpenAI] = useState(false)
 
@@ -141,15 +156,15 @@ export function ProviderDialog({
   function applyPreset(p: ProviderPreset) {
     setPreset(p.id)
     if (!name) setName(p.name)
-    setClaude(draftOfPreset(p.claude, 'ANTHROPIC_AUTH_TOKEN'))
-    setOpenai(draftOfPreset(p.openai, 'OPENAI_API_KEY'))
+    setClaude(draftOfPresetClaude(p.claude, 'ANTHROPIC_AUTH_TOKEN'))
+    setOpenai(draftOfPresetOpenAI(p.openai, 'OPENAI_API_KEY'))
     setPresetHasNoOpenAI(p.openai.base_url === '')
   }
 
   // 1M 是槽位上的声明而非独立模型：下拉与选项都用基名，标记单独一个复选框。
   const claudeMainBase = isPassthrough(claude.defaults) ? '' : stripOneM(claude.defaults.main)
   const claudeOneM = hasOneM(claude.defaults.main)
-  const claudeModelOptions = [...new Set(claude.models.map(stripOneM))]
+  const claudeModelOptions = [...new Set(claude.models.map((m) => m.name))]
 
   /** 自定义平台 = preset 留空，两个端点都清空由用户自己填（M1.5 spec §2.3）。 */
   function applyCustom() {
@@ -164,7 +179,7 @@ export function ProviderDialog({
     platformKey !== '' || (!platformCleared && Boolean(editing?.key_last4))
 
   /** 与后端 providers.validate 同一条规则，在按钮上先挡一次（M1.6 spec §2.3）。 */
-  function endpointOK(d: EndpointDraft, existingLast4?: string): boolean {
+  function endpointOK(d: ClaudeEndpointDraft | OpenAIEndpointDraft, existingLast4?: string): boolean {
     if (d.baseURL.trim() === '') return true // 没配的端点不要求 key
     if (d.key !== '') return true
     if (!d.cleared && Boolean(existingLast4)) return true
@@ -339,12 +354,35 @@ export function ProviderDialog({
           key={`claude-${preset}`}
           id="claude"
           label="Claude"
-          draft={claude}
-          setDraft={setClaude}
+          baseURL={claude.baseURL}
+          setBaseURL={(baseURL) => setClaude({ ...claude, baseURL })}
+          keyVal={claude.key}
+          setKeyVal={(key) =>
+            setClaude({
+              ...claude,
+              key,
+              cleared: key === '' ? claude.cleared : false,
+            })
+          }
+          cleared={claude.cleared}
+          setCleared={(cleared) => setClaude({ ...claude, key: '', cleared })}
           existingLast4={editing?.claude?.key_last4}
           editing={Boolean(editing)}
           probeKey={claude.key || platformKey}
           onProbe={onProbe ?? probeEndpoint}
+          onAdopt={(probe) => {
+            const newModels: ClaudeModel[] = probe.models?.length
+              ? probe.models.map((name) => {
+                  const existing = claude.models.find((m) => m.name === name)
+                  return { name, one_m: existing ? Boolean(existing.one_m) : false }
+                })
+              : claude.models
+            setClaude({
+              ...claude,
+              baseURL: probe.base_url,
+              models: newModels,
+            })
+          }}
         >
           <label className="mb-1 block text-xs text-ink3" htmlFor="claude-auth-field">
             <Trans>鉴权字段</Trans>
@@ -360,8 +398,7 @@ export function ProviderDialog({
             <option value="ANTHROPIC_API_KEY">ANTHROPIC_API_KEY</option>
           </select>
 
-          <ModelList
-            idPrefix="claude"
+          <ClaudeModelList
             models={claude.models}
             onChange={(models) => setClaude({ ...claude, models })}
           />
@@ -423,12 +460,29 @@ export function ProviderDialog({
           key={`openai-${preset}`}
           id="openai"
           label="OpenAI"
-          draft={openai}
-          setDraft={setOpenai}
+          baseURL={openai.baseURL}
+          setBaseURL={(baseURL) => setOpenai({ ...openai, baseURL })}
+          keyVal={openai.key}
+          setKeyVal={(key) =>
+            setOpenai({
+              ...openai,
+              key,
+              cleared: key === '' ? openai.cleared : false,
+            })
+          }
+          cleared={openai.cleared}
+          setCleared={(cleared) => setOpenai({ ...openai, key: '', cleared })}
           existingLast4={editing?.openai?.key_last4}
           editing={Boolean(editing)}
           probeKey={openai.key || platformKey}
           onProbe={onProbe ?? probeEndpoint}
+          onAdopt={(probe) => {
+            setOpenai({
+              ...openai,
+              baseURL: probe.base_url,
+              models: probe.models?.length ? probe.models : openai.models,
+            })
+          }}
           notice={
             <>
               <p data-testid="openai-inert-note" className="mb-2 text-xs text-ink3">
@@ -456,7 +510,7 @@ export function ProviderDialog({
             onChange={(e) => setOpenai({ ...openai, authField: e.target.value })}
           />
 
-          <ModelList
+          <OpenAIModelList
             idPrefix="openai"
             models={openai.models}
             onChange={(models) => setOpenai({ ...openai, models })}
@@ -515,30 +569,40 @@ export function ProviderDialog({
 function EndpointSection({
   id,
   label,
-  draft,
-  setDraft,
+  baseURL,
+  setBaseURL,
+  keyVal,
+  setKeyVal,
+  cleared,
+  setCleared,
   existingLast4,
   editing,
   probeKey,
   onProbe,
+  onAdopt,
   notice,
   children,
 }: {
   id: 'claude' | 'openai'
   label: string
-  draft: EndpointDraft
-  setDraft: (d: EndpointDraft) => void
+  baseURL: string
+  setBaseURL: (v: string) => void
+  keyVal: string
+  setKeyVal: (v: string) => void
+  cleared: boolean
+  setCleared: (v: boolean) => void
   existingLast4?: string
   editing: boolean
   probeKey: string
   onProbe: (input: ProbeInput) => Promise<ProbeResult>
+  onAdopt: (result: ProbeResult) => void
   notice?: React.ReactNode
   children: React.ReactNode
 }) {
   const { t } = useLingui()
   // 默认折叠，base_url 非空的展开。
-  const [open, setOpen] = useState(() => draft.baseURL !== '')
-  const configured = draft.baseURL.trim() !== ''
+  const [open, setOpen] = useState(() => baseURL !== '')
+  const configured = baseURL.trim() !== ''
 
   const [probe, setProbe] = useState<ProbeResult | null>(null)
   const [probing, setProbing] = useState(false)
@@ -550,7 +614,7 @@ function EndpointSection({
     setProbe(null)
     try {
       setProbe(
-        await onProbe({ endpoint: id, base_url: draft.baseURL.trim(), key: probeKey }),
+        await onProbe({ endpoint: id, base_url: baseURL.trim(), key: probeKey }),
       )
     } catch (e) {
       setProbeErr(e instanceof ApiError ? e.message : String(e))
@@ -562,11 +626,7 @@ function EndpointSection({
   /** 采用是显式动作：探测只给结论，改不改由用户决定。 */
   function adopt() {
     if (!probe?.base_url) return
-    setDraft({
-      ...draft,
-      baseURL: probe.base_url,
-      models: probe.models?.length ? probe.models : draft.models,
-    })
+    onAdopt(probe)
     setProbe(null)
   }
 
@@ -599,8 +659,8 @@ function EndpointSection({
               id={`${id}-base-url`}
               aria-label={`${id} base_url`}
               className="flex-1 rounded border border-line bg-wash px-2 py-1.5 font-mono text-sm"
-              value={draft.baseURL}
-              onChange={(e) => setDraft({ ...draft, baseURL: e.target.value })}
+              value={baseURL}
+              onChange={(e) => setBaseURL(e.target.value)}
             />
             <button
               type="button"
@@ -615,7 +675,7 @@ function EndpointSection({
 
           {probeErr && <p className="mb-3 text-xs text-red-500">{probeErr}</p>}
           {probe && (
-            <ProbeResultPanel id={id} result={probe} current={draft.baseURL.trim()} onAdopt={adopt} />
+            <ProbeResultPanel id={id} result={probe} current={baseURL.trim()} onAdopt={adopt} />
           )}
 
           {children}
@@ -630,30 +690,24 @@ function EndpointSection({
               type="password"
               className="flex-1 rounded border border-line bg-wash px-2 py-1.5 font-mono text-sm"
               placeholder={editing ? t`留空则不修改` : t`留空则用平台级`}
-              value={draft.key}
-              onChange={(e) =>
-                setDraft({
-                  ...draft,
-                  key: e.target.value,
-                  cleared: e.target.value === '' ? draft.cleared : false,
-                })
-              }
+              value={keyVal}
+              onChange={(e) => setKeyVal(e.target.value)}
             />
-            {existingLast4 && !draft.cleared && (
+            {existingLast4 && !cleared && (
               <span className="text-xs text-ink3">····{existingLast4}</span>
             )}
           </div>
           <p className="mt-1 text-[11px] text-ink3">
-            {draft.cleared ? (
+            {cleared ? (
               <Trans>保存后回落平台级。</Trans>
             ) : (
               <Trans>留空则用平台级。</Trans>
             )}
-            {existingLast4 && !draft.cleared && (
+            {existingLast4 && !cleared && (
               <button
                 type="button"
                 className="ml-2 text-accent"
-                onClick={() => setDraft({ ...draft, key: '', cleared: true })}
+                onClick={() => setCleared(true)}
               >
                 <Trans>清除</Trans>
               </button>
@@ -755,8 +809,78 @@ function ProbeResultPanel({
   )
 }
 
-/** 模型清单的 tag 输入。两个端点各一份，模型 id 常常不同（M1.6 spec §1.3）。 */
-function ModelList({
+/** Claude 模型清单：每行 模型名 + [支持 1M ☐] + [×] (spec §7.1)。 */
+function ClaudeModelList({
+  models,
+  onChange,
+}: {
+  models: ClaudeModel[]
+  onChange: (models: ClaudeModel[]) => void
+}) {
+  const { t } = useLingui()
+  const [draft, setDraft] = useState('')
+
+  return (
+    <>
+      <div className="mb-1 text-xs text-ink3">
+        <Trans>模型清单</Trans>
+      </div>
+      <div className="mb-2 flex flex-col gap-1.5">
+        {models.map((m, idx) => (
+          <div
+            key={m.name}
+            className="flex items-center justify-between rounded bg-wash px-2 py-1 font-mono text-xs"
+          >
+            <span className="flex-1 font-medium">{m.name}</span>
+            <label className="mr-2 flex items-center gap-1 text-ink2">
+              <input
+                type="checkbox"
+                aria-label={t`${m.name} 支持 1M`}
+                checked={Boolean(m.one_m)}
+                onChange={(e) => {
+                  const next = [...models]
+                  next[idx] = { ...m, one_m: e.target.checked }
+                  onChange(next)
+                }}
+              />
+              <span className="text-[11px]">
+                <Trans>支持 1M</Trans>
+              </span>
+            </label>
+            <button
+              type="button"
+              aria-label={t`移除 ${m.name}`}
+              onClick={() => onChange(models.filter((x) => x.name !== m.name))}
+            >
+              <X size={12} />
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="mb-3">
+        <input
+          aria-label="claude 添加模型"
+          placeholder={t`模型 id`}
+          className="w-full rounded border border-line bg-wash px-2 py-1.5 font-mono text-sm"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter') return
+            e.preventDefault()
+            const v = draft.trim()
+            if (v && !models.some((m) => m.name === v)) {
+              onChange([...models, { name: v, one_m: false }])
+            }
+            setDraft('')
+          }}
+        />
+      </div>
+    </>
+  )
+}
+
+/** OpenAI 模型清单：标签 chip 列表。 */
+function OpenAIModelList({
   idPrefix,
   models,
   onChange,

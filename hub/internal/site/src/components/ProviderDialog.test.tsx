@@ -20,20 +20,21 @@ const presets: ProviderPreset[] = [
     claude: {
       base_url: 'https://open.bigmodel.cn/api/anthropic',
       auth_field: 'ANTHROPIC_AUTH_TOKEN',
-      models: ['glm-5.2', 'glm-4.7'],
+      models: [
+        { name: 'glm-5.2', one_m: true },
+        { name: 'glm-4.7', one_m: false },
+      ],
       defaults: {
         main: 'glm-5.2[1m]',
         opus: 'glm-5.2[1m]',
         sonnet: 'glm-5.2[1m]',
         haiku: 'glm-4.7',
       },
-      default_model: '',
     },
     openai: {
       base_url: 'https://open.bigmodel.cn/api/paas/v4',
       auth_field: 'OPENAI_API_KEY',
       models: ['glm-5.2'],
-      defaults: { main: '', opus: '', sonnet: '', haiku: '' },
       default_model: 'glm-5.2',
     },
   },
@@ -43,15 +44,13 @@ const presets: ProviderPreset[] = [
     claude: {
       base_url: 'https://api.anthropic.com',
       auth_field: 'ANTHROPIC_API_KEY',
-      models: ['claude-opus-5'],
+      models: [{ name: 'claude-opus-5', one_m: false }],
       defaults: { main: '', opus: '', sonnet: '', haiku: '' },
-      default_model: '',
     },
     openai: {
       base_url: '',
       auth_field: 'OPENAI_API_KEY',
       models: [],
-      defaults: { main: '', opus: '', sonnet: '', haiku: '' },
       default_model: '',
     },
   },
@@ -67,7 +66,10 @@ const editing: ProviderRecord = {
     base_url: 'https://open.bigmodel.cn/api/anthropic',
     auth_field: 'ANTHROPIC_AUTH_TOKEN',
     key_last4: 'a1b2',
-    models: ['glm-5.2', 'glm-4.7'],
+    models: [
+      { name: 'glm-5.2', one_m: true },
+      { name: 'glm-4.7', one_m: false },
+    ],
     defaults: {
       main: 'glm-5.2[1m]',
       opus: 'glm-5.2[1m]',
@@ -378,4 +380,61 @@ describe('ProviderDialog 端点探测', () => {
     await userEvent.click(screen.getByRole('button', { name: /OpenAI 端点/ }))
     expect(screen.getByLabelText('openai 探测')).toBeDisabled()
   })
+
+  it('勾「支持 1M」写进 models[i].one_m', async () => {
+    const save = vi.fn().mockResolvedValue(undefined)
+    render(
+      wrap(
+        <ProviderDialog
+          presets={presets}
+          editing={editing}
+          onClose={vi.fn()}
+          onSaved={vi.fn()}
+          onSubmit={save}
+        />,
+      ),
+    )
+    // glm-4.7 initially has one_m = false
+    const chk = screen.getByRole('checkbox', { name: 'glm-4.7 支持 1M' })
+    expect(chk).not.toBeChecked()
+    await userEvent.click(chk)
+    expect(chk).toBeChecked()
+
+    await userEvent.click(screen.getByText('保存'))
+    expect(save.mock.calls[0][0].claude.models).toEqual([
+      { name: 'glm-5.2', one_m: true },
+      { name: 'glm-4.7', one_m: true },
+    ])
+  })
+
+  it('Claude 端点探测合并回来的新模型 one_m 默认 false', async () => {
+    const save = vi.fn().mockResolvedValue(undefined)
+    const onProbe = vi.fn().mockResolvedValue({
+      status: 'ok',
+      base_url: 'https://open.bigmodel.cn/api/anthropic',
+      models: ['glm-5.2', 'glm-5.5-new'],
+      tried: ['https://open.bigmodel.cn/api/anthropic'],
+    })
+    render(
+      wrap(
+        <ProviderDialog
+          presets={presets}
+          editing={editing}
+          onClose={vi.fn()}
+          onSaved={vi.fn()}
+          onSubmit={save}
+          onProbe={onProbe}
+        />,
+      ),
+    )
+    await userEvent.click(screen.getByLabelText('claude 探测'))
+    await userEvent.click(await screen.findByText('采用'))
+
+    await userEvent.click(screen.getByText('保存'))
+    expect(save.mock.calls[0][0].claude.models).toEqual([
+      { name: 'glm-5.2', one_m: true }, // preserved existing one_m
+      { name: 'glm-5.5-new', one_m: false }, // new model defaulted to false
+    ])
+  })
 })
+

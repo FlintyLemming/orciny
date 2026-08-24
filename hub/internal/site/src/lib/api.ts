@@ -9,6 +9,7 @@ import { pb } from '@/lib/pb'
 import type {
   Binding,
   BindingMatchResult,
+  ClaudeModel,
   FileEntry,
   Finding,
   ModelSlots,
@@ -213,13 +214,21 @@ export function clearDegraded(machineId: string) {
 
 // ---------- M1.5 AI 服务配置与绑定 ----------
 
-export interface EndpointBody {
+export interface ClaudeEndpointBody {
+  base_url: string
+  auth_field?: string
+  models: ClaudeModel[]
+  /** 省略 = 不修改；'' = 清空；有值 = 替换（M1.6 spec §5.2） */
+  key?: string
+  defaults?: ModelSlots
+}
+
+export interface OpenAIEndpointBody {
   base_url: string
   auth_field?: string
   models: string[]
   /** 省略 = 不修改；'' = 清空；有值 = 替换（M1.6 spec §5.2） */
   key?: string
-  defaults?: ModelSlots
   default_model?: string
 }
 
@@ -229,8 +238,8 @@ export interface ProviderBody {
   note: string
   /** 平台级 key，三态同 EndpointBody.key */
   key?: string
-  claude: EndpointBody
-  openai: EndpointBody
+  claude: ClaudeEndpointBody
+  openai: OpenAIEndpointBody
 }
 
 /** providers.MatchBaseURL 的反查结果（M1.5 spec §6.3 的三档）。 */

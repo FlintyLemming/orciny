@@ -14,7 +14,7 @@ describe('sanitizeProvider', () => {
         base_url: 'https://open.bigmodel.cn/api/anthropic',
         auth_field: 'ANTHROPIC_AUTH_TOKEN',
         key_last4: '3456',
-        models: ['glm-5.2'],
+        models: [{ name: 'glm-5.2', one_m: true }, { name: 'glm-4.7', one_m: false }],
         defaults: { main: 'glm-5.2', opus: 'glm-5.2', sonnet: 'glm-5.2', haiku: 'glm-4.7' },
       },
       claude_key_cipher: '不该出现在这里',
@@ -25,6 +25,10 @@ describe('sanitizeProvider', () => {
     const got = sanitizeProvider(raw)
     expect(got.claude?.base_url).toBe('https://open.bigmodel.cn/api/anthropic')
     expect(got.claude?.key_last4).toBe('3456')
+    expect(got.claude?.models).toEqual([
+      { name: 'glm-5.2', one_m: true },
+      { name: 'glm-4.7', one_m: false },
+    ])
     expect(got.key_last4).toBe('3456')
   })
 
