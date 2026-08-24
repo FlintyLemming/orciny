@@ -5,6 +5,7 @@ import { $authEmail, logout } from '@/stores/auth'
 import { Sidebar } from './Sidebar'
 import { ThemeToggle } from './ThemeToggle'
 import { LangToggle } from './LangToggle'
+import { Toast } from './Toast'
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const email = useStore($authEmail)
@@ -28,6 +29,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </header>
         {/* flex-col 让需要撑满视口的页面（编辑器）能用 flex-1；overflow-auto 保留长列表滚动 */}
         <main className="flex min-h-0 flex-1 flex-col overflow-auto p-6">{children}</main>
+        <Toast />
       </div>
     </div>
   )
