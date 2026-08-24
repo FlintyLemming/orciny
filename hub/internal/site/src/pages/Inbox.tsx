@@ -440,57 +440,21 @@ export function Inbox() {
       )}
 
       {reviewing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog">
-          <div className="max-h-[80vh] w-full max-w-2xl overflow-auto rounded-lg border border-line bg-surface p-5 shadow-xl">
-            <h2 className="mb-2 text-base font-semibold">
-              <Trans>收编前复核</Trans>
-            </h2>
-            <p className="mb-4 text-sm text-ink3">
-              <Trans>
-                以下条目变量还原不完整（restore_partial）。请逐条查看 diff 并勾选确认后再收编。
-              </Trans>
-            </p>
-            <ul className="mb-4 space-y-3">
-              {reviewing.map((e) => (
-                <li key={e.id} className="rounded border border-line p-2">
-                  <label className="mb-2 flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={reviewChecked.has(e.id)}
-                      onChange={() => {
-                        setReviewChecked((prev) => {
-                          const next = new Set(prev)
-                          if (next.has(e.id)) next.delete(e.id)
-                          else next.add(e.id)
-                          return next
-                        })
-                      }}
-                    />
-                    <span className="font-mono">{e.path}</span>
-                  </label>
-                  <DriftCard event={e} selected={false} onToggle={() => {}} />
-                </li>
-              ))}
-            </ul>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                className="rounded bg-wash px-3 py-1.5 text-sm"
-                onClick={() => setReviewing(null)}
-              >
-                <Trans>取消</Trans>
-              </button>
-              <button
-                type="button"
-                disabled={busy || reviewChecked.size !== reviewing.length}
-                className="rounded bg-accent px-3 py-1.5 text-sm text-white disabled:opacity-40"
-                onClick={() => void doAdopt([...reviewChecked])}
-              >
-                {t`确认收编`}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ReviewDialog
+          events={reviewing}
+          checked={reviewChecked}
+          busy={busy}
+          onToggle={(id) => {
+            setReviewChecked((prev) => {
+              const next = new Set(prev)
+              if (next.has(id)) next.delete(id)
+              else next.add(id)
+              return next
+            })
+          }}
+          onCancel={() => setReviewing(null)}
+          onConfirm={() => void doAdopt([...reviewChecked])}
+        />
       )}
 
       {compare && (
@@ -537,4 +501,70 @@ async function loadCurrent(rec: DriftEventRecord): Promise<string> {
     }
   }
   return ''
+}
+
+/**
+ * 收编前复核弹窗：restore_partial 的条目要逐条看过 diff 再勾。
+ * 单独导出是为了能直接测——整页要连 store 与 api 一起 mock。
+ */
+export function ReviewDialog({
+  events,
+  checked,
+  busy,
+  onToggle,
+  onCancel,
+  onConfirm,
+}: {
+  events: DriftEvent[]
+  checked: Set<string>
+  busy: boolean
+  onToggle: (id: string) => void
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  const { t } = useLingui()
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog">
+      <div className="max-h-[80vh] w-full max-w-2xl overflow-auto rounded-lg border border-line bg-surface p-5 shadow-xl">
+        <h2 className="mb-2 text-base font-semibold">
+          <Trans>收编前复核</Trans>
+        </h2>
+        <p className="mb-4 text-sm text-ink3">
+          <Trans>
+            以下条目变量还原不完整（restore_partial）。请逐条查看 diff 并勾选确认后再收编。
+          </Trans>
+        </p>
+        <ul className="mb-4 space-y-3">
+          {events.map((e) => (
+            // 复核的勾选就用卡片自己的复选框。再在卡片外面套一个，两个框
+            // 指的是同一件事却各管各的状态，用户不知道该勾哪个。
+            <li key={e.id}>
+              <DriftCard
+                event={e}
+                selected={checked.has(e.id)}
+                onToggle={() => onToggle(e.id)}
+              />
+            </li>
+          ))}
+        </ul>
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            className="rounded bg-wash px-3 py-1.5 text-sm"
+            onClick={onCancel}
+          >
+            <Trans>取消</Trans>
+          </button>
+          <button
+            type="button"
+            disabled={busy || checked.size !== events.length}
+            className="rounded bg-accent px-3 py-1.5 text-sm text-white disabled:opacity-40"
+            onClick={onConfirm}
+          >
+            {t`确认收编`}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
