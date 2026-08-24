@@ -4,7 +4,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { i18n } from '@lingui/core'
 import { I18nProvider } from '@lingui/react'
 import { Toast } from '@/components/Toast'
-import { $toast, hideToast, showToast } from '@/stores/toast'
+import { hideToast, showToast } from '@/stores/toast'
 
 i18n.load('en', {})
 i18n.activate('en')

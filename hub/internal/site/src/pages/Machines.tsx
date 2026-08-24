@@ -5,6 +5,15 @@ import { Plus, Trash2 } from 'lucide-react'
 import {
   $machines, $machinesLoading, deleteMachine, renameMachine, subscribeMachines,
 } from '@/stores/machines'
+import { $configSets, subscribeConfigSets } from '@/stores/configsets'
+import { $providers, subscribeProviders } from '@/stores/providers'
+import { isPassthrough, stripOneM } from '@/lib/binding'
+import { pb } from '@/lib/pb'
+import {
+  COLLECTION_ASSIGNMENTS,
+  type AssignmentRecord,
+  type MachineRecord,
+} from '@/types/collections'
 import { StatusDot } from '@/components/StatusDot'
 import { navigate } from '@/router'
 import { AddMachineDialog } from '@/components/AddMachineDialog'
@@ -14,10 +23,79 @@ export function Machines() {
   const { t } = useLingui()
   const machines = useStore($machines)
   const loading = useStore($machinesLoading)
+  const configSets = useStore($configSets)
+  const providers = useStore($providers)
+  const [assignments, setAssignments] = useState<AssignmentRecord[]>([])
   const [adding, setAdding] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null)
 
   useEffect(() => subscribeMachines(), [])
+  useEffect(() => subscribeConfigSets(), [])
+  useEffect(() => subscribeProviders(), [])
+
+  useEffect(() => {
+    let cancelled = false
+    void pb
+      .collection(COLLECTION_ASSIGNMENTS)
+      .getFullList<AssignmentRecord>()
+      .then((list) => {
+        if (!cancelled) setAssignments(list)
+      })
+      .catch(() => {
+        if (!cancelled) setAssignments([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  function renderModelCell(m: MachineRecord) {
+    const assign = assignments.find((a) => a.machine === m.id)
+    if (!assign || !assign.config_set) return '—'
+
+    const set = configSets.find((s) => s.id === assign.config_set)
+    if (!set) return '—'
+
+    const binding = set.expand?.head?.binding ?? set.draft_binding
+    if (!binding || !binding.provider) {
+      return (
+        <button
+          type="button"
+          onClick={() => navigate('configsets', set.id)}
+          className="text-xs text-ink3 hover:underline"
+        >
+          <Trans>未绑定</Trans>
+        </button>
+      )
+    }
+
+    if (isPassthrough(binding.models)) {
+      return (
+        <button
+          type="button"
+          onClick={() => navigate('configsets', set.id)}
+          className="text-xs text-ink2 hover:underline"
+        >
+          <Trans>透传</Trans>
+        </button>
+      )
+    }
+
+    const provider = providers.find((p) => p.id === binding.provider)
+    const provName = provider?.name || set.head_provider || binding.provider
+    const baseModel = stripOneM(binding.models.main || '')
+    const label = `${provName} · ${baseModel}`
+
+    return (
+      <button
+        type="button"
+        onClick={() => navigate('configsets', set.id)}
+        className="text-xs text-ink hover:underline"
+      >
+        {label}
+      </button>
+    )
+  }
 
   return (
     <div>
@@ -56,6 +134,7 @@ export function Machines() {
               <th className="py-2 font-normal"><Trans>系统</Trans></th>
               <th className="py-2 font-normal"><Trans>agent 版本</Trans></th>
               <th className="py-2 font-normal"><Trans>Claude Code</Trans></th>
+              <th className="py-2 font-normal"><Trans>模型</Trans></th>
               <th className="py-2 font-normal"><Trans>最后心跳</Trans></th>
               <th />
             </tr>
@@ -85,6 +164,9 @@ export function Machines() {
                 <td className="py-2 font-mono text-xs text-ink2">{m.agent_version}</td>
                 <td className="py-2 font-mono text-xs text-ink2">
                   {m.tool_versions?.['claude-code'] ?? '—'}
+                </td>
+                <td className="py-2 font-mono text-xs">
+                  {renderModelCell(m)}
                 </td>
                 <td className="py-2 text-xs text-ink3">
                   {/* online 时不显示秒级心跳时间：last_seen 只在状态变化时写（spec §6.5） */}

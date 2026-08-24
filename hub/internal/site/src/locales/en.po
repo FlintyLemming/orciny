@@ -31,6 +31,11 @@ msgstr "{0} models"
 msgid "{0} 内容未能安全脱敏，无法自动收编"
 msgstr "{0}: content could not be safely redacted; cannot adopt automatically"
 
+#. placeholder {0}: m.name
+#: src/components/ProviderDialog.tsx
+msgid "{0} 支持 1M"
+msgstr "{0} 1M supported"
+
 #. placeholder {0}: e.path
 #: src/lib/inbox.ts
 msgid "{0} 是服务绑定漂移：收编会把占位符拍平成硬编码地址，绑定会当场失效。请改用「改绑定」或「恢复」"
@@ -313,6 +318,10 @@ msgstr "Credential deleted"
 msgid "凭据已轮换"
 msgstr "Credential rotated"
 
+#: src/pages/ConfigSetDetail.tsx
+msgid "切换模型至 {mainModel}"
+msgstr "Switch model to {mainModel}"
+
 #: src/pages/Credentials.tsx
 #~ msgid "列表只显示末四位。值不会出现在版本历史或日志里。"
 #~ msgstr "Only the last four characters are shown. Values never appear in revision history or logs."
@@ -556,6 +565,22 @@ msgstr "No config set assigned yet."
 msgid "已保存"
 msgstr "Saved"
 
+#: src/components/ModelQuickSwitch.tsx
+msgid "已分设 →"
+msgstr "Split slots →"
+
+#: src/pages/ConfigSetDetail.tsx
+msgid "已切到 {mainModel} · 影响 {affected} 台"
+msgstr "Switched to {mainModel} · affects {affected} machines"
+
+#: src/components/ModelQuickSwitch.tsx
+msgid "已切到 {modelVal} · 影响 {affectedMachines} 台"
+msgstr "Switched to {modelVal} · affects {affectedMachines} machines"
+
+#: src/components/ModelQuickSwitch.tsx
+msgid "已切到透传 · 影响 {affectedMachines} 台"
+msgstr "Switched to passthrough · affects {affectedMachines} machines"
+
 #: src/pages/MachineDetail.tsx
 msgid "已删除"
 msgstr "Removed"
@@ -653,6 +678,18 @@ msgstr "Start collection"
 msgid "待对齐"
 msgstr "Pending"
 
+#: src/components/ModelQuickSwitch.tsx
+msgid "快切模型"
+msgstr "Quick switch model"
+
+#: src/components/ModelQuickSwitch.tsx
+msgid "快切模型至 {modelVal}"
+msgstr "Quick switch model to {modelVal}"
+
+#: src/components/ModelQuickSwitch.tsx
+msgid "快切模型至 透传"
+msgstr "Quick switch model to passthrough"
+
 #: src/pages/Inbox.tsx
 msgid "忽略"
 msgstr "Ignore"
@@ -722,6 +759,14 @@ msgstr "Notices (do not block publishing)"
 #: src/components/BindingBar.tsx
 msgid "插入 env 片段"
 msgstr "Insert env snippet"
+
+#: src/components/Toast.tsx
+msgid "撤销"
+msgstr "Undo"
+
+#: src/components/ProviderDialog.tsx
+msgid "支持 1M"
+msgstr "1M support"
 
 #: src/components/Sidebar.tsx
 #: src/pages/Inbox.tsx
@@ -826,6 +871,10 @@ msgstr "No drift items"
 msgid "有未发布改动"
 msgstr "Unpublished changes"
 
+#: src/components/ModelQuickSwitch.tsx
+msgid "有未发布改动 →"
+msgstr "Unpublished changes →"
+
 #: src/components/BindingBar.tsx
 msgid "服务绑定"
 msgstr "Service Binding"
@@ -860,6 +909,8 @@ msgid "未指定默认模型"
 msgstr "No default model"
 
 #: src/components/BindingBar.tsx
+#: src/components/ModelQuickSwitch.tsx
+#: src/pages/Machines.tsx
 msgid "未绑定"
 msgstr "Not bound"
 
@@ -867,6 +918,10 @@ msgstr "Not bound"
 #: src/pages/Providers.tsx
 msgid "未配置"
 msgstr "Not configured"
+
+#: src/components/ModelQuickSwitch.tsx
+msgid "未配置 Claude 端点"
+msgstr "Claude endpoint not configured"
 
 #: src/components/DegradedBanner.tsx
 msgid "本机处于降级状态"
@@ -913,6 +968,10 @@ msgstr "Validation failed; cannot publish"
 #: src/pages/ImportWizard.tsx
 msgid "校验通过，可以发布为 v1。"
 msgstr "Validation passed; ready to publish as v1."
+
+#: src/pages/Machines.tsx
+msgid "模型"
+msgstr "Model"
 
 #: src/components/ProviderDialog.tsx
 msgid "模型 id"
@@ -1102,6 +1161,11 @@ msgstr "Exclude from management"
 msgid "移除"
 msgstr "Remove"
 
+#. placeholder {0}: m.name
+#: src/components/ProviderDialog.tsx
+msgid "移除 {0}"
+msgstr "Remove {0}"
+
 #: src/components/ProviderDialog.tsx
 msgid "移除 {m}"
 msgstr "Remove {m}"
@@ -1239,6 +1303,10 @@ msgstr "This platform does not offer an OpenAI endpoint. You can still enter one
 msgid "该文件含未能安全脱敏的凭据，请在 Web 上手工处理"
 msgstr "This file contains credentials that could not be safely redacted; handle it manually in the Web UI"
 
+#: src/components/BindingBar.tsx
+msgid "该模型未标记支持 1M 上下文，可在 AI 服务页修改"
+msgstr "This model is not marked as supporting 1M context; edit it on the AI Services page"
+
 #: src/pages/ConfigSets.tsx
 msgid "该配置集的全部版本历史将被删除，且无法恢复；已指派的机器会失去指派，但磁盘上的文件不会被动。确定删除？"
 msgstr "All revision history for this config set will be permanently deleted; assigned machines lose the assignment, but on-disk files are untouched. Delete?"
@@ -1349,6 +1417,12 @@ msgstr "Sign out"
 #: src/pages/ConfigSetDetail.tsx
 msgid "选择左侧文件开始编辑"
 msgstr "Select a file on the left to start editing"
+
+#: src/components/ModelQuickSwitch.tsx
+#: src/pages/ConfigSetDetail.tsx
+#: src/pages/Machines.tsx
+msgid "透传"
+msgstr "Passthrough"
 
 #: src/components/BindingBar.tsx
 msgid "透传（不指定模型）"

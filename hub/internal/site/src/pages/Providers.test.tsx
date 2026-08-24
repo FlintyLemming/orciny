@@ -18,7 +18,12 @@ const base: ProviderRecord = {
     base_url: 'https://open.bigmodel.cn/api/anthropic',
     auth_field: 'ANTHROPIC_AUTH_TOKEN',
     key_last4: 'a1b2',
-    models: ['glm-5.2', 'glm-4.7', 'glm-5-turbo', 'glm-5.2[1m]'],
+    models: [
+      { name: 'glm-5.2', one_m: true },
+      { name: 'glm-4.7', one_m: false },
+      { name: 'glm-5-turbo', one_m: false },
+      { name: 'glm-5.2-1m', one_m: true },
+    ],
     defaults: null,
   },
   openai: null,
