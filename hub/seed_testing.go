@@ -48,10 +48,10 @@ func (h *Hub) SeedProvider(t *testing.T, name, baseURL, key string) string {
 	id, err := h.CreateProvider(providers.Input{
 		Name: name,
 		Key:  &key,
-		Claude: providers.EndpointInput{
+		Claude: providers.ClaudeEndpointInput{
 			BaseURL:   baseURL,
 			AuthField: providers.AuthToken,
-			Models:    []string{"glm-5.1", "glm-4.7"},
+			Models:    []providers.ClaudeModel{{Name: "glm-5.1"}, {Name: "glm-4.7"}},
 		},
 	})
 	require.NoError(t, err, "建服务配置")
@@ -67,12 +67,12 @@ func (h *Hub) SeedProviderWithOpenAI(
 	id, err := h.CreateProvider(providers.Input{
 		Name: name,
 		Key:  &key,
-		Claude: providers.EndpointInput{
+		Claude: providers.ClaudeEndpointInput{
 			BaseURL:   claudeURL,
 			AuthField: providers.AuthToken,
-			Models:    []string{"glm-5.2", "glm-4.7"},
+			Models:    []providers.ClaudeModel{{Name: "glm-5.2"}, {Name: "glm-4.7"}},
 		},
-		OpenAI: providers.EndpointInput{
+		OpenAI: providers.OpenAIEndpointInput{
 			BaseURL:      openaiURL,
 			AuthField:    providers.DefaultOpenAIAuthField,
 			Models:       []string{openaiModel},
@@ -110,11 +110,11 @@ func (h *Hub) ProviderInputOf(t *testing.T, providerID, baseURL string) provider
 		Name:   r.GetString("name"),
 		Preset: r.GetString("preset"),
 		Note:   r.GetString("note"),
-		Claude: providers.EndpointInput{
+		Claude: providers.ClaudeEndpointInput{
 			BaseURL: baseURL, AuthField: cl.AuthField,
 			Models: cl.Models, Defaults: cl.Defaults,
 		},
-		OpenAI: providers.EndpointInput{
+		OpenAI: providers.OpenAIEndpointInput{
 			BaseURL: oa.BaseURL, AuthField: oa.AuthField,
 			Models: oa.Models, DefaultModel: oa.DefaultModel,
 		},

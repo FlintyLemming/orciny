@@ -261,17 +261,17 @@ func (r *rig) seedProviderWithDefaults(
 	t *testing.T, name, baseURL, key string, defaults providers.ModelSlots,
 ) string {
 	t.Helper()
-	models := []string{}
+	models := []providers.ClaudeModel{}
 	if defaults.Main != "" {
-		models = append(models, defaults.Main)
+		models = append(models, providers.ClaudeModel{Name: defaults.Main})
 	}
 	if defaults.Haiku != "" && defaults.Haiku != defaults.Main {
-		models = append(models, defaults.Haiku)
+		models = append(models, providers.ClaudeModel{Name: defaults.Haiku})
 	}
 	rec, err := r.provs.Create(providers.Input{
 		Name: name,
 		Key:  &key,
-		Claude: providers.EndpointInput{
+		Claude: providers.ClaudeEndpointInput{
 			BaseURL:   baseURL,
 			AuthField: providers.AuthToken,
 			Models:    models,

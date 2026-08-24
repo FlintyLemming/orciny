@@ -110,8 +110,8 @@ func TestServeFailsWhenProviderKeyDoesNotDecrypt(t *testing.T) {
 			BaseURL:   "https://open.bigmodel.cn/api/anthropic",
 			AuthField: providers.AuthToken,
 			KeyLast4:  "3456",
-			Models:    []string{"glm-5.2"},
 		},
+		Models: []providers.ClaudeModel{{Name: "glm-5.2"}},
 	})
 	require.NoError(t, app.Save(rec))
 

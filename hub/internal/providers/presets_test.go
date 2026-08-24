@@ -29,18 +29,33 @@ func TestPresetSeedIsWellFormed(t *testing.T) {
 
 		// [1m] 是槽位上的上下文声明，不是一个独立模型：它只出现在 Defaults
 		// 里，模型清单只列基名，否则下拉里同一个模型会并排出现两次。
+		claudeModelMap := map[string]bool{}
 		for _, m := range p.Claude.Models {
-			require.False(t, providers.HasOneM(m),
-				"%s 的模型清单不该出现 1M 变体 %q，标记只写进 Defaults", p.ID, m)
+			require.False(t, providers.HasOneM(m.Name),
+				"%s 的模型清单不该出现 1M 变体 %q，标记只写进 Defaults", p.ID, m.Name)
+			claudeModelMap[m.Name] = m.OneM
 		}
 
 		if p.Claude.Defaults.Full() {
-			require.Contains(t, p.Claude.Models, providers.StripOneM(p.Claude.Defaults.Main),
+			base := providers.StripOneM(p.Claude.Defaults.Main)
+			require.Contains(t, claudeModelMap, base,
 				"%s 的默认主模型基名必须在模型清单里", p.ID)
+			for _, slot := range []string{
+				p.Claude.Defaults.Main, p.Claude.Defaults.Opus,
+				p.Claude.Defaults.Sonnet, p.Claude.Defaults.Haiku,
+			} {
+				if providers.HasOneM(slot) {
+					slotBase := providers.StripOneM(slot)
+					require.True(t, claudeModelMap[slotBase],
+						"%s 的 Defaults 声明了 %s[1m]，但 Claude.Models 里的 %s 未标记 OneM: true",
+						p.ID, slotBase, slotBase)
+				}
+			}
 		}
 		// 订阅域预留（spec §9）：填了 type 就必须填 mode，反之亦然。
 		require.Equal(t, p.CollectorType == "", p.CollectorMode == "",
 			"%s 的 CollectorType 与 CollectorMode 必须同时为空或同时非空", p.ID)
+
 	}
 	require.NotEmpty(t, providers.Presets(), "种子表不能是空的")
 }
@@ -102,8 +117,6 @@ func TestPresetOpenAIEndpointIsCompleteWhenPresent(t *testing.T) {
 		require.NotEmpty(t, p.OpenAI.Models, "%s 的 openai 端点要有模型清单", p.ID)
 		require.Contains(t, p.OpenAI.Models, p.OpenAI.DefaultModel,
 			"%s 的 openai 默认模型必须在清单里", p.ID)
-		require.True(t, p.OpenAI.Defaults.Empty(),
-			"%s 的 openai 端点不该有四槽——那是 Claude Code 特有的概念", p.ID)
 	}
 }
 

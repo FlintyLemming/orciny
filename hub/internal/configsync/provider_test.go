@@ -26,14 +26,14 @@ func (r *rig) seedProviderWith(
 	in := providers.Input{
 		Name: name,
 		Key:  &key,
-		Claude: providers.EndpointInput{
+		Claude: providers.ClaudeEndpointInput{
 			BaseURL:   baseURL,
 			AuthField: providers.AuthToken,
-			Models:    []string{"glm-5.1"},
+			Models:    []providers.ClaudeModel{{Name: "glm-5.1"}},
 		},
 	}
 	if openaiURL != "" {
-		in.OpenAI = providers.EndpointInput{
+		in.OpenAI = providers.OpenAIEndpointInput{
 			BaseURL:      openaiURL,
 			AuthField:    providers.DefaultOpenAIAuthField,
 			Models:       []string{openaiModel},
@@ -53,13 +53,13 @@ func (r *rig) seedProviderWithTwoKeys(
 	rec, err := r.provs.Create(providers.Input{
 		Name: name,
 		Key:  &platformKey,
-		Claude: providers.EndpointInput{
+		Claude: providers.ClaudeEndpointInput{
 			BaseURL:   "https://relay.example/anthropic",
 			AuthField: providers.AuthToken,
-			Models:    []string{"relay-max"},
+			Models:    []providers.ClaudeModel{{Name: "relay-max"}},
 			Key:       &claudeKey,
 		},
-		OpenAI: providers.EndpointInput{
+		OpenAI: providers.OpenAIEndpointInput{
 			BaseURL:      "https://relay.example/v1",
 			AuthField:    providers.DefaultOpenAIAuthField,
 			Models:       []string{"relay-max"},
@@ -117,11 +117,11 @@ func (r *rig) inputFor(t *testing.T, providerID, baseURL string) providers.Input
 		Name:   rec.GetString("name"),
 		Preset: rec.GetString("preset"),
 		Note:   rec.GetString("note"),
-		Claude: providers.EndpointInput{
+		Claude: providers.ClaudeEndpointInput{
 			BaseURL: baseURL, AuthField: cl.AuthField,
 			Models: cl.Models, Defaults: cl.Defaults,
 		},
-		OpenAI: providers.EndpointInput{
+		OpenAI: providers.OpenAIEndpointInput{
 			BaseURL: oa.BaseURL, AuthField: oa.AuthField,
 			Models: oa.Models, DefaultModel: oa.DefaultModel,
 		},

@@ -37,10 +37,12 @@ func minimalInput(name string) providers.Input {
 	return providers.Input{
 		Name: name,
 		Key:  strp("sk-zhipu-abcdef123456"),
-		Claude: providers.EndpointInput{
+		Claude: providers.ClaudeEndpointInput{
 			BaseURL:   "https://open.bigmodel.cn/api/anthropic",
 			AuthField: providers.AuthToken,
-			Models:    []string{"glm-5.2", "glm-4.7"},
+			Models: []providers.ClaudeModel{
+				{Name: "glm-5.2"}, {Name: "glm-4.7"},
+			},
 		},
 	}
 }
@@ -53,7 +55,7 @@ func zhipuInput() providers.Input {
 		Name:   "智谱 GLM · 个人",
 		Preset: p.ID,
 		Key:    strp("sk-zhipu-abcdef123456"),
-		Claude: providers.EndpointInput{
+		Claude: providers.ClaudeEndpointInput{
 			BaseURL:   p.Claude.BaseURL + "/",
 			AuthField: p.Claude.AuthField,
 			Models:    p.Claude.Models,
@@ -97,19 +99,19 @@ func TestUpdateChangesBaseURLAndModels(t *testing.T) {
 	in := zhipuInput()
 	in.Key = nil // 不修改 key
 	in.Claude.BaseURL = "https://open.bigmodel.cn/api/coding/paas/v4"
-	in.Claude.Models = append(in.Claude.Models, "glm-experimental")
+	in.Claude.Models = append(in.Claude.Models, providers.ClaudeModel{Name: "glm-experimental"})
 	got, err := s.Update(rec.Id, in)
 	require.NoError(t, err)
 
 	cl := providers.ClaudeOf(got)
 	require.Equal(t, "https://open.bigmodel.cn/api/coding/paas/v4", cl.BaseURL)
-	require.Contains(t, cl.Models, "glm-experimental")
+	require.Contains(t, cl.Models, providers.ClaudeModel{Name: "glm-experimental"})
 }
 
 func TestCreateStoresBothEndpoints(t *testing.T) {
 	_, s, _ := newStore(t)
 	in := minimalInput("智谱 GLM")
-	in.OpenAI = providers.EndpointInput{
+	in.OpenAI = providers.OpenAIEndpointInput{
 		BaseURL:      "https://open.bigmodel.cn/api/paas/v4",
 		AuthField:    providers.DefaultOpenAIAuthField,
 		Models:       []string{"glm-5.2"},
@@ -127,6 +129,7 @@ func TestCreateStoresBothEndpoints(t *testing.T) {
 	require.Equal(t, "glm-5.2", oa.DefaultModel)
 }
 
+
 // 只配一个端点是常态，另一个必须是「未配置」而不是校验失败。
 func TestCreateWithOnlyClaudeEndpoint(t *testing.T) {
 	_, s, _ := newStore(t)
@@ -141,7 +144,7 @@ func TestEndpointKeyOverridesPlatformKey(t *testing.T) {
 	_, s, _ := newStore(t)
 	in := minimalInput("两把 key 的中转")
 	in.Claude.Key = strp("sk-claude-side-000111")
-	in.OpenAI = providers.EndpointInput{
+	in.OpenAI = providers.OpenAIEndpointInput{
 		BaseURL:   "https://relay.example/v1",
 		AuthField: providers.DefaultOpenAIAuthField,
 		Models:    []string{"gpt-5.2"}, DefaultModel: "gpt-5.2",
@@ -254,7 +257,7 @@ func TestHalfFilledSlotsStillRejected(t *testing.T) {
 func TestOpenAIAuthFieldIsFreeText(t *testing.T) {
 	_, s, _ := newStore(t)
 	in := minimalInput("自定义鉴权字段")
-	in.OpenAI = providers.EndpointInput{
+	in.OpenAI = providers.OpenAIEndpointInput{
 		BaseURL:   "https://relay.example/v1",
 		AuthField: "X_CUSTOM_TOKEN",
 		Models:    []string{"gpt-5.2"}, DefaultModel: "gpt-5.2",
@@ -268,7 +271,7 @@ func TestOpenAIAuthFieldIsFreeText(t *testing.T) {
 func TestOpenAIAuthFieldDefaults(t *testing.T) {
 	_, s, _ := newStore(t)
 	in := minimalInput("默认鉴权字段")
-	in.OpenAI = providers.EndpointInput{
+	in.OpenAI = providers.OpenAIEndpointInput{
 		BaseURL: "https://relay.example/v1",
 		Models:  []string{"gpt-5.2"}, DefaultModel: "gpt-5.2",
 	}
@@ -360,13 +363,14 @@ func TestMatchBaseURLFallsBackToHost(t *testing.T) {
 func TestMatchBaseURLScansClaudeEndpointOnly(t *testing.T) {
 	_, s, _ := newStore(t)
 	in := minimalInput("智谱 GLM")
-	in.OpenAI = providers.EndpointInput{
+	in.OpenAI = providers.OpenAIEndpointInput{
 		BaseURL:   "https://openai-only.example/v1",
 		AuthField: providers.DefaultOpenAIAuthField,
 		Models:    []string{"gpt-5.2"}, DefaultModel: "gpt-5.2",
 	}
 	r, err := s.Create(in)
 	require.NoError(t, err)
+
 
 	// claude 端点：精确命中
 	m, err := s.MatchBaseURL("https://open.bigmodel.cn/api/anthropic/")

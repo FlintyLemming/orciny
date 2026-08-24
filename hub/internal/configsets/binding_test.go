@@ -30,15 +30,15 @@ func seedProviderWith(t *testing.T, app core.App, name, openaiBaseURL string) st
 			BaseURL:   "https://open.bigmodel.cn/api/anthropic",
 			AuthField: providers.AuthToken,
 			KeyLast4:  "1234",
-			Models:    []string{"glm-5.2"},
 		},
+		Models: []providers.ClaudeModel{{Name: "glm-5.2"}},
 	})
 	p.Set("openai", providers.OpenAIEndpoint{
 		Endpoint: providers.Endpoint{
 			BaseURL:   openaiBaseURL,
 			AuthField: providers.DefaultOpenAIAuthField,
-			Models:    []string{},
 		},
+		Models: []string{},
 	})
 	require.NoError(t, app.Save(p))
 	return p.Id

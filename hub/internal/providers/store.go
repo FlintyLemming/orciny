@@ -40,22 +40,26 @@ type Match struct {
 	PresetName   string `json:"preset_name,omitempty"`
 }
 
-// EndpointInput 的 Key 是三态（spec §5.2「留空则不修改，填写即替换」）：
+// ClaudeEndpointInput 的 Key 是三态（spec §5.2「留空则不修改，填写即替换」）：
 //
 //	nil  = 不修改（编辑态密码框留空）
 //	""   = 清空（端点级清空即回落平台级）
 //	非空 = 替换
-//
-// 用 *string 而不是 (string, bool) 一对字段，是因为它要原样从 HTTP 请求体
-// 反序列化过来：JSON 里字段缺席 → nil，字段是 "" → 清空。两种意图在
-// wire 上就分得开，路由层不必再发明一套约定。
-type EndpointInput struct {
+type ClaudeEndpointInput struct {
+	BaseURL   string
+	AuthField string
+	Models    []ClaudeModel
+	Key       *string
+	Defaults  ModelSlots
+}
+
+// OpenAIEndpointInput 的 Key 同三态。
+type OpenAIEndpointInput struct {
 	BaseURL      string
 	AuthField    string
 	Models       []string
 	Key          *string
-	Defaults     ModelSlots // 仅 claude 端点有意义
-	DefaultModel string     // 仅 openai 端点有意义
+	DefaultModel string
 }
 
 // Input 是建 / 改一条服务配置需要的全部字段。
@@ -63,10 +67,11 @@ type Input struct {
 	Name   string
 	Preset string
 	Note   string
-	Key    *string // 平台级，三态同 EndpointInput.Key
-	Claude EndpointInput
-	OpenAI EndpointInput
+	Key    *string // 平台级，三态同 ClaudeEndpointInput.Key
+	Claude ClaudeEndpointInput
+	OpenAI OpenAIEndpointInput
 }
+
 
 type Store struct {
 	app core.App
@@ -223,10 +228,10 @@ func (s *Store) applyAndValidate(r *core.Record, in Input) error {
 	if strings.TrimSpace(in.Name) == "" {
 		return fmt.Errorf("providers: 需要 name")
 	}
-	if err := validateEndpointInput(EndpointClaude, in.Claude); err != nil {
+	if err := validateClaudeEndpointInput(in.Claude); err != nil {
 		return err
 	}
-	if err := validateEndpointInput(EndpointOpenAI, in.OpenAI); err != nil {
+	if err := validateOpenAIEndpointInput(in.OpenAI); err != nil {
 		return err
 	}
 
@@ -250,16 +255,16 @@ func (s *Store) applyAndValidate(r *core.Record, in Input) error {
 			// 不能把用户敲的尾斜杠带进库。
 			BaseURL:   NormalizeURL(in.Claude.BaseURL),
 			AuthField: in.Claude.AuthField,
-			Models:    orEmpty(in.Claude.Models),
 		},
+		Models:   orEmptyClaude(in.Claude.Models),
 		Defaults: in.Claude.Defaults,
 	}
 	openai := OpenAIEndpoint{
 		Endpoint: Endpoint{
 			BaseURL:   NormalizeURL(in.OpenAI.BaseURL),
 			AuthField: in.OpenAI.AuthField,
-			Models:    orEmpty(in.OpenAI.Models),
 		},
+		Models:       orEmptyStrings(in.OpenAI.Models),
 		DefaultModel: in.OpenAI.DefaultModel,
 	}
 	if openai.AuthField == "" {
@@ -437,38 +442,54 @@ func (s *Store) VerifyAll() error {
 	return nil
 }
 
-// validateEndpointInput 只看输入本身能不能自洽；「有没有 key」要等
-// 合并进记录之后才判得了（见 stampLast4）。
-func validateEndpointInput(name string, in EndpointInput) error {
+// validateClaudeEndpointInput 只看 Claude 端点输入本身能不能自洽。
+func validateClaudeEndpointInput(in ClaudeEndpointInput) error {
 	if strings.TrimSpace(in.BaseURL) == "" {
 		return nil // 未配置的端点不校验其余字段
 	}
 	if HostOf(in.BaseURL) == "" {
-		return fmt.Errorf("%w: %s 端点的 %q 解析不出 host", ErrBadBaseURL, name, in.BaseURL)
+		return fmt.Errorf("%w: claude 端点的 %q 解析不出 host", ErrBadBaseURL, in.BaseURL)
 	}
-	if name == EndpointClaude {
-		// claude 端点的 auth_field 是二选一枚举（M1.5 spec §3.3）：
-		// 它是 Claude Code 的 settings.json env 键名问题。
-		if in.AuthField != AuthToken && in.AuthField != AuthAPIKey {
-			return fmt.Errorf("%w: %q（只允许 %s / %s）",
-				ErrBadAuthField, in.AuthField, AuthToken, AuthAPIKey)
-		}
-		// 半填的四槽是配置错误：只钉主模型会让 Claude Code 拿 claude-haiku-*
-		// 去打人家的 endpoint（M1.5 spec §2.3）。
-		if !in.Defaults.Empty() && !in.Defaults.Full() {
-			return fmt.Errorf("providers: 四个模型槽必须要么全空（透传）要么全满")
-		}
+	// claude 端点的 auth_field 是二选一枚举（M1.5 spec §3.3）：
+	// 它是 Claude Code 的 settings.json env 键名问题。
+	if in.AuthField != AuthToken && in.AuthField != AuthAPIKey {
+		return fmt.Errorf("%w: %q（只允许 %s / %s）",
+			ErrBadAuthField, in.AuthField, AuthToken, AuthAPIKey)
+	}
+	// 半填的四槽是配置错误：只钉主模型会让 Claude Code 拿 claude-haiku-*
+	// 去打人家的 endpoint（M1.5 spec §2.3）。
+	if !in.Defaults.Empty() && !in.Defaults.Full() {
+		return fmt.Errorf("providers: 四个模型槽必须要么全空（透传）要么全满")
+	}
+	return nil
+}
+
+// validateOpenAIEndpointInput 只看 OpenAI 端点输入本身能不能自洽。
+func validateOpenAIEndpointInput(in OpenAIEndpointInput) error {
+	if strings.TrimSpace(in.BaseURL) == "" {
+		return nil
+	}
+	if HostOf(in.BaseURL) == "" {
+		return fmt.Errorf("%w: openai 端点的 %q 解析不出 host", ErrBadBaseURL, in.BaseURL)
 	}
 	// openai 端点的 auth_field 是自由文本，不校验（spec §2.4）。
 	return nil
 }
 
-func orEmpty(xs []string) []string {
+func orEmptyClaude(xs []ClaudeModel) []ClaudeModel {
+	if xs == nil {
+		return []ClaudeModel{}
+	}
+	return xs
+}
+
+func orEmptyStrings(xs []string) []string {
 	if xs == nil {
 		return []string{}
 	}
 	return xs
 }
+
 
 // write 记事件。事件里只有名字与平台，不含 key、不含 base_url 之外的值。
 func (s *Store) write(kind string, r *core.Record) {

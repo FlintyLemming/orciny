@@ -30,7 +30,7 @@ func TestClaudeOfAndOpenAIOfDecodeRecord(t *testing.T) {
 		"base_url":"https://open.bigmodel.cn/api/anthropic",
 		"auth_field":"ANTHROPIC_AUTH_TOKEN",
 		"key_last4":"3456",
-		"models":["glm-5.2"],
+		"models":[{"name":"glm-5.2"}],
 		"defaults":{"main":"glm-5.2","opus":"glm-5.2","sonnet":"glm-5.2","haiku":"glm-4.7"}
 	}`))
 	r.Set("openai", json.RawMessage(`{
@@ -65,3 +65,21 @@ func TestEndpointOfEmptyRecordIsZeroValue(t *testing.T) {
 	require.False(t, providers.OpenAIOf(r).Configured())
 	require.Empty(t, providers.OpenAIOf(r).DefaultModel)
 }
+
+func TestClaudeModelJSONRoundTrip(t *testing.T) {
+	m := providers.ClaudeModel{Name: "glm-5.2", OneM: true}
+	b, err := json.Marshal(m)
+	require.NoError(t, err)
+	require.Equal(t, `{"name":"glm-5.2","one_m":true}`, string(b))
+
+	m2 := providers.ClaudeModel{Name: "glm-4.7", OneM: false}
+	b2, err := json.Marshal(m2)
+	require.NoError(t, err)
+	require.Equal(t, `{"name":"glm-4.7"}`, string(b2))
+
+	var decoded providers.ClaudeModel
+	require.NoError(t, json.Unmarshal([]byte(`{"name":"test"}`), &decoded))
+	require.Equal(t, "test", decoded.Name)
+	require.False(t, decoded.OneM)
+}
+

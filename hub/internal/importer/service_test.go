@@ -235,14 +235,14 @@ func (r *rig) seedProvider(t *testing.T, name string) string {
 		Endpoint: providers.Endpoint{
 			BaseURL:   "https://open.bigmodel.cn/api/anthropic",
 			AuthField: providers.AuthToken,
-			Models:    []string{"glm-5.2"},
 		},
+		Models: []providers.ClaudeModel{{Name: "glm-5.2"}},
 	})
 	rec.Set("openai", providers.OpenAIEndpoint{
 		Endpoint: providers.Endpoint{
 			AuthField: providers.DefaultOpenAIAuthField,
-			Models:    []string{},
 		},
+		Models: []string{},
 	})
 	require.NoError(t, r.app.Save(rec))
 	return rec.Id

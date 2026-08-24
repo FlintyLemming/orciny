@@ -203,8 +203,8 @@ func seedProvider(t *testing.T, app core.App, name string) string {
 			BaseURL:   "https://open.bigmodel.cn/api/anthropic",
 			AuthField: providers.AuthToken,
 			KeyLast4:  "1234",
-			Models:    []string{"glm-5.2"},
 		},
+		Models: []providers.ClaudeModel{{Name: "glm-5.2"}},
 	})
 	require.NoError(t, app.Save(p))
 	return p.Id
