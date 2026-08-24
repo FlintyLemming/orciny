@@ -1,7 +1,16 @@
 import { useState } from 'react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { ChevronDown, ChevronRight } from 'lucide-react'
-import { emptySlots, fillAllSlots, hasProviderRefs, isPassthrough } from '@/lib/binding'
+import {
+  emptySlots,
+  fillAllSlots,
+  hasOneM,
+  hasProviderRefs,
+  isPassthrough,
+  setOneM,
+  setSlotsOneM,
+  stripOneM,
+} from '@/lib/binding'
 import type { Binding, ModelSlots, ProviderRecord } from '@/types/collections'
 
 /**
@@ -32,6 +41,11 @@ export function BindingBar({
   // 模型清单取 claude 端点：绑定本期恒指 claude（M1.6 spec §1.3）。
   const models = provider?.claude?.models ?? []
   const slots = binding?.models ?? emptySlots()
+  // [1m] 是槽位上的声明而不是独立模型：下拉一律列基名，标记单独一个复选框，
+  // 否则同一个模型会在下拉里并排出现两次。
+  const modelOptions = [...new Set(models.map(stripOneM))]
+  const mainBase = stripOneM(slots.main)
+  const oneM = hasOneM(slots.main)
 
   function setSlot(key: keyof ModelSlots, value: string) {
     if (!binding) return
@@ -79,16 +93,31 @@ export function BindingBar({
             <select
               aria-label={t`主模型`}
               className="rounded border border-line bg-wash px-2 py-1 font-mono text-sm"
-              value={slots.main}
-              onChange={(e) => onChange({ ...binding, models: fillAllSlots(e.target.value) })}
+              value={mainBase}
+              onChange={(e) =>
+                onChange({ ...binding, models: fillAllSlots(setOneM(e.target.value, oneM)) })
+              }
             >
               <option value="">{t`透传（不指定模型）`}</option>
-              {models.map((m) => (
+              {modelOptions.map((m) => (
                 <option key={m} value={m}>
                   {m}
                 </option>
               ))}
             </select>
+
+            <label className="flex items-center gap-1 text-xs text-ink3">
+              <input
+                type="checkbox"
+                aria-label={t`声明 1M 上下文`}
+                checked={oneM}
+                disabled={mainBase === ''}
+                onChange={(e) =>
+                  onChange({ ...binding, models: setSlotsOneM(slots, mainBase, e.target.checked) })
+                }
+              />
+              <Trans>声明 1M</Trans>
+            </label>
 
             <button
               type="button"
@@ -120,11 +149,11 @@ export function BindingBar({
               <select
                 aria-label={k}
                 className="rounded border border-line bg-wash px-2 py-1 font-mono text-sm"
-                value={slots[k]}
-                onChange={(e) => setSlot(k, e.target.value)}
+                value={stripOneM(slots[k])}
+                onChange={(e) => setSlot(k, setOneM(e.target.value, hasOneM(slots[k])))}
               >
                 <option value="">{t`（空）`}</option>
-                {models.map((m) => (
+                {modelOptions.map((m) => (
                   <option key={m} value={m}>
                     {m}
                   </option>

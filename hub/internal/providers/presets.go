@@ -6,7 +6,11 @@
 // 不再做成用户可见的 credentials 实体（spec §1.1 第二条）。
 package providers
 
-import "github.com/pocketbase/pocketbase/core"
+import (
+	"strings"
+
+	"github.com/pocketbase/pocketbase/core"
+)
 
 // 鉴权字段名。auth_field 决定的是 env 的**键名**，占位符替的是**值**，
 // 替不了键名——所以换绑到 auth_field 不同的 Provider 时，settings.json 里
@@ -36,6 +40,25 @@ func (m ModelSlots) Empty() bool {
 
 func (m ModelSlots) Full() bool {
 	return m.Main != "" && m.Opus != "" && m.Sonnet != "" && m.Haiku != ""
+}
+
+// OneMSuffix 是 Claude Code 的 100 万上下文声明。它是模型名字符串上的语法
+// （Claude Code 侧按 /\[1m\]/i 匹配后把上下文窗口按 1e6 计），不是一个独立
+// 的模型——所以它只出现在 ModelSlots 里，模型清单只列基名。
+const OneMSuffix = "[1m]"
+
+// HasOneM 判断模型名是否带 1M 声明。大小写不敏感，与 Claude Code 一致。
+func HasOneM(model string) bool {
+	return strings.HasSuffix(strings.ToLower(strings.TrimRight(model, " ")), OneMSuffix)
+}
+
+// StripOneM 去掉尾部的 1M 声明，返回模型基名。不带声明时原样返回。
+func StripOneM(model string) string {
+	trimmed := strings.TrimRight(model, " ")
+	if !HasOneM(trimmed) {
+		return model
+	}
+	return strings.TrimRight(trimmed[:len(trimmed)-len(OneMSuffix)], " ")
 }
 
 // 端点名。与占位符的端点段（protocol.ProviderKeys）逐字符一致。
@@ -156,9 +179,10 @@ var presets = []Preset{
 		Claude: PresetEndpoint{
 			BaseURL:   "https://open.bigmodel.cn/api/anthropic",
 			AuthField: AuthToken,
-			// [1m] 后缀开 100 万上下文窗口，官方文档同时要求把
-			// CLAUDE_CODE_AUTO_COMPACT_WINDOW 调到 1000000。
-			Models: []string{"glm-5.2[1m]", "glm-5.2", "glm-5-turbo", "glm-4.7"},
+			// [1m] 只写进 Defaults：它是槽位上的上下文声明，不是一个独立模型。
+			// Claude Code 见到该后缀即按 1e6 计算 auto-compact 阈值与 /context，
+			// 无需另设 CLAUDE_CODE_AUTO_COMPACT_WINDOW。
+			Models: []string{"glm-5.2", "glm-5-turbo", "glm-4.7"},
 			Defaults: ModelSlots{
 				Main: "glm-5.2[1m]", Opus: "glm-5.2[1m]",
 				Sonnet: "glm-5.2[1m]", Haiku: "glm-4.7",
@@ -209,7 +233,7 @@ var presets = []Preset{
 			BaseURL:   "https://api.moonshot.cn/anthropic",
 			AuthField: AuthToken,
 			Models: []string{
-				"kimi-k3[1m]", "kimi-k2.7-code", "kimi-k2.7-code-highspeed", "kimi-k2.6",
+				"kimi-k3", "kimi-k2.7-code", "kimi-k2.7-code-highspeed", "kimi-k2.6",
 			},
 			Defaults: ModelSlots{
 				Main: "kimi-k3[1m]", Opus: "kimi-k3[1m]",

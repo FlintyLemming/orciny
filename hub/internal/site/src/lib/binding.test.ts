@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest'
 import {
   emptySlots,
   fillAllSlots,
+  hasOneM,
   hasProviderRefs,
   insertEnvSnippet,
   isPassthrough,
+  setOneM,
+  setSlotsOneM,
+  stripOneM,
 } from '@/lib/binding'
 
 describe('模型槽', () => {
@@ -68,5 +72,45 @@ describe('hasProviderRefs', () => {
     expect(hasProviderRefs('{"a":"{{cred.k}}"}')).toBe(false)
     // 转义的不算
     expect(hasProviderRefs('写法是 {{{{provider.claude.base_url}}')).toBe(false)
+  })
+})
+
+describe('1M 上下文声明', () => {
+  it('识别规则与 Claude Code 的 /[1m]/i 对齐', () => {
+    expect(hasOneM('glm-5.2[1m]')).toBe(true)
+    expect(hasOneM('glm-5.2[1M]')).toBe(true)
+    expect(hasOneM('glm-5.2 [1m]  ')).toBe(true)
+    expect(hasOneM('glm-5.2')).toBe(false)
+    expect(hasOneM('glm-5.2[1m]-turbo')).toBe(false)
+  })
+
+  it('strip 拿到基名，set 写回小写形式', () => {
+    expect(stripOneM('glm-5.2 [1M]  ')).toBe('glm-5.2')
+    expect(stripOneM('glm-5.2')).toBe('glm-5.2')
+    expect(setOneM('glm-5.2', true)).toBe('glm-5.2[1m]')
+    expect(setOneM('glm-5.2[1M]', true)).toBe('glm-5.2[1m]')
+    expect(setOneM('glm-5.2[1m]', false)).toBe('glm-5.2')
+    expect(setOneM('', true)).toBe('')
+  })
+
+  it('只给基名相同的槽换声明，其余槽原样保留', () => {
+    // 智谱预设：haiku 故意指向便宜的 glm-4.7，不该被 1M 开关波及。
+    const slots = {
+      main: 'glm-5.2[1m]',
+      opus: 'glm-5.2[1m]',
+      sonnet: 'glm-5.2[1m]',
+      haiku: 'glm-4.7',
+    }
+    expect(setSlotsOneM(slots, 'glm-5.2', false)).toEqual({
+      main: 'glm-5.2',
+      opus: 'glm-5.2',
+      sonnet: 'glm-5.2',
+      haiku: 'glm-4.7',
+    })
+    expect(setSlotsOneM(setSlotsOneM(slots, 'glm-5.2', false), 'glm-5.2', true)).toEqual(slots)
+  })
+
+  it('空槽不会被塞进声明', () => {
+    expect(setSlotsOneM(emptySlots(), '', true)).toEqual(emptySlots())
   })
 })

@@ -21,7 +21,12 @@ const presets: ProviderPreset[] = [
       base_url: 'https://open.bigmodel.cn/api/anthropic',
       auth_field: 'ANTHROPIC_AUTH_TOKEN',
       models: ['glm-5.2', 'glm-4.7'],
-      defaults: { main: 'glm-5.2', opus: 'glm-5.2', sonnet: 'glm-5.2', haiku: 'glm-4.7' },
+      defaults: {
+        main: 'glm-5.2[1m]',
+        opus: 'glm-5.2[1m]',
+        sonnet: 'glm-5.2[1m]',
+        haiku: 'glm-4.7',
+      },
       default_model: '',
     },
     openai: {
@@ -62,8 +67,13 @@ const editing: ProviderRecord = {
     base_url: 'https://open.bigmodel.cn/api/anthropic',
     auth_field: 'ANTHROPIC_AUTH_TOKEN',
     key_last4: 'a1b2',
-    models: ['glm-5.2'],
-    defaults: { main: 'glm-5.2', opus: 'glm-5.2', sonnet: 'glm-5.2', haiku: 'glm-4.7' },
+    models: ['glm-5.2', 'glm-4.7'],
+    defaults: {
+      main: 'glm-5.2[1m]',
+      opus: 'glm-5.2[1m]',
+      sonnet: 'glm-5.2[1m]',
+      haiku: 'glm-4.7',
+    },
   },
   openai: null,
   created: '',
@@ -104,7 +114,7 @@ describe('ProviderDialog', () => {
 
     // 没有任何 checkbox / switch 可以单独开关端点
     expect(screen.queryByRole('switch')).toBeNull()
-    expect(screen.queryByRole('checkbox')).toBeNull()
+    expect(screen.queryByRole('checkbox', { name: /端点/ })).toBeNull()
   })
 
   it('OpenAI 分区带「本期不产生注入」的说明', async () => {
@@ -212,5 +222,66 @@ describe('ProviderDialog', () => {
       ),
     )
     expect(screen.getByTestId('reinject-hint')).toBeTruthy()
+  })
+})
+
+describe('ProviderDialog 的 1M 上下文声明', () => {
+  it('下拉列基名，1M 用独立复选框表示——同一个模型不该在下拉里出现两次', async () => {
+    render(wrap(<ProviderDialog presets={presets} onClose={vi.fn()} onSaved={vi.fn()} />))
+    await userEvent.click(screen.getByText('Zhipu GLM'))
+
+    expect(screen.getByLabelText('claude 默认模型')).toHaveValue('glm-5.2')
+    expect(screen.getByRole('checkbox', { name: 'claude 声明 1M 上下文' })).toBeChecked()
+    expect(screen.getByLabelText('claude 默认模型')).not.toHaveDisplayValue('glm-5.2[1m]')
+  })
+
+  it('取消 1M 只影响用了该模型的槽，haiku 的独立映射保留', async () => {
+    const save = vi.fn().mockResolvedValue(undefined)
+    render(
+      wrap(
+        <ProviderDialog
+          presets={presets}
+          editing={editing}
+          onClose={vi.fn()}
+          onSaved={vi.fn()}
+          onSubmit={save}
+        />,
+      ),
+    )
+    await userEvent.click(screen.getByRole('checkbox', { name: 'claude 声明 1M 上下文' }))
+    await userEvent.click(screen.getByText('保存'))
+
+    expect(save.mock.calls[0][0].claude.defaults).toEqual({
+      main: 'glm-5.2',
+      opus: 'glm-5.2',
+      sonnet: 'glm-5.2',
+      haiku: 'glm-4.7',
+    })
+  })
+
+  it('换默认模型时带着当前的 1M 声明', async () => {
+    const save = vi.fn().mockResolvedValue(undefined)
+    render(
+      wrap(
+        <ProviderDialog
+          presets={presets}
+          editing={editing}
+          onClose={vi.fn()}
+          onSaved={vi.fn()}
+          onSubmit={save}
+        />,
+      ),
+    )
+    await userEvent.selectOptions(screen.getByLabelText('claude 默认模型'), 'glm-4.7')
+    await userEvent.click(screen.getByText('保存'))
+
+    expect(save.mock.calls[0][0].claude.defaults.main).toBe('glm-4.7[1m]')
+  })
+
+  it('透传（不设模型）时 1M 复选框禁用', async () => {
+    render(wrap(<ProviderDialog presets={presets} onClose={vi.fn()} onSaved={vi.fn()} />))
+    await userEvent.click(screen.getByText('Anthropic Official'))
+
+    expect(screen.getByRole('checkbox', { name: 'claude 声明 1M 上下文' })).toBeDisabled()
   })
 })

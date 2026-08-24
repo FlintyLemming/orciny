@@ -193,3 +193,70 @@ describe('BindingBar 的端点感知', () => {
     expect(screen.getByRole('option', { name: 'glm-5.1' })).toBeTruthy()
   })
 })
+
+describe('BindingBar 的 1M 上下文声明', () => {
+  const binding = { provider: 'p1', models: fillAllSlots('glm-5.1[1m]') }
+
+  it('已存的 1M 绑定：下拉显示基名而不是空白', () => {
+    render(
+      wrap(
+        <BindingBar
+          providers={[provider]}
+          binding={binding}
+          settingsText=""
+          onChange={vi.fn()}
+          onInsertSnippet={vi.fn()}
+        />,
+      ),
+    )
+    expect(screen.getByLabelText('主模型')).toHaveValue('glm-5.1')
+    expect(screen.getByRole('checkbox', { name: '声明 1M 上下文' })).toBeChecked()
+  })
+
+  it('取消 1M 只影响基名相同的槽', async () => {
+    const onChange = vi.fn()
+    const mixed = {
+      provider: 'p1',
+      models: { main: 'glm-5.1[1m]', opus: 'glm-5.1[1m]', sonnet: 'glm-5.1[1m]', haiku: 'glm-4.7' },
+    }
+    render(
+      wrap(
+        <BindingBar
+          providers={[provider]}
+          binding={mixed}
+          settingsText=""
+          onChange={onChange}
+          onInsertSnippet={vi.fn()}
+        />,
+      ),
+    )
+    await userEvent.click(screen.getByRole('checkbox', { name: '声明 1M 上下文' }))
+
+    expect(onChange.mock.calls[0][0].models).toEqual({
+      main: 'glm-5.1',
+      opus: 'glm-5.1',
+      sonnet: 'glm-5.1',
+      haiku: 'glm-4.7',
+    })
+  })
+
+  it('高级里的分槽下拉保留各槽自己的声明', async () => {
+    const onChange = vi.fn()
+    render(
+      wrap(
+        <BindingBar
+          providers={[provider]}
+          binding={binding}
+          settingsText=""
+          onChange={onChange}
+          onInsertSnippet={vi.fn()}
+        />,
+      ),
+    )
+    await userEvent.click(screen.getByRole('button', { name: /高级/ }))
+    expect(screen.getByLabelText('haiku')).toHaveValue('glm-5.1')
+
+    await userEvent.selectOptions(screen.getByLabelText('haiku'), 'glm-4.7')
+    expect(onChange.mock.calls[0][0].models.haiku).toBe('glm-4.7[1m]')
+  })
+})

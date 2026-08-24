@@ -2,7 +2,15 @@ import { useEffect, useState } from 'react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { ChevronDown, ChevronRight, X } from 'lucide-react'
 import { ApiError, createProvider, updateProvider, type ProviderBody } from '@/lib/api'
-import { emptySlots, fillAllSlots, isPassthrough } from '@/lib/binding'
+import {
+  emptySlots,
+  fillAllSlots,
+  hasOneM,
+  isPassthrough,
+  setOneM,
+  setSlotsOneM,
+  stripOneM,
+} from '@/lib/binding'
 import type {
   ClaudeEndpointRecord,
   ModelSlots,
@@ -126,6 +134,11 @@ export function ProviderDialog({
     setOpenai(draftOfPreset(p.openai, 'OPENAI_API_KEY'))
     setPresetHasNoOpenAI(p.openai.base_url === '')
   }
+
+  // 1M 是槽位上的声明而非独立模型：下拉与选项都用基名，标记单独一个复选框。
+  const claudeMainBase = isPassthrough(claude.defaults) ? '' : stripOneM(claude.defaults.main)
+  const claudeOneM = hasOneM(claude.defaults.main)
+  const claudeModelOptions = [...new Set(claude.models.map(stripOneM))]
 
   /** 自定义平台 = preset 留空，两个端点都清空由用户自己填（M1.5 spec §2.3）。 */
   function applyCustom() {
@@ -341,29 +354,55 @@ export function ProviderDialog({
           />
 
           {/* 四槽：要么全空（透传）要么全满（M1.5 spec §2.3）。
-              主模型下拉一次填满四个，避免半填这种没有正确处理方式的中间态。 */}
+              主模型下拉一次填满四个，避免半填这种没有正确处理方式的中间态。
+
+              [1m] 不进下拉：它是槽位上的上下文声明，不是一个独立模型。混在
+              选项里会让同一个模型并排出现两次，用户看不出区别。 */}
           <label className="mb-1 block text-xs text-ink3" htmlFor="claude-main-model">
             <Trans>默认模型（四槽同填）</Trans>
           </label>
           <select
             id="claude-main-model"
             aria-label={t`claude 默认模型`}
-            className="mb-3 w-full rounded border border-line bg-wash px-2 py-1.5 font-mono text-sm"
-            value={isPassthrough(claude.defaults) ? '' : claude.defaults.main}
+            className="mb-2 w-full rounded border border-line bg-wash px-2 py-1.5 font-mono text-sm"
+            value={claudeMainBase}
             onChange={(e) =>
               setClaude({
                 ...claude,
-                defaults: e.target.value === '' ? emptySlots() : fillAllSlots(e.target.value),
+                defaults:
+                  e.target.value === ''
+                    ? emptySlots()
+                    : fillAllSlots(setOneM(e.target.value, claudeOneM)),
               })
             }
           >
             <option value="">{t`透传（不设模型变量）`}</option>
-            {claude.models.map((m) => (
+            {claudeModelOptions.map((m) => (
               <option key={m} value={m}>
                 {m}
               </option>
             ))}
           </select>
+
+          <label className="mb-1 flex items-center gap-2 text-xs text-ink3">
+            <input
+              type="checkbox"
+              aria-label={t`claude 声明 1M 上下文`}
+              checked={claudeOneM}
+              disabled={claudeMainBase === ''}
+              onChange={(e) =>
+                setClaude({
+                  ...claude,
+                  defaults: setSlotsOneM(claude.defaults, claudeMainBase, e.target.checked),
+                })
+              }
+            />
+            <Trans>声明 1M 上下文</Trans>
+          </label>
+          <p className="mb-3 text-xs text-ink3">
+            {/* 用 t 而不是多行 <Trans>：JSX 会把换行折成空格，中文里那是个错字。 */}
+            {t`给模型名追加 [1m]：只告诉 Claude Code 按 100 万上下文计算 auto-compact 阈值与 /context 占用，不改变上游实际能力。上游窗口不足 1M 时误勾会导致压缩不触发、请求直接报错。只影响基名相同的槽，单独指到别的模型的槽不受波及。`}
+          </p>
         </EndpointSection>
 
         {/* ---------- OpenAI 端点 ---------- */}

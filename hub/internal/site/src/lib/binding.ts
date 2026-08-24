@@ -24,6 +24,48 @@ export function fillAllSlots(model: string): ModelSlots {
   return { main: model, opus: model, sonnet: model, haiku: model }
 }
 
+/**
+ * Claude Code 的 100 万上下文声明。它是模型名字符串上的语法（Claude Code 按
+ * /\[1m\]/i 匹配后把窗口按 1e6 计），不是一个独立模型——所以它只落在槽位值
+ * 里，端点的模型清单只列基名。
+ */
+export const ONE_M_SUFFIX = '[1m]'
+
+/** 模型名是否带 1M 声明。大小写不敏感，与 Claude Code 一致。 */
+export function hasOneM(model: string): boolean {
+  return model.trimEnd().toLowerCase().endsWith(ONE_M_SUFFIX)
+}
+
+/** 去掉尾部的 1M 声明，返回模型基名。不带声明时原样返回。 */
+export function stripOneM(model: string): string {
+  const trimmed = model.trimEnd()
+  if (!hasOneM(trimmed)) return model
+  return trimmed.slice(0, -ONE_M_SUFFIX.length).trimEnd()
+}
+
+/** 按 enabled 给模型基名加上或去掉 1M 声明。空名原样返回。 */
+export function setOneM(model: string, enabled: boolean): string {
+  const base = stripOneM(model).trim()
+  if (!base || !enabled) return base
+  return base + ONE_M_SUFFIX
+}
+
+/**
+ * 只给基名等于 base 的槽换 1M 声明，其余槽原样保留。
+ *
+ * 预设可以把 haiku 单独指到别的便宜模型（智谱就是 glm-4.7），1M 开关不该
+ * 把那种拆分一并抹平——所以按基名匹配，而不是四槽同填。
+ */
+export function setSlotsOneM(slots: ModelSlots, base: string, enabled: boolean): ModelSlots {
+  const apply = (slot: string) => (stripOneM(slot) === base ? setOneM(slot, enabled) : slot)
+  return {
+    main: apply(slots.main),
+    opus: apply(slots.opus),
+    sonnet: apply(slots.sonnet),
+    haiku: apply(slots.haiku),
+  }
+}
+
 /** 透传模式 = 四槽全空。半填不算——那是配置错误。 */
 export function isPassthrough(s: ModelSlots): boolean {
   return !s.main && !s.opus && !s.sonnet && !s.haiku

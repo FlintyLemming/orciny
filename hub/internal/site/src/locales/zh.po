@@ -88,6 +88,10 @@ msgid "Claude Code"
 msgstr "Claude Code"
 
 #: src/components/ProviderDialog.tsx
+msgid "claude 声明 1M 上下文"
+msgstr "claude 声明 1M 上下文"
+
+#: src/components/ProviderDialog.tsx
 msgid "claude 默认模型"
 msgstr "claude 默认模型"
 
@@ -456,6 +460,15 @@ msgstr "在线"
 #: src/pages/Inbox.tsx
 msgid "基线"
 msgstr "基线"
+
+#: src/components/BindingBar.tsx
+msgid "声明 1M"
+msgstr "声明 1M"
+
+#: src/components/BindingBar.tsx
+#: src/components/ProviderDialog.tsx
+msgid "声明 1M 上下文"
+msgstr "声明 1M 上下文"
 
 #: src/pages/ImportWizard.tsx
 msgid "处理敏感项：抽取为凭据（推荐）、保留明文（进版本历史）、或移出纳管。"
@@ -1099,6 +1112,10 @@ msgstr "签发注册 token"
 #: src/pages/Machines.tsx
 msgid "系统"
 msgstr "系统"
+
+#: src/components/ProviderDialog.tsx
+msgid "给模型名追加 [1m]：只告诉 Claude Code 按 100 万上下文计算 auto-compact 阈值与 /context 占用，不改变上游实际能力。上游窗口不足 1M 时误勾会导致压缩不触发、请求直接报错。只影响基名相同的槽，单独指到别的模型的槽不受波及。"
+msgstr "给模型名追加 [1m]：只告诉 Claude Code 按 100 万上下文计算 auto-compact 阈值与 /context 占用，不改变上游实际能力。上游窗口不足 1M 时误勾会导致压缩不触发、请求直接报错。只影响基名相同的槽，单独指到别的模型的槽不受波及。"
 
 #. placeholder {0}: p.name
 #: src/pages/Providers.tsx

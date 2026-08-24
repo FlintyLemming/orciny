@@ -27,9 +27,16 @@ func TestPresetSeedIsWellFormed(t *testing.T) {
 		require.True(t, p.Claude.Defaults.Empty() || p.Claude.Defaults.Full(),
 			"%s 的四个模型槽必须要么全空要么全满，当前 %+v", p.ID, p.Claude.Defaults)
 
+		// [1m] 是槽位上的上下文声明，不是一个独立模型：它只出现在 Defaults
+		// 里，模型清单只列基名，否则下拉里同一个模型会并排出现两次。
+		for _, m := range p.Claude.Models {
+			require.False(t, providers.HasOneM(m),
+				"%s 的模型清单不该出现 1M 变体 %q，标记只写进 Defaults", p.ID, m)
+		}
+
 		if p.Claude.Defaults.Full() {
-			require.Contains(t, p.Claude.Models, p.Claude.Defaults.Main,
-				"%s 的默认主模型必须在模型清单里", p.ID)
+			require.Contains(t, p.Claude.Models, providers.StripOneM(p.Claude.Defaults.Main),
+				"%s 的默认主模型基名必须在模型清单里", p.ID)
 		}
 		// 订阅域预留（spec §9）：填了 type 就必须填 mode，反之亦然。
 		require.Equal(t, p.CollectorType == "", p.CollectorMode == "",
@@ -122,4 +129,24 @@ func TestPresetsReturnsACopy(t *testing.T) {
 	a[0].Name = "被改过了"
 	b := providers.Presets()
 	require.NotEqual(t, "被改过了", b[0].Name)
+}
+
+// 1M 声明是模型名上的语法，识别规则与 Claude Code 的 /\[1m\]/i 对齐。
+func TestOneMMarker(t *testing.T) {
+	cases := []struct {
+		model string
+		has   bool
+		base  string
+	}{
+		{"glm-5.2[1m]", true, "glm-5.2"},
+		{"glm-5.2[1M]", true, "glm-5.2"},    // Claude Code 大小写不敏感
+		{"glm-5.2 [1m]  ", true, "glm-5.2"}, // 尾随空格不该影响判断
+		{"glm-5.2", false, "glm-5.2"},
+		{"glm-5.2[1m]-turbo", false, "glm-5.2[1m]-turbo"}, // 只认结尾
+		{"", false, ""},
+	}
+	for _, c := range cases {
+		require.Equal(t, c.has, providers.HasOneM(c.model), "HasOneM(%q)", c.model)
+		require.Equal(t, c.base, providers.StripOneM(c.model), "StripOneM(%q)", c.model)
+	}
 }

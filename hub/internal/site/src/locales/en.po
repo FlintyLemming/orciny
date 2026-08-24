@@ -88,6 +88,10 @@ msgid "Claude Code"
 msgstr "Claude Code"
 
 #: src/components/ProviderDialog.tsx
+msgid "claude 声明 1M 上下文"
+msgstr "claude declare 1M context"
+
+#: src/components/ProviderDialog.tsx
 msgid "claude 默认模型"
 msgstr "claude default model"
 
@@ -456,6 +460,15 @@ msgstr "Online"
 #: src/pages/Inbox.tsx
 msgid "基线"
 msgstr "Baseline"
+
+#: src/components/BindingBar.tsx
+msgid "声明 1M"
+msgstr "Declare 1M"
+
+#: src/components/BindingBar.tsx
+#: src/components/ProviderDialog.tsx
+msgid "声明 1M 上下文"
+msgstr "Declare 1M context"
 
 #: src/pages/ImportWizard.tsx
 msgid "处理敏感项：抽取为凭据（推荐）、保留明文（进版本历史）、或移出纳管。"
@@ -1099,6 +1112,10 @@ msgstr "Enroll token issued"
 #: src/pages/Machines.tsx
 msgid "系统"
 msgstr "OS"
+
+#: src/components/ProviderDialog.tsx
+msgid "给模型名追加 [1m]：只告诉 Claude Code 按 100 万上下文计算 auto-compact 阈值与 /context 占用，不改变上游实际能力。上游窗口不足 1M 时误勾会导致压缩不触发、请求直接报错。只影响基名相同的槽，单独指到别的模型的槽不受波及。"
+msgstr "Appends [1m] to the model name. This only tells Claude Code to size its auto-compact threshold and /context readout for a 1M window; it does not change what the upstream actually supports. Declaring 1M on a smaller window means compaction never fires and requests fail upstream. Only slots sharing this base model are affected — a slot pointed at a different model is left alone."
 
 #. placeholder {0}: p.name
 #: src/pages/Providers.tsx
