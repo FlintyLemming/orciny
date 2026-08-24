@@ -22,6 +22,7 @@ func TestProviderRoutesRequireSuperuser(t *testing.T) {
 	for _, c := range []struct{ method, path, body string }{
 		{"GET", "/api/orciny/provider-presets", ""},
 		{"POST", "/api/orciny/providers", providerReqBody},
+		{"POST", "/api/orciny/providers/probe", `{"endpoint":"openai","base_url":"https://x.test"}`},
 		{"PUT", "/api/orciny/providers/p1", providerReqBody},
 		{"DELETE", "/api/orciny/providers/p1", ""},
 		{"PUT", "/api/orciny/config-sets/s1/binding", `{"provider":"p1"}`},
@@ -144,4 +145,70 @@ func TestBindingMatchReturnsURL(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
 	require.Equal(t, "https://api.moonshot.cn/anthropic", got.URL)
+}
+
+// 探测端点：粘一个根地址，后端试出正确路径并把模型清单带回来。
+func TestProbeEndpointCompletesBaseURL(t *testing.T) {
+	relay := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/models" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data":[{"id":"glm-5"},{"id":"kimi-k2.6"}]}`))
+			return
+		}
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte("<!doctype html><html></html>"))
+	}))
+	defer relay.Close()
+
+	srv := newRouterServer(t, routes.Deps{Admin: &fakeAdmin{}})
+	body := `{"endpoint":"openai","base_url":"` + relay.URL + `","key":"sk-test"}`
+	rec := doSuperuser(t, srv, "POST", "/api/orciny/providers/probe", body)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var got struct {
+		Status  string   `json:"status"`
+		BaseURL string   `json:"base_url"`
+		Models  []string `json:"models"`
+		Tried   []string `json:"tried"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
+	require.Equal(t, "ok", got.Status)
+	require.Equal(t, relay.URL+"/v1", got.BaseURL)
+	require.Equal(t, []string{"glm-5", "kimi-k2.6"}, got.Models)
+}
+
+// 一个候选都没确认时仍是 200 —— 探测本身跑成功了，只是结论是「没找到」。
+// base_url 留空，由前端保留用户的输入。
+func TestProbeEndpointReportsNotFoundWithoutRewriting(t *testing.T) {
+	relay := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte("<!doctype html>"))
+	}))
+	defer relay.Close()
+
+	srv := newRouterServer(t, routes.Deps{Admin: &fakeAdmin{}})
+	body := `{"endpoint":"claude","base_url":"` + relay.URL + `","key":"sk-test"}`
+	rec := doSuperuser(t, srv, "POST", "/api/orciny/providers/probe", body)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var got struct {
+		Status  string `json:"status"`
+		BaseURL string `json:"base_url"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
+	require.Equal(t, "not_api", got.Status)
+	require.Empty(t, got.BaseURL)
+}
+
+// 解不动的地址不该让 hub 去发请求，直接 400。
+func TestProbeEndpointRejectsBadBaseURL(t *testing.T) {
+	srv := newRouterServer(t, routes.Deps{Admin: &fakeAdmin{}})
+	for _, body := range []string{
+		`{"endpoint":"openai","base_url":"不是 URL","key":"k"}`,
+		`{"endpoint":"openai","base_url":"","key":"k"}`,
+		`{"endpoint":"火星协议","base_url":"https://x.test","key":"k"}`,
+	} {
+		rec := doSuperuser(t, srv, "POST", "/api/orciny/providers/probe", body)
+		require.Equal(t, http.StatusBadRequest, rec.Code, "body=%s", body)
+	}
 }

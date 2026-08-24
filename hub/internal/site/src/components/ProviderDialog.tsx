@@ -1,7 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { ChevronDown, ChevronRight, X } from 'lucide-react'
-import { ApiError, createProvider, updateProvider, type ProviderBody } from '@/lib/api'
+import {
+  ApiError,
+  createProvider,
+  probeEndpoint,
+  updateProvider,
+  type ProbeInput,
+  type ProbeResult,
+  type ProviderBody,
+} from '@/lib/api'
 import {
   emptySlots,
   fillAllSlots,
@@ -91,6 +99,7 @@ export function ProviderDialog({
   onClose,
   onSaved,
   onSubmit,
+  onProbe,
 }: {
   presets: ProviderPreset[]
   /** 非空 = 编辑既有服务配置 */
@@ -101,6 +110,8 @@ export function ProviderDialog({
   onSaved: () => void
   /** 注入用。默认走 createProvider / updateProvider。 */
   onSubmit?: (body: ProviderBody) => Promise<void>
+  /** 注入用。默认走 probeEndpoint。 */
+  onProbe?: (input: ProbeInput) => Promise<ProbeResult>
 }) {
   const { t } = useLingui()
 
@@ -332,6 +343,8 @@ export function ProviderDialog({
           setDraft={setClaude}
           existingLast4={editing?.claude?.key_last4}
           editing={Boolean(editing)}
+          probeKey={claude.key || platformKey}
+          onProbe={onProbe ?? probeEndpoint}
         >
           <label className="mb-1 block text-xs text-ink3" htmlFor="claude-auth-field">
             <Trans>鉴权字段</Trans>
@@ -414,6 +427,8 @@ export function ProviderDialog({
           setDraft={setOpenai}
           existingLast4={editing?.openai?.key_last4}
           editing={Boolean(editing)}
+          probeKey={openai.key || platformKey}
+          onProbe={onProbe ?? probeEndpoint}
           notice={
             <>
               <p data-testid="openai-inert-note" className="mb-2 text-xs text-ink3">
@@ -504,6 +519,8 @@ function EndpointSection({
   setDraft,
   existingLast4,
   editing,
+  probeKey,
+  onProbe,
   notice,
   children,
 }: {
@@ -513,6 +530,8 @@ function EndpointSection({
   setDraft: (d: EndpointDraft) => void
   existingLast4?: string
   editing: boolean
+  probeKey: string
+  onProbe: (input: ProbeInput) => Promise<ProbeResult>
   notice?: React.ReactNode
   children: React.ReactNode
 }) {
@@ -520,6 +539,36 @@ function EndpointSection({
   // 默认折叠，base_url 非空的展开。
   const [open, setOpen] = useState(() => draft.baseURL !== '')
   const configured = draft.baseURL.trim() !== ''
+
+  const [probe, setProbe] = useState<ProbeResult | null>(null)
+  const [probing, setProbing] = useState(false)
+  const [probeErr, setProbeErr] = useState('')
+
+  async function runProbe() {
+    setProbing(true)
+    setProbeErr('')
+    setProbe(null)
+    try {
+      setProbe(
+        await onProbe({ endpoint: id, base_url: draft.baseURL.trim(), key: probeKey }),
+      )
+    } catch (e) {
+      setProbeErr(e instanceof ApiError ? e.message : String(e))
+    } finally {
+      setProbing(false)
+    }
+  }
+
+  /** 采用是显式动作：探测只给结论，改不改由用户决定。 */
+  function adopt() {
+    if (!probe?.base_url) return
+    setDraft({
+      ...draft,
+      baseURL: probe.base_url,
+      models: probe.models?.length ? probe.models : draft.models,
+    })
+    setProbe(null)
+  }
 
   return (
     <div className="mb-4 rounded border border-line">
@@ -545,13 +594,29 @@ function EndpointSection({
           <label className="mb-1 block text-xs text-ink3" htmlFor={`${id}-base-url`}>
             base_url
           </label>
-          <input
-            id={`${id}-base-url`}
-            aria-label={`${id} base_url`}
-            className="mb-3 w-full rounded border border-line bg-wash px-2 py-1.5 font-mono text-sm"
-            value={draft.baseURL}
-            onChange={(e) => setDraft({ ...draft, baseURL: e.target.value })}
-          />
+          <div className="mb-2 flex items-center gap-2">
+            <input
+              id={`${id}-base-url`}
+              aria-label={`${id} base_url`}
+              className="flex-1 rounded border border-line bg-wash px-2 py-1.5 font-mono text-sm"
+              value={draft.baseURL}
+              onChange={(e) => setDraft({ ...draft, baseURL: e.target.value })}
+            />
+            <button
+              type="button"
+              aria-label={`${id} 探测`}
+              className="shrink-0 rounded border border-line px-2 py-1.5 text-xs disabled:opacity-40"
+              disabled={!configured || probing}
+              onClick={() => void runProbe()}
+            >
+              {probing ? <Trans>探测中…</Trans> : <Trans>探测</Trans>}
+            </button>
+          </div>
+
+          {probeErr && <p className="mb-3 text-xs text-red-500">{probeErr}</p>}
+          {probe && (
+            <ProbeResultPanel id={id} result={probe} current={draft.baseURL.trim()} onAdopt={adopt} />
+          )}
 
           {children}
 
@@ -595,6 +660,96 @@ function EndpointSection({
             )}
           </p>
         </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * 探测结论面板。
+ *
+ * 只报告、不改写——采用是用户的显式动作。这与 NormalizeURL 的立场一致：
+ * 吞掉用户输入比留着一个奇怪的字符串更糟。
+ *
+ * base_url 为空表示一个候选都没确认，此时不给「采用」，只把试过的地址列出来
+ * 供用户自己核对。
+ */
+function ProbeResultPanel({
+  id,
+  result,
+  current,
+  onAdopt,
+}: {
+  id: string
+  result: ProbeResult
+  current: string
+  onAdopt: () => void
+}) {
+  const confirmed = result.base_url !== ''
+  const unchanged = confirmed && result.base_url === current
+  const models = result.models ?? []
+  const tried = result.tried ?? []
+
+  return (
+    <div
+      data-testid={`${id}-probe-result`}
+      className="mb-3 rounded border border-line bg-wash px-2 py-2 text-xs"
+    >
+      {result.status === 'ok' && (
+        <p>
+          {unchanged ? (
+            <Trans>地址原样可用。</Trans>
+          ) : (
+            <Trans>
+              地址应为 <span className="font-mono">{result.base_url}</span>。
+            </Trans>
+          )}{' '}
+          {models.length > 0 && <Trans>返回 {models.length} 个模型。</Trans>}
+        </p>
+      )}
+
+      {/* 401 是有用的结果：路径确认了，问题只在 key 上。 */}
+      {result.status === 'auth_failed' && (
+        <p>
+          <Trans>
+            地址 <span className="font-mono">{result.base_url}</span> 上有这个 API，
+            但这个 key 没通过。地址可以先采用，key 另外核对。
+          </Trans>
+        </p>
+      )}
+
+      {result.status === 'not_api' && (
+        <p>
+          <Trans>
+            试过的地址返回的是网页而不是 JSON——多半是路径少了一段，
+            中转站把它交给前端兜底了。
+          </Trans>
+        </p>
+      )}
+
+      {result.status === 'no_route' && (
+        <p>
+          <Trans>试过的地址上都没有这个 API。请核对路径。</Trans>
+        </p>
+      )}
+
+      {result.status === 'unreachable' && (
+        <p>
+          <Trans>连不上——检查地址、网络，或者 hub 到这个站的出网。</Trans>
+        </p>
+      )}
+
+      {tried.length > 0 && (
+        <p className="mt-1 text-ink3">
+          <Trans>试过：</Trans>
+          <span className="font-mono">{tried.join('、')}</span>
+        </p>
+      )}
+
+      {confirmed && (
+        <button type="button" className="mt-2 text-accent" onClick={onAdopt}>
+          <Trans>采用</Trans>
+        </button>
       )}
     </div>
   )

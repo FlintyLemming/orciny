@@ -83,6 +83,7 @@ func Register(e *core.ServeEvent, d Deps) error {
 	g.POST("/machines/{id}/clear-degraded", d.clearDegraded).Bind(su)
 	g.GET("/provider-presets", d.providerPresets).Bind(su)
 	g.POST("/providers", d.createProvider).Bind(su)
+	g.POST("/providers/probe", d.probeEndpoint).Bind(su)
 	g.PUT("/providers/{id}", d.updateProvider).Bind(su)
 	g.DELETE("/providers/{id}", d.deleteProvider).Bind(su)
 	g.PUT("/config-sets/{id}/binding", d.setBinding).Bind(su)

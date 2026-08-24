@@ -457,6 +457,20 @@ msgstr "Run this command on the target machine to connect it:"
 msgid "在线"
 msgstr "Online"
 
+#. placeholder {0}: result.base_url
+#: src/components/ProviderDialog.tsx
+msgid "地址 <0>{0}</0> 上有这个 API， 但这个 key 没通过。地址可以先采用，key 另外核对。"
+msgstr "The API is there at <0>{0}</0>, but this key was rejected. You can adopt the address now and sort the key out separately."
+
+#: src/components/ProviderDialog.tsx
+msgid "地址原样可用。"
+msgstr "The address works as typed."
+
+#. placeholder {0}: result.base_url
+#: src/components/ProviderDialog.tsx
+msgid "地址应为 <0>{0}</0>。"
+msgstr "The address should be <0>{0}</0>."
+
 #: src/pages/Inbox.tsx
 msgid "基线"
 msgstr "Baseline"
@@ -692,6 +706,14 @@ msgstr "Assign config set"
 #: src/pages/MachineDetail.tsx
 msgid "指纹"
 msgstr "Fingerprint"
+
+#: src/components/ProviderDialog.tsx
+msgid "探测"
+msgstr "Probe"
+
+#: src/components/ProviderDialog.tsx
+msgid "探测中…"
+msgstr "Probing…"
 
 #: src/components/PublishDialog.tsx
 msgid "提示（不影响发布）"
@@ -1176,6 +1198,18 @@ msgstr "Settings"
 msgid "识别为「{presetName}」。新建服务配置？"
 msgstr "Identified as \"{presetName}\". Create a service config?"
 
+#: src/components/ProviderDialog.tsx
+msgid "试过："
+msgstr "Tried: "
+
+#: src/components/ProviderDialog.tsx
+msgid "试过的地址上都没有这个 API。请核对路径。"
+msgstr "None of the addresses tried have this API. Check the path."
+
+#: src/components/ProviderDialog.tsx
+msgid "试过的地址返回的是网页而不是 JSON——多半是路径少了一段， 中转站把它交给前端兜底了。"
+msgstr "The addresses tried returned a web page instead of JSON — most likely the path is missing a segment and the relay fell through to its frontend."
+
 #. placeholder {0}: formatCountdown(remaining)
 #: src/components/AddMachineDialog.tsx
 msgid "该 token 一次性使用，{0} 后过期。新机器上线后本窗口会自动关闭。"
@@ -1258,6 +1292,11 @@ msgstr "Path is relative to HOME, e.g. .claude/settings.json"
 msgid "返回"
 msgstr "Back"
 
+#. placeholder {0}: models.length
+#: src/components/ProviderDialog.tsx
+msgid "返回 {0} 个模型。"
+msgstr "Returned {0} models."
+
 #: src/pages/MachineDetail.tsx
 msgid "返回列表"
 msgstr "Back to list"
@@ -1294,6 +1333,10 @@ msgstr "The address this machine uses may be \"{name}\". Change the config set b
 #: src/components/BindingBar.tsx
 msgid "这条服务配置还没有 Claude 端点"
 msgstr "This service config has no Claude endpoint yet"
+
+#: src/components/ProviderDialog.tsx
+msgid "连不上——检查地址、网络，或者 hub 到这个站的出网。"
+msgstr "Cannot connect — check the address, the network, or the hub's outbound access to this site."
 
 #: src/components/Shell.tsx
 msgid "退出"
@@ -1349,6 +1392,10 @@ msgstr "Config set published"
 #: src/pages/MachineDetail.tsx
 msgid "配置集已回滚"
 msgstr "Config set rolled back"
+
+#: src/components/ProviderDialog.tsx
+msgid "采用"
+msgstr "Adopt"
 
 #: src/pages/ImportWizard.tsx
 msgid "采集中…"

@@ -82,6 +82,44 @@ func (d Deps) createProvider(e *core.RequestEvent) error {
 	return e.JSON(http.StatusOK, map[string]any{"id": id})
 }
 
+// probeEndpoint 探测一个 base_url，试出正确的协议路径并带回模型清单。
+//
+// 不经过 Admin：探测只发外拨 HTTP，不读也不写库。key 随请求体来而不是
+// 从库里取——探测的主场景是**新建**服务配置，那会儿 key 还没落库。
+//
+// 这是 hub 唯一一处朝用户填的地址外拨请求的地方。私网地址不封：
+// 自建中转挂在内网或 localhost 是正常用法，封掉会砸掉真实场景。
+// 代价由 superuser 鉴权、10s 超时、拒绝跨主机跳转三条共同兜住。
+func (d Deps) probeEndpoint(e *core.RequestEvent) error {
+	var req struct {
+		Endpoint string `json:"endpoint"`
+		BaseURL  string `json:"base_url"`
+		Key      string `json:"key"`
+	}
+	if err := e.BindBody(&req); err != nil {
+		return e.BadRequestError("请求体格式错误", nil)
+	}
+	if req.Endpoint != providers.EndpointClaude && req.Endpoint != providers.EndpointOpenAI {
+		return e.BadRequestError("endpoint 只能是 claude 或 openai", nil)
+	}
+	// 解不动的地址不拿去发请求，直接回绝。
+	if len(providers.Candidates(req.Endpoint, req.BaseURL)) == 0 {
+		return e.BadRequestError("base_url 不是一个可用的地址", nil)
+	}
+
+	r := providers.Probe(e.Request.Context(), providers.NewProbeClient(),
+		req.Endpoint, req.BaseURL, req.Key)
+
+	// 没确认也是 200：探测这个动作本身跑成功了，结论是「没找到」。
+	// base_url 留空，前端据此保留用户的输入。
+	return e.JSON(http.StatusOK, map[string]any{
+		"status":   r.Signal.Status(),
+		"base_url": r.BaseURL,
+		"models":   r.Models,
+		"tried":    r.Tried,
+	})
+}
+
 func (d Deps) bindingMatch(e *core.RequestEvent) error {
 	if d.Admin == nil {
 		return e.InternalServerError("管理服务未就绪", nil)

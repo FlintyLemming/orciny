@@ -255,6 +255,34 @@ export function updateProvider(id: string, body: ProviderBody) {
   return putJSON(`/api/orciny/providers/${id}`, body)
 }
 
+/** 一次端点探测的输入。key 随请求走：主场景是新建，那会儿 key 还没落库。 */
+export interface ProbeInput {
+  endpoint: 'claude' | 'openai'
+  base_url: string
+  key: string
+}
+
+/**
+ * status 是后端的信号阶梯（providers.Signal.Status），UI 按它分支措辞：
+ *   ok          地址与 key 都对，models 可用
+ *   auth_failed 地址对、key 不对——地址仍可采用
+ *   not_api     撞上了中转站的前端兜底页（200 + HTML），路径不对
+ *   no_route    API 认得域名但没有这条路由
+ *   unreachable 连不上
+ *
+ * base_url 只在确认到路径时非空；空串表示一个候选都没确认，此时**保留用户的输入**。
+ */
+export interface ProbeResult {
+  status: 'ok' | 'auth_failed' | 'not_api' | 'no_route' | 'unreachable'
+  base_url: string
+  models: string[] | null
+  tried: string[] | null
+}
+
+export function probeEndpoint(input: ProbeInput) {
+  return postJSON<ProbeResult>('/api/orciny/providers/probe', input)
+}
+
 export function deleteProvider(id: string) {
   return deleteJSON(`/api/orciny/providers/${id}`)
 }

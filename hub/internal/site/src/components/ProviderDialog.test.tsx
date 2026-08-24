@@ -285,3 +285,97 @@ describe('ProviderDialog 的 1M 上下文声明', () => {
     expect(screen.getByRole('checkbox', { name: 'claude 声明 1M 上下文' })).toBeDisabled()
   })
 })
+
+describe('ProviderDialog 端点探测', () => {
+  function probing(result: unknown) {
+    const onProbe = vi.fn().mockResolvedValue(result)
+    render(
+      wrap(
+        <ProviderDialog
+          presets={presets}
+          onClose={vi.fn()}
+          onSaved={vi.fn()}
+          onProbe={onProbe}
+        />,
+      ),
+    )
+    return onProbe
+  }
+
+  it('把当前 base_url 与有效 key 送给后端，端点级 key 优先于平台级', async () => {
+    const onProbe = probing({ status: 'ok', base_url: '', models: [], tried: [] })
+    await userEvent.click(screen.getByRole('button', { name: /OpenAI 端点/ }))
+    await userEvent.type(screen.getByLabelText('openai base_url'), 'https://new-api.test')
+    await userEvent.type(screen.getByLabelText('API key'), 'sk-platform')
+    await userEvent.click(screen.getByLabelText('openai 探测'))
+
+    expect(onProbe).toHaveBeenCalledWith({
+      endpoint: 'openai',
+      base_url: 'https://new-api.test',
+      key: 'sk-platform',
+    })
+
+    await userEvent.type(screen.getByLabelText('openai 单独的 key'), 'sk-endpoint')
+    await userEvent.click(screen.getByLabelText('openai 探测'))
+    expect(onProbe.mock.calls[1][0].key).toBe('sk-endpoint')
+  })
+
+  it('探测结果不自动改写输入，点「采用」才写进表单', async () => {
+    probing({
+      status: 'ok',
+      base_url: 'https://new-api.test/v1',
+      models: ['glm-5', 'kimi-k2.6'],
+      tried: ['https://new-api.test', 'https://new-api.test/v1'],
+    })
+    await userEvent.click(screen.getByRole('button', { name: /OpenAI 端点/ }))
+    await userEvent.type(screen.getByLabelText('openai base_url'), 'https://new-api.test')
+    await userEvent.click(screen.getByLabelText('openai 探测'))
+
+    // 结论出来了，但输入框还是用户填的那个——不静默改写。
+    expect(await screen.findByTestId('openai-probe-result')).toBeTruthy()
+    expect(screen.getByLabelText('openai base_url')).toHaveValue('https://new-api.test')
+
+    await userEvent.click(screen.getByText('采用'))
+    expect(screen.getByLabelText('openai base_url')).toHaveValue('https://new-api.test/v1')
+    expect(screen.getByLabelText('移除 glm-5')).toBeTruthy()
+    expect(screen.getByLabelText('移除 kimi-k2.6')).toBeTruthy()
+  })
+
+  it('401 时地址仍可采用，但说明问题出在 key 上', async () => {
+    probing({
+      status: 'auth_failed',
+      base_url: 'https://new-api.test/v1',
+      models: [],
+      tried: ['https://new-api.test/v1'],
+    })
+    await userEvent.click(screen.getByRole('button', { name: /OpenAI 端点/ }))
+    await userEvent.type(screen.getByLabelText('openai base_url'), 'https://new-api.test')
+    await userEvent.click(screen.getByLabelText('openai 探测'))
+
+    expect(await screen.findByTestId('openai-probe-result')).toHaveTextContent(/key/)
+    await userEvent.click(screen.getByText('采用'))
+    expect(screen.getByLabelText('openai base_url')).toHaveValue('https://new-api.test/v1')
+  })
+
+  it('一个候选都没确认时不给「采用」，保留用户的输入', async () => {
+    probing({
+      status: 'not_api',
+      base_url: '',
+      models: [],
+      tried: ['https://new-api.test', 'https://new-api.test/v1'],
+    })
+    await userEvent.click(screen.getByRole('button', { name: /OpenAI 端点/ }))
+    await userEvent.type(screen.getByLabelText('openai base_url'), 'https://new-api.test')
+    await userEvent.click(screen.getByLabelText('openai 探测'))
+
+    expect(await screen.findByTestId('openai-probe-result')).toBeTruthy()
+    expect(screen.queryByText('采用')).toBeNull()
+    expect(screen.getByLabelText('openai base_url')).toHaveValue('https://new-api.test')
+  })
+
+  it('base_url 为空时探测按钮不可用——没有可探的东西', async () => {
+    probing({ status: 'ok', base_url: '', models: [], tried: [] })
+    await userEvent.click(screen.getByRole('button', { name: /OpenAI 端点/ }))
+    expect(screen.getByLabelText('openai 探测')).toBeDisabled()
+  })
+})

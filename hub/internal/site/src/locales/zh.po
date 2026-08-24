@@ -457,6 +457,20 @@ msgstr "在目标机器上执行这行命令即可接入："
 msgid "在线"
 msgstr "在线"
 
+#. placeholder {0}: result.base_url
+#: src/components/ProviderDialog.tsx
+msgid "地址 <0>{0}</0> 上有这个 API， 但这个 key 没通过。地址可以先采用，key 另外核对。"
+msgstr "地址 <0>{0}</0> 上有这个 API， 但这个 key 没通过。地址可以先采用，key 另外核对。"
+
+#: src/components/ProviderDialog.tsx
+msgid "地址原样可用。"
+msgstr "地址原样可用。"
+
+#. placeholder {0}: result.base_url
+#: src/components/ProviderDialog.tsx
+msgid "地址应为 <0>{0}</0>。"
+msgstr "地址应为 <0>{0}</0>。"
+
 #: src/pages/Inbox.tsx
 msgid "基线"
 msgstr "基线"
@@ -692,6 +706,14 @@ msgstr "指派配置集"
 #: src/pages/MachineDetail.tsx
 msgid "指纹"
 msgstr "指纹"
+
+#: src/components/ProviderDialog.tsx
+msgid "探测"
+msgstr "探测"
+
+#: src/components/ProviderDialog.tsx
+msgid "探测中…"
+msgstr "探测中…"
 
 #: src/components/PublishDialog.tsx
 msgid "提示（不影响发布）"
@@ -1176,6 +1198,18 @@ msgstr "设置"
 msgid "识别为「{presetName}」。新建服务配置？"
 msgstr "识别为「{presetName}」。新建服务配置？"
 
+#: src/components/ProviderDialog.tsx
+msgid "试过："
+msgstr "试过："
+
+#: src/components/ProviderDialog.tsx
+msgid "试过的地址上都没有这个 API。请核对路径。"
+msgstr "试过的地址上都没有这个 API。请核对路径。"
+
+#: src/components/ProviderDialog.tsx
+msgid "试过的地址返回的是网页而不是 JSON——多半是路径少了一段， 中转站把它交给前端兜底了。"
+msgstr "试过的地址返回的是网页而不是 JSON——多半是路径少了一段， 中转站把它交给前端兜底了。"
+
 #. placeholder {0}: formatCountdown(remaining)
 #: src/components/AddMachineDialog.tsx
 msgid "该 token 一次性使用，{0} 后过期。新机器上线后本窗口会自动关闭。"
@@ -1258,6 +1292,11 @@ msgstr "路径相对于 HOME，例如 .claude/settings.json"
 msgid "返回"
 msgstr "返回"
 
+#. placeholder {0}: models.length
+#: src/components/ProviderDialog.tsx
+msgid "返回 {0} 个模型。"
+msgstr "返回 {0} 个模型。"
+
 #: src/pages/MachineDetail.tsx
 msgid "返回列表"
 msgstr "返回列表"
@@ -1294,6 +1333,10 @@ msgstr "这台机器用的地址可能是「{name}」。把配置集的绑定改
 #: src/components/BindingBar.tsx
 msgid "这条服务配置还没有 Claude 端点"
 msgstr "这条服务配置还没有 Claude 端点"
+
+#: src/components/ProviderDialog.tsx
+msgid "连不上——检查地址、网络，或者 hub 到这个站的出网。"
+msgstr "连不上——检查地址、网络，或者 hub 到这个站的出网。"
 
 #: src/components/Shell.tsx
 msgid "退出"
@@ -1349,6 +1392,10 @@ msgstr "配置集已发布"
 #: src/pages/MachineDetail.tsx
 msgid "配置集已回滚"
 msgstr "配置集已回滚"
+
+#: src/components/ProviderDialog.tsx
+msgid "采用"
+msgstr "采用"
 
 #: src/pages/ImportWizard.tsx
 msgid "采集中…"
