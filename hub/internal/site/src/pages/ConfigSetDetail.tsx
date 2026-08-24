@@ -23,7 +23,7 @@ import {
   removeDraftFile,
   normalizeFileEntry,
 } from '@/lib/api'
-import { nextDraftState, type DraftState } from '@/lib/draftState'
+import { diffAgainstHead, nextDraftState, type DraftState } from '@/lib/draftState'
 import { insertEnvSnippet } from '@/lib/binding'
 import { $providers, subscribeProviders } from '@/stores/providers'
 import { setBinding } from '@/lib/api'
@@ -56,6 +56,14 @@ export function ConfigSetDetail({ id }: { id: string }) {
 
   useEffect(() => subscribeConfigSet(id), [id])
   useEffect(() => subscribeProviders(), [])
+
+  useEffect(() => {
+    if (set && draftState !== 'publishing') {
+      const diff = diffAgainstHead(set)
+      setDraftState(diff.isDirty ? 'dirty' : 'clean')
+    }
+  }, [set])
+
   // settings.json 的当前草稿文本，决定要不要显示「插入 env 片段」。
   const [settingsText, setSettingsText] = useState('')
 
