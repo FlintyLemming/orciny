@@ -101,9 +101,9 @@ describe('ModelQuickSwitch', () => {
     )
 
     const select = screen.getByRole('combobox', { name: '快切模型' })
-    expect(select).toHaveValue('glm-4.7')
+    expect(select).toHaveValue('p1:glm-4.7')
 
-    await userEvent.selectOptions(select, 'glm-5.2')
+    await userEvent.selectOptions(select, 'p1:glm-5.2')
 
     expect(api.setBinding).toHaveBeenCalledWith('s1', {
       provider: 'p1',
@@ -127,6 +127,50 @@ describe('ModelQuickSwitch', () => {
     expect(api.rollbackConfigSet).toHaveBeenCalledWith('s1', 'r1')
   })
 
+  it('支持跨 Provider 切换', async () => {
+    const provider2: ProviderRecord = {
+      id: 'p2',
+      name: 'Kimi Moonshot',
+      preset: 'kimi',
+      note: '',
+      key_last4: '5678',
+      claude: {
+        base_url: 'https://api.moonshot.cn/v1',
+        auth_field: 'ANTHROPIC_AUTH_TOKEN',
+        key_last4: '5678',
+        models: [{ name: 'kimi-k3', one_m: true }],
+        defaults: null,
+      },
+      openai: null,
+      created: '',
+      updated: '',
+    }
+
+    render(
+      wrap(
+        <ModelQuickSwitch
+          set={baseSet}
+          providers={[testProvider, provider2]}
+          affectedMachines={3}
+        />,
+      ),
+    )
+
+    const select = screen.getByRole('combobox', { name: '快切模型' })
+    await userEvent.selectOptions(select, 'p2:kimi-k3')
+
+    expect(api.setBinding).toHaveBeenCalledWith('s1', {
+      provider: 'p2',
+      models: {
+        main: 'kimi-k3[1m]',
+        opus: 'kimi-k3[1m]',
+        sonnet: 'kimi-k3[1m]',
+        haiku: 'kimi-k3[1m]',
+      },
+    })
+    expect(api.publishConfigSet).toHaveBeenCalledWith('s1', expect.stringContaining('kimi-k3[1m]'))
+  })
+
   it('选中不支持 1M 的模型时不带 [1m]', async () => {
     const setWith52: ConfigSetRecord = {
       ...baseSet,
@@ -146,7 +190,7 @@ describe('ModelQuickSwitch', () => {
     )
 
     const select = screen.getByRole('combobox', { name: '快切模型' })
-    await userEvent.selectOptions(select, 'glm-4.7')
+    await userEvent.selectOptions(select, 'p1:glm-4.7')
 
     expect(api.setBinding).toHaveBeenCalledWith('s1', {
       provider: 'p1',
@@ -177,7 +221,7 @@ describe('ModelQuickSwitch', () => {
     )
 
     const select = screen.getByRole('combobox', { name: '快切模型' })
-    await userEvent.selectOptions(select, 'glm-5.2')
+    await userEvent.selectOptions(select, 'p1:glm-5.2')
 
     expect(api.setBinding).toHaveBeenCalled()
     expect(api.publishConfigSet).not.toHaveBeenCalled()

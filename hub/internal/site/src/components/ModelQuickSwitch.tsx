@@ -61,37 +61,49 @@ export function ModelQuickSwitch({
     )
   }
 
-  const providerId = draftBinding?.provider || ''
-  const provider = providers.find((p) => p.id === providerId)
-
-  if (!provider || !provider.claude?.base_url) {
+  const usableProviders = providers.filter((p) => Boolean(p.claude?.base_url))
+  if (usableProviders.length === 0) {
     return (
       <span className="text-xs text-ink3">
-        {providerId ? <Trans>未配置 Claude 端点</Trans> : <Trans>未绑定</Trans>}
+        <Trans>未配置 Claude 端点</Trans>
       </span>
     )
   }
 
-  const models = provider.claude.models ?? []
-  const currentVal = isPassthrough(draftBinding?.models ?? emptySlots())
-    ? ''
-    : stripOneM(draftBinding?.models?.main ?? '')
+  const currentProviderId = draftBinding?.provider || ''
+  const currentMainBase = stripOneM(draftBinding?.models?.main ?? '')
+  const isPass = isPassthrough(draftBinding?.models ?? emptySlots())
+  const currentVal = !isPass && currentProviderId && currentMainBase
+    ? `${currentProviderId}:${currentMainBase}`
+    : ''
 
-  async function handleSelect(modelName: string) {
+  async function handleSelect(val: string) {
+    if (val === currentVal) return
     setBusy(true)
     try {
+      let nextBinding = null
       let modelVal = ''
-      if (modelName !== '') {
-        const targetModel = models.find((m) => m.name === modelName)
+
+      if (val !== '') {
+        const [pId, modelName] = val.split(':')
+        const targetProv = providers.find((p) => p.id === pId)
+        const targetModel = targetProv?.claude?.models?.find((m) => m.name === modelName)
         const targetOneM = Boolean(targetModel?.one_m)
         modelVal = targetOneM ? `${modelName}[1m]` : modelName
+        nextBinding = {
+          provider: pId,
+          models: fillAllSlots(modelVal),
+        }
+      } else {
+        // 透传模式：保留当前 provider 或首个可用 provider，四槽置空
+        const pId = currentProviderId || usableProviders[0]?.id || ''
+        nextBinding = {
+          provider: pId,
+          models: emptySlots(),
+        }
       }
 
-      const nextSlots = modelVal ? fillAllSlots(modelVal) : emptySlots()
-      await setBinding(set.id, {
-        provider: providerId,
-        models: nextSlots,
-      })
+      await setBinding(set.id, nextBinding)
 
       // 校验是否有阻断项
       const problems = await validateConfigSet(set.id)
@@ -131,11 +143,16 @@ export function ModelQuickSwitch({
       onChange={(e) => void handleSelect(e.target.value)}
       className="rounded border border-line bg-wash px-2 py-1 font-mono text-xs text-ink disabled:opacity-50"
     >
-      <option value="">{t`透传`}</option>
-      {models.map((m) => (
-        <option key={m.name} value={m.name}>
-          {m.name}
-        </option>
+      <option value="">{t`透传（不指定模型）`}</option>
+      {usableProviders.map((p) => (
+        <optgroup key={p.id} label={p.name}>
+          {(p.claude?.models ?? []).map((m) => (
+            <option key={m.name} value={`${p.id}:${m.name}`}>
+              {m.name}
+              {m.one_m ? ' · 1M' : ''}
+            </option>
+          ))}
+        </optgroup>
       ))}
     </select>
   )
