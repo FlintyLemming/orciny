@@ -7,6 +7,24 @@
 **当前进度：M0（骨架）** — hub 可部署、agent 一行接入、面板实时显示机队在线状态。
 里程碑与完整功能规格见 [产品设计文档](docs/PRODUCT-DESIGN.md)。
 
+## 简单演示（当前已经做完的）
+
+添加设备
+
+<img width="940" height="657" alt="{FBF661E1-731F-452D-9472-7C8CE41330E7}" src="https://github.com/user-attachments/assets/fc7d8c37-8cf3-4dca-90f1-2782fcf3e558" />
+
+添加订阅
+
+<img width="940" height="657" alt="{96EB646A-A5B7-4734-8D2C-D73C02846A90}" src="https://github.com/user-attachments/assets/babe68fd-8171-4851-b1e8-87ab2b882601" />
+
+添加配置
+
+<img width="940" height="657" alt="{DC566D4C-5174-4B42-A705-1A964CB680BB}" src="https://github.com/user-attachments/assets/f72e7475-c4f6-4062-96b1-958e1f661b81" />
+
+快捷修改模型
+
+<img width="940" height="657" alt="{663EBFC2-162D-4F5C-B28B-8E7AA61D07C5}" src="https://github.com/user-attachments/assets/f983cc7a-873d-406e-8aac-88564a608842" />
+
 ## 快速开始
 
 **1. 起 hub**
