@@ -4,8 +4,9 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { i18n } from '@lingui/core'
 import { I18nProvider } from '@lingui/react'
-import { ReviewDialog } from '@/pages/Inbox'
+import { ReviewDialog, buildOverrideTargets } from '@/pages/Inbox'
 import type { DriftEvent } from '@/lib/inbox'
+import type { DriftEventRecord } from '@/types/collections'
 
 i18n.load('zh', {})
 i18n.activate('zh')
@@ -76,5 +77,37 @@ describe('ReviewDialog', () => {
 
     await user.click(screen.getByLabelText('.claude/CLAUDE.md'))
     expect(confirm).toBeEnabled()
+  })
+})
+
+describe('buildOverrideTargets', () => {
+  const rec = (over: Partial<DriftEventRecord> = {}): DriftEventRecord => ({
+    id: 'e1', machine: 'm1', config_set: 's1', path: '.claude/settings.json',
+    kind: 'modified', base_hash: 'h-base', current_blob: 'b1', mode: 420,
+    diff: '', restore_partial: false, truncated: false, binding_drift: false,
+    binding_url: '', state: 'open', resolved_revision: '', resolved_at: '',
+    created: '2026-09-01T00:00:00Z', updated: '2026-09-01T00:00:00Z',
+    ...over,
+  })
+
+  it('两侧都是 JSON 对象 → 切成 selector 列表', () => {
+    const [target] = buildOverrideTargets(
+      [rec()],
+      { 'h-base': '{"env":{"A":"中台"}}' },
+      { e1: '{"env":{"A":"本机"}}' },
+    )
+    expect(target.points?.map((p) => p.selector)).toEqual(['env.A'])
+    expect(target.hunkCount).toBe(0)
+  })
+
+  it('非 JSON → points 为 null，按 @@ 块数给 hunkCount', () => {
+    const diff = ['@@ -1,3 +1,3 @@', '-a', '+A'].join('\n')
+    const [target] = buildOverrideTargets(
+      [rec({ diff })],
+      { 'h-base': '# 标题' },
+      { e1: '# 新标题' },
+    )
+    expect(target.points).toBeNull()
+    expect(target.hunkCount).toBe(1)
   })
 })

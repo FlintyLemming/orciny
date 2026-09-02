@@ -19,12 +19,24 @@ import {
   type DriftEvent,
 } from '@/lib/inbox'
 import { DriftCard } from '@/components/DriftCard'
+import { AttentionBanner } from '@/components/AttentionBanner'
+import {
+  OverrideDialog,
+  defaultChecked,
+  selectionsOf,
+  type OverrideTarget,
+} from '@/components/OverrideDialog'
+import { $overrides, subscribeOverrides } from '@/stores/overrides'
+import { diffHunkCount, splitPoints } from '@/lib/overridePoints'
 import { ThreeWayCompare } from '@/components/ThreeWayCompare'
 import {
   adoptDrift,
   createProviderFromDrift,
+  dropOverride,
   getBlob,
   ignoreDrift,
+  keepOverride,
+  overrideDrift,
   listProviderPresets,
   matchBindingDrift,
   rebindDrift,
@@ -34,6 +46,7 @@ import { reloadProviders } from '@/stores/providers'
 import type {
   BindingMatchResult,
   DriftEventRecord,
+  MachineOverrideRecord,
   ProviderPreset,
 } from '@/types/collections'
 
@@ -42,9 +55,37 @@ const FILTERS: { key: DriftFilter; label: React.ReactNode }[] = [
   { key: 'superseded', label: <Trans>已被覆盖</Trans> },
   { key: 'adopted', label: <Trans>已收编</Trans> },
   { key: 'restored', label: <Trans>已恢复</Trans> },
-  { key: 'ignored', label: <Trans>已忽略</Trans> },
+  { key: 'overridden', label: <Trans>已本机保留</Trans> },
+  // 「已退管」与「已本机保留」是两个不同的去向，不合并（spec §2.2）。
+  { key: 'ignored', label: <Trans>已退管</Trans> },
   { key: 'all', label: <Trans>全部</Trans> },
 ]
+
+/**
+ * 把选中的漂移变成弹窗要的 target。
+ *
+ * baseByHash / curById 是已经取回来的内容（base_hash → 基线内容、
+ * event id → 本机内容）。两侧都是 JSON 对象就切 selector，否则走文本一路
+ * ——hunk 下标就是 diff 里 @@ 块的序号，与后端的 overrides.Hunks 一一对应。
+ */
+export function buildOverrideTargets(
+  events: DriftEventRecord[],
+  baseByHash: Record<string, string>,
+  curById: Record<string, string>,
+): OverrideTarget[] {
+  return events.map((e) => {
+    const base = baseByHash[e.base_hash] ?? ''
+    const cur = curById[e.id] ?? ''
+    const points = splitPoints(base, cur)
+    return {
+      id: e.id,
+      path: e.path,
+      diff: e.diff ?? '',
+      points,
+      hunkCount: points ? 0 : diffHunkCount(e.diff ?? ''),
+    }
+  })
+}
 
 export function Inbox() {
   const { t } = useLingui()
@@ -66,9 +107,20 @@ export function Inbox() {
     right: { label: string; content: string }
   } | null>(null)
   const [globalIgnore, setGlobalIgnore] = useState(false)
+  const [overriding, setOverriding] = useState<OverrideTarget[] | null>(null)
+  const [overrideChecked, setOverrideChecked] = useState<Record<string, Set<string>>>({})
+  const [ignoreMenu, setIgnoreMenu] = useState(false)
+
+  const overrides = useStore($overrides)
 
   useEffect(() => subscribeDrifts(), [])
   useEffect(() => subscribeMachines(), [])
+  useEffect(() => subscribeOverrides(), [])
+
+  const attention = useMemo(
+    () => overrides.filter((o) => o.attention !== ''),
+    [overrides],
+  )
 
   // 绑定漂移的反查结果。一般只有一两条，进页面时一次性取回来。
   const [matches, setMatches] = useState<Record<string, BindingMatchResult>>({})
@@ -268,6 +320,99 @@ export function Inbox() {
     }
   }
 
+  /** 本机保留：取回两侧内容 → 切差异点 → 开弹窗（默认全选）。 */
+  async function handleOverride() {
+    if (selected.size === 0) return
+    setBusy(true)
+    setActionErr('')
+    try {
+      const recs = [...selected]
+        .map((id) => byId.get(id))
+        .filter((r): r is DriftEventRecord => Boolean(r))
+      const baseByHash: Record<string, string> = {}
+      const curById: Record<string, string> = {}
+      for (const r of recs) {
+        if (r.base_hash && !(r.base_hash in baseByHash)) {
+          baseByHash[r.base_hash] = await getBlob(r.base_hash).catch(() => '')
+        }
+        curById[r.id] = await loadCurrent(r)
+      }
+      const targets = buildOverrideTargets(recs, baseByHash, curById)
+      setOverriding(targets)
+      setOverrideChecked(defaultChecked(targets))
+    } catch (e) {
+      setActionErr(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function doOverride() {
+    if (!overriding) return
+    setBusy(true)
+    setActionErr('')
+    try {
+      const points = selectionsOf(overriding, overrideChecked)
+      // restore_partial 的条目必须列进 reviewed —— 与收编同一条规矩。
+      const reviewed = overriding
+        .filter((tg) => byId.get(tg.id)?.restore_partial)
+        .map((tg) => tg.id)
+      await overrideDrift(Object.keys(points), points, reviewed)
+      setOverriding(null)
+      setOverrideChecked({})
+      clearSelection()
+    } catch (e) {
+      setActionErr(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleAttentionAction(fn: (id: string) => Promise<unknown>, id: string) {
+    setBusy(true)
+    setActionErr('')
+    try {
+      await fn(id)
+    } catch (e) {
+      setActionErr(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /**
+   * 三方对比：中台现值（theirs）/ 排除那一刻的基线（base）/ 本机（mine）。
+   *
+   * 两种 kind 的三份内容存在**不同的地方**：json_key 在 base_value /
+   * mine_value / shadowed_value 三个文本字段里，text 在三个 blob 关系里。
+   * 读错地方会得到三个空白面板。
+   */
+  async function openOverrideCompare(o: MachineOverrideRecord) {
+    setBusy(true)
+    setActionErr('')
+    try {
+      const blobText = async (hash?: string) =>
+        hash ? await getBlob(hash).catch(() => '') : ''
+      const isText = o.kind === 'text'
+      const theirs = isText
+        ? await blobText(o.expand?.shadowed_blob?.hash)
+        : o.shadowed_value
+      const base = isText ? await blobText(o.expand?.base_blob?.hash) : o.base_value
+      const mine = isText ? await blobText(o.expand?.mine_blob?.hash) : o.mine_value
+
+      setCompare({
+        path: o.path,
+        base: theirs,
+        left: { label: t`排除那一刻的基线`, content: base },
+        right: { label: machineName.get(o.machine) ?? o.machine, content: mine },
+      })
+    } catch (e) {
+      setActionErr(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function openCompare(path: string, events: DriftEvent[]) {
     if (events.length < 2) return
     const a = byId.get(events[0].id)
@@ -321,6 +466,15 @@ export function Inbox() {
           ))}
         </div>
       </div>
+
+      <AttentionBanner
+        items={attention}
+        machineName={machineName}
+        busy={busy}
+        onDrop={(id) => void handleAttentionAction(dropOverride, id)}
+        onKeep={(id) => void handleAttentionAction(keepOverride, id)}
+        onCompare={(o) => void openOverrideCompare(o)}
+      />
 
       {(error || actionErr) && (
         <p className="text-sm text-rose-600">{error || actionErr}</p>
@@ -395,15 +549,6 @@ export function Inbox() {
               </button>
             )}
 
-            <label className="flex items-center gap-1 text-xs text-ink3">
-              <input
-                type="checkbox"
-                checked={globalIgnore}
-                onChange={(e) => setGlobalIgnore(e.target.checked)}
-              />
-              <Trans>全局忽略</Trans>
-            </label>
-
             <button
               type="button"
               disabled={busy || blockers.length > 0}
@@ -422,12 +567,58 @@ export function Inbox() {
             </button>
             <button
               type="button"
-              disabled={busy}
-              onClick={() => void handleIgnore()}
-              className="rounded bg-wash px-3 py-1.5 text-xs"
+              disabled={busy || selected.size === 0}
+              onClick={() => void handleOverride()}
+              title={t`勾出的差异点归这台机器所有，中台以后改到别处照旧同步过来`}
+              className="rounded bg-emerald-600 px-3 py-1.5 text-xs text-white disabled:opacity-40"
             >
-              <Trans>忽略</Trans>
+              <Trans>本机保留</Trans>
             </button>
+
+            {/*
+              「全局」收进下拉：它是个重量级动作（改全机队的行为），
+              不该和常用动作抢同一层视觉权重（spec §6.1）。
+            */}
+            <div className="relative">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setIgnoreMenu((v) => !v)}
+                title={t`中台不再向这台机器下发该路径，也不再提醒。想只保留几处差异请用「本机保留」`}
+                className="rounded bg-wash px-3 py-1.5 text-xs"
+              >
+                <Trans>不再管这个路径 ▾</Trans>
+              </button>
+              {ignoreMenu && (
+                <div className="absolute right-0 bottom-full mb-1 w-64 rounded border border-line bg-surface p-3 text-xs shadow-lg">
+                  <p className="mb-2 text-ink3">
+                    <Trans>
+                      中台不再向这台机器下发该路径，也不再提醒。
+                      想只保留几处差异请用「本机保留」。
+                    </Trans>
+                  </p>
+                  <label className="mb-2 flex items-center gap-1 text-ink2">
+                    <input
+                      type="checkbox"
+                      checked={globalIgnore}
+                      onChange={(e) => setGlobalIgnore(e.target.checked)}
+                    />
+                    <Trans>对全机队生效</Trans>
+                  </label>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      setIgnoreMenu(false)
+                      void handleIgnore()
+                    }}
+                    className="w-full rounded bg-wash px-2 py-1"
+                  >
+                    <Trans>确认退管</Trans>
+                  </button>
+                </div>
+              )}
+            </div>
             <button
               type="button"
               onClick={clearSelection}
@@ -454,6 +645,29 @@ export function Inbox() {
           }}
           onCancel={() => setReviewing(null)}
           onConfirm={() => void doAdopt([...reviewChecked])}
+        />
+      )}
+
+      {overriding && (
+        <OverrideDialog
+          targets={overriding}
+          checked={overrideChecked}
+          busy={busy}
+          onToggle={(targetId, key) => {
+            setOverrideChecked((prev) => {
+              const next = { ...prev }
+              const set = new Set(next[targetId])
+              if (set.has(key)) set.delete(key)
+              else set.add(key)
+              next[targetId] = set
+              return next
+            })
+          }}
+          onCancel={() => {
+            setOverriding(null)
+            setOverrideChecked({})
+          }}
+          onConfirm={() => void doOverride()}
         />
       )}
 
