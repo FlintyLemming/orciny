@@ -2,6 +2,7 @@ package migrations_test
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/pocketbase/pocketbase/core"
@@ -565,3 +566,87 @@ func TestDown006Refuses(t *testing.T) {
 	require.Error(t, migrations.Down006(app))
 }
 
+func TestMachineOverridesCollection(t *testing.T) {
+	app := newApp(t)
+	c, err := app.FindCollectionByNameOrId("machine_overrides")
+	require.NoError(t, err)
+
+	for _, f := range []string{
+		"machine", "path", "kind", "selector", "base_value", "mine_value",
+		"base_blob", "mine_blob", "attention", "shadowed_value",
+		"shadowed_blob", "shadowed_rev", "origin_drift", "note",
+		"created", "updated",
+	} {
+		require.NotNil(t, c.Fields.GetByName(f), "machine_overrides.%s 缺失", f)
+	}
+
+	kind, ok := c.Fields.GetByName("kind").(*core.SelectField)
+	require.True(t, ok)
+	require.ElementsMatch(t, []string{"json_key", "text"}, kind.Values)
+
+	att, ok := c.Fields.GetByName("attention").(*core.SelectField)
+	require.True(t, ok)
+	require.ElementsMatch(t,
+		[]string{"hub_changed", "merge_conflict", "path_gone", "unmergeable"},
+		att.Values)
+
+	// API rule 一律 nil —— 仅 superuser 可访问，与其余 collection 一致。
+	require.Nil(t, c.ListRule)
+	require.Nil(t, c.ViewRule)
+	require.Nil(t, c.CreateRule)
+	require.Nil(t, c.UpdateRule)
+	require.Nil(t, c.DeleteRule)
+}
+
+func TestMachineOverridesUniqueOnMachinePathSelector(t *testing.T) {
+	app := newApp(t)
+	c, err := app.FindCollectionByNameOrId("machine_overrides")
+	require.NoError(t, err)
+
+	var unique, attention bool
+	for _, idx := range c.Indexes {
+		if strings.Contains(idx, "idx_overrides_machine_path_sel") {
+			require.Contains(t, idx, "UNIQUE")
+			unique = true
+		}
+		if strings.Contains(idx, "idx_overrides_attention") {
+			require.Contains(t, idx, "attention != ''")
+			attention = true
+		}
+	}
+	require.True(t, unique, "缺唯一索引 idx_overrides_machine_path_sel")
+	require.True(t, attention, "缺部分索引 idx_overrides_attention")
+}
+
+func TestDriftStateHasOverridden(t *testing.T) {
+	app := newApp(t)
+	c, err := app.FindCollectionByNameOrId("drift_events")
+	require.NoError(t, err)
+	state, ok := c.Fields.GetByName("state").(*core.SelectField)
+	require.True(t, ok)
+	require.ElementsMatch(t, []string{
+		"open", "adopted", "restored", "ignored", "superseded", "overridden",
+	}, state.Values)
+}
+
+// 存量忽略规则原样留着，不被 007 动过（spec §3 第 3 条）。
+func TestMigration007LeavesIgnoreRulesAlone(t *testing.T) {
+	app := newApp(t)
+	c, err := app.FindCollectionByNameOrId("ignore_rules")
+	require.NoError(t, err)
+	rec := core.NewRecord(c)
+	rec.Set("path", ".claude/settings.json")
+	require.NoError(t, app.Save(rec))
+
+	// 再跑一次迁移必须幂等，且不碰这条规则。
+	require.NoError(t, migrations.Up007(app))
+
+	got, err := app.FindRecordById("ignore_rules", rec.Id)
+	require.NoError(t, err)
+	require.Equal(t, ".claude/settings.json", got.GetString("path"))
+}
+
+func TestDown007Refuses(t *testing.T) {
+	app := newApp(t)
+	require.Error(t, migrations.Down007(app), "删集合等于删用户的覆盖层，必须拒绝")
+}
