@@ -160,3 +160,56 @@ func TestGCOrphansOnlyDeletesUnreferenced(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, ok)
 }
+
+// 覆盖层引用的 blob 不能被当孤儿清掉——那是静默数据丢失（spec §8.3）。
+func TestGCOrphansKeepsOverrideBlobs(t *testing.T) {
+	app := newApp(t)
+	s := blobs.New(app)
+
+	baseH, err := s.Put([]byte("覆盖层的基线侧"))
+	require.NoError(t, err)
+	mineH, err := s.Put([]byte("覆盖层的本机侧"))
+	require.NoError(t, err)
+	shadowH, err := s.Put([]byte("被挡下的中台新版"))
+	require.NoError(t, err)
+	orphan, err := s.Put([]byte("真孤儿"))
+	require.NoError(t, err)
+
+	machines, err := app.FindCollectionByNameOrId("machines")
+	require.NoError(t, err)
+	m := core.NewRecord(machines)
+	m.Set("fingerprint", "fp-gc")
+	m.Set("pub_key", "pk-gc")
+	m.Set("status", "offline")
+	require.NoError(t, app.Save(m))
+
+	idOf := func(h string) string {
+		r, err := app.FindFirstRecordByData("blobs", "hash", h)
+		require.NoError(t, err)
+		return r.Id
+	}
+
+	ovc, err := app.FindCollectionByNameOrId("machine_overrides")
+	require.NoError(t, err)
+	ov := core.NewRecord(ovc)
+	ov.Set("machine", m.Id)
+	ov.Set("path", ".claude/CLAUDE.md")
+	ov.Set("kind", "text")
+	ov.Set("base_blob", idOf(baseH))
+	ov.Set("mine_blob", idOf(mineH))
+	ov.Set("shadowed_blob", idOf(shadowH))
+	require.NoError(t, app.Save(ov))
+
+	n, err := s.GCOrphans("")
+	require.NoError(t, err)
+	require.Equal(t, 1, n)
+
+	for _, h := range []string{baseH, mineH, shadowH} {
+		ok, err := s.Has(h)
+		require.NoError(t, err)
+		require.True(t, ok, "被覆盖层引用的 blob 不该被删")
+	}
+	ok, err := s.Has(orphan)
+	require.NoError(t, err)
+	require.False(t, ok)
+}

@@ -147,16 +147,35 @@ func (s *Store) GCOrphans(setID string) (int, error) {
 		return 0, err
 	}
 
+	markByID := func(id string) {
+		if id == "" {
+			return
+		}
+		if b, err := s.app.FindRecordById("blobs", id); err == nil && b != nil {
+			referenced[b.GetString("hash")] = true
+		}
+	}
+
 	drifts, err := s.app.FindAllRecords("drift_events")
 	if err != nil {
 		return 0, fmt.Errorf("blobs: 扫描 drift_events: %w", err)
 	}
 	for _, d := range drifts {
-		if id := d.GetString("current_blob"); id != "" {
-			if b, err := s.app.FindRecordById("blobs", id); err == nil && b != nil {
-				referenced[b.GetString("hash")] = true
-			}
-		}
+		markByID(d.GetString("current_blob"))
+	}
+
+	// 覆盖层的三份内容是**用户数据**：不补进来，删一个配置集就会把
+	// 用户的本机保留内容当孤儿清掉（spec §8.3）。
+	// 合并产物 blob 不必单独保护——它由 base + 覆盖层纯函数决定，
+	// 被 GC 掉之后下一次 Snapshot 会重新算出来并 Put 回去。
+	ovs, err := s.app.FindAllRecords("machine_overrides")
+	if err != nil {
+		return 0, fmt.Errorf("blobs: 扫描 machine_overrides: %w", err)
+	}
+	for _, o := range ovs {
+		markByID(o.GetString("base_blob"))
+		markByID(o.GetString("mine_blob"))
+		markByID(o.GetString("shadowed_blob"))
 	}
 
 	all, err := s.app.FindAllRecords("blobs")

@@ -108,6 +108,33 @@ func (s *Service) NotifyProvider(providerID string) error {
 	return nil
 }
 
+// NotifyOverride 在本机覆盖层增删之后通知单台机器（M1.8 spec §4.4）。
+//
+// **不带 RevisionID**：与 NotifyProvider 走同一条路。agent 拉回来发现
+// revision 相同但文件内容变了，BuildPlan 逐文件比 rendered hash，
+// 变了的判 Overwrite、没变的判 Skip——零新代码，也不产生漂移。
+func (s *Service) NotifyOverride(machineID string) error {
+	assign, err := s.d.Sets.Assignment(machineID)
+	if err != nil {
+		if errors.Is(err, configsets.ErrNoAssignment) {
+			return nil
+		}
+		return err
+	}
+	setID := assign.GetString("config_set")
+	set, err := s.d.App.FindRecordById("config_sets", setID)
+	if err != nil {
+		return fmt.Errorf("configsync: 配置集 %s 不存在: %w", setID, err)
+	}
+	if set.GetBool("paused") {
+		return nil
+	}
+	s.send(machineID, protocol.ConfigNotify{
+		ConfigSetID: setID, Reason: protocol.ReasonOverride,
+	})
+	return nil
+}
+
 // OnMachineOnline 是握手成功后的补发入口。
 func (s *Service) OnMachineOnline(machineID string) {
 	if err := s.NotifyMachine(machineID, protocol.ReasonAssigned); err != nil {

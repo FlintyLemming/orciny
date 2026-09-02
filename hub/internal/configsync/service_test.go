@@ -14,6 +14,7 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/configsync"
 	"github.com/FlintyLemming/orciny/hub/internal/events"
 	_ "github.com/FlintyLemming/orciny/hub/internal/migrations"
+	"github.com/FlintyLemming/orciny/hub/internal/overrides"
 	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/hub/internal/revisions"
 	"github.com/FlintyLemming/orciny/hub/internal/secretbox"
@@ -61,6 +62,8 @@ type rig struct {
 	provs  *providers.Store
 	sender *fakeSender
 	svc    *configsync.Service
+	blobs  *blobs.Store
+	ovs    *overrides.Service
 }
 
 func newRig(t *testing.T) *rig {
@@ -81,12 +84,37 @@ func newRig(t *testing.T) *rig {
 		vars:   variables.NewStore(app),
 		provs:  providers.NewStore(app, key, ev),
 		sender: &fakeSender{online: map[string]bool{}},
+		blobs:  b,
 	}
+	r.ovs = overrides.NewService(app, b, ev, nil)
 	r.svc = configsync.NewService(configsync.Deps{
 		App: app, Blobs: b, Sets: r.sets, Revs: r.revs, Vars: r.vars,
-		Providers: r.provs, Events: ev, Sender: r.sender,
+		Providers: r.provs, Events: ev, Sender: r.sender, Overrides: r.ovs,
 	})
 	return r
+}
+
+// publish 建配置集、写文件、发布，返回配置集 id。
+func (r *rig) publish(t *testing.T, files map[string][]byte) string {
+	t.Helper()
+	set, err := r.sets.Create("集-"+t.Name(), "")
+	require.NoError(t, err)
+	for path, content := range files {
+		_, err := r.sets.SetDraftFile(set.Id, path, content, 0o644, nil)
+		require.NoError(t, err)
+	}
+	_, err = r.revs.Publish(set.Id, "v1", "publish")
+	require.NoError(t, err)
+	return set.Id
+}
+
+// assign 建一台机器并指派到给定配置集，返回机器 id。
+func (r *rig) assign(t *testing.T, setID, fp string) string {
+	t.Helper()
+	m := r.machine(t, fp)
+	_, err := r.sets.Assign(m, setID, configsets.ModeApply)
+	require.NoError(t, err)
+	return m
 }
 
 func (r *rig) machine(t *testing.T, fp string) string {
@@ -428,4 +456,72 @@ func TestPullWithStaleRevisionKeepsApplyMode(t *testing.T) {
 	r.svc.Pull(m, protocol.ConfigPull{Have: v1.Id})
 	sent := r.sender.of(protocol.KindConfigSnapshot)
 	require.Equal(t, protocol.ModeApply, sent[0].payload.(protocol.ConfigSnapshot).Mode)
+}
+
+// 有覆盖层的机器拿到合并后的 hash；同配置集的其它机器拿原 hash。
+func TestSnapshotAppliesOverridesPerMachine(t *testing.T) {
+	r := newRig(t)
+	setID := r.publish(t, map[string][]byte{
+		".claude/settings.json": []byte(`{"env":{"A":"中台"}}`),
+	})
+	a := r.assign(t, setID, "fp-ov-a")
+	b := r.assign(t, setID, "fp-ov-b")
+
+	require.NoError(t, r.ovs.CreateJSON(a, ".claude/settings.json", "",
+		[]overrides.Point{{Selector: "env.A", BaseValue: `"中台"`, MineValue: `"本机"`}}))
+
+	snapA, err := r.svc.Snapshot(a)
+	require.NoError(t, err)
+	snapB, err := r.svc.Snapshot(b)
+	require.NoError(t, err)
+
+	contentA, err := r.blobs.Get(hashOf(t, snapA, ".claude/settings.json"))
+	require.NoError(t, err)
+	require.JSONEq(t, `{"env":{"A":"本机"}}`, string(contentA))
+
+	contentB, err := r.blobs.Get(hashOf(t, snapB, ".claude/settings.json"))
+	require.NoError(t, err)
+	require.JSONEq(t, `{"env":{"A":"中台"}}`, string(contentB), "别的机器不受影响")
+
+	require.NotEqual(t, snapA.Checksum, snapB.Checksum, "清单变了 checksum 必须跟着变")
+}
+
+// 没有覆盖层时 checksum 与 head 逐位相同——重算不是行为变更。
+func TestSnapshotChecksumUnchangedWithoutOverrides(t *testing.T) {
+	r := newRig(t)
+	setID := r.publish(t, map[string][]byte{".claude/CLAUDE.md": []byte("规矩\n")})
+	m := r.assign(t, setID, "fp-ov-c")
+
+	snap, err := r.svc.Snapshot(m)
+	require.NoError(t, err)
+	head, err := r.revs.Head(setID)
+	require.NoError(t, err)
+	require.Equal(t, head.GetString("checksum"), snap.Checksum)
+}
+
+// 覆盖层增删后发一条不带 RevisionID 的 ConfigNotify（spec §4.4）。
+func TestNotifyOverrideSendsNotifyWithoutRevision(t *testing.T) {
+	r := newRig(t)
+	setID := r.publish(t, map[string][]byte{".claude/CLAUDE.md": []byte("规矩\n")})
+	m := r.assign(t, setID, "fp-ov-d")
+
+	require.NoError(t, r.svc.NotifyOverride(m))
+
+	sent := r.sender.of(protocol.KindConfigNotify)
+	require.NotEmpty(t, sent)
+	n := sent[len(sent)-1].payload.(protocol.ConfigNotify)
+	require.Equal(t, m, sent[len(sent)-1].machine)
+	require.Equal(t, protocol.ReasonOverride, n.Reason)
+	require.Empty(t, n.RevisionID, "不带 RevisionID：同版本、内容变了")
+}
+
+func hashOf(t *testing.T, snap protocol.ConfigSnapshot, path string) string {
+	t.Helper()
+	for _, f := range snap.Files {
+		if f.Path == path {
+			return f.Hash
+		}
+	}
+	t.Fatalf("快照里没有 %s", path)
+	return ""
 }

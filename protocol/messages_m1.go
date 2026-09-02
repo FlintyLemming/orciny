@@ -41,6 +41,11 @@ const (
 	ReasonAdopted   = "adopted"
 	ReasonRotated   = "rotated"
 	ReasonAssigned  = "assigned"
+
+	// ReasonOverride：本机覆盖层增删。与 ReasonRotated 同类——
+	// 不带 RevisionID，agent 拉回来发现版本没变但内容变了，
+	// BuildPlan 自行判 Overwrite（M1.8 spec §4.4）。
+	ReasonOverride = "override"
 )
 
 // DriftCommand.Op

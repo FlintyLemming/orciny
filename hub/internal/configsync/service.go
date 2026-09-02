@@ -15,6 +15,7 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/blobs"
 	"github.com/FlintyLemming/orciny/hub/internal/configsets"
 	"github.com/FlintyLemming/orciny/hub/internal/events"
+	"github.com/FlintyLemming/orciny/hub/internal/overrides"
 	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/hub/internal/revisions"
 	"github.com/FlintyLemming/orciny/hub/internal/variables"
@@ -55,6 +56,9 @@ type Deps struct {
 	// Drift 处理漂移上报。两步装配：先建 configsync（此字段空），再建 drift，
 	// 最后 SetDrift（drift 构造时需要 *configsync.Service）。
 	Drift DriftHandler
+	// Overrides 是本机覆盖层（M1.8 spec §4.3）。快照组装到一半时挂上去，
+	// 把该机器保留的差异点盖回文件清单。nil = 不做合并（单测常见）。
+	Overrides *overrides.Service
 }
 
 type Service struct {
@@ -135,13 +139,27 @@ func (s *Service) Snapshot(machineID string) (protocol.ConfigSnapshot, error) {
 		mode = protocol.ModeSurvey
 	}
 
+	// 覆盖层落在**占位符空间**：中台基线未渲染，agent 上报的漂移内容
+	// 也经 RestoreWithBase 还原成占位符，两侧同处一个空间才能合并。
+	// 渲染仍发生在 agent 侧、合并之后（spec §4.3）。
+	checksum := head.GetString("checksum")
+	if s.d.Overrides != nil {
+		files, err = s.d.Overrides.Apply(machineID, head.Id, files)
+		if err != nil {
+			return snap, err
+		}
+		// 清单的 hash 变了，指纹必须跟着重算。没有覆盖层时
+		// Checksum(files) 与 head.checksum 逐位相同，因此这不是行为变更。
+		checksum = protocol.Checksum(files)
+	}
+
 	return protocol.ConfigSnapshot{
 		ConfigSetID: setID,
 		RevisionID:  head.Id,
 		Seq:         uint32(head.GetInt("seq")),
 		Manifest:    []byte(head.GetString("manifest")),
 		Files:       files,
-		Checksum:    head.GetString("checksum"),
+		Checksum:    checksum,
 		Variables:   vars,
 		Provider:    provider,
 		IgnorePaths: ignore,
