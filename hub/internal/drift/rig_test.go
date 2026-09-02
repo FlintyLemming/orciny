@@ -15,6 +15,7 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/drift"
 	"github.com/FlintyLemming/orciny/hub/internal/events"
 	_ "github.com/FlintyLemming/orciny/hub/internal/migrations"
+	"github.com/FlintyLemming/orciny/hub/internal/overrides"
 	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/hub/internal/revisions"
 	"github.com/FlintyLemming/orciny/hub/internal/secretbox"
@@ -68,6 +69,7 @@ type rig struct {
 	provs     *providers.Store
 	sync      *configsync.Service
 	sender    *fakeSender
+	ovs       *overrides.Service
 	svc       *drift.Service
 	machineID string
 	setID     string
@@ -90,9 +92,10 @@ func newRig(t *testing.T) *rig {
 	sets := configsets.NewService(app, b, ev)
 	revs := revisions.NewService(app, b, ev)
 	provs := providers.NewStore(app, key, ev)
+	ovs := overrides.NewService(app, b, ev, nil)
 	syncSvc := configsync.NewService(configsync.Deps{
 		App: app, Blobs: b, Sets: sets, Revs: revs, Vars: vars,
-		Providers: provs, Events: ev, Sender: sender,
+		Providers: provs, Events: ev, Sender: sender, Overrides: ovs,
 	})
 
 	r := &rig{
@@ -104,10 +107,11 @@ func newRig(t *testing.T) *rig {
 		provs:  provs,
 		sync:   syncSvc,
 		sender: sender,
+		ovs:    ovs,
 	}
 	r.svc = drift.NewService(drift.Deps{
 		App: app, Blobs: b, Sets: r.sets, Revs: r.revs, Events: ev,
-		Sync: r.sync, Providers: provs,
+		Sync: r.sync, Providers: provs, Overrides: r.ovs,
 	})
 	r.sync.SetDrift(r.svc)
 
@@ -270,4 +274,12 @@ func (r *rig) requireEvent(t *testing.T, kind string) {
 		map[string]any{"k": kind, "m": r.machineID})
 	require.NoError(t, err)
 	require.NotEmpty(t, recs, "应有事件 %s", kind)
+}
+
+// overridesOf 返回一台机器的全部覆盖层。
+func (r *rig) overridesOf(t *testing.T, machineID string) []*core.Record {
+	t.Helper()
+	recs, err := r.ovs.ForMachine(machineID)
+	require.NoError(t, err)
+	return recs
 }

@@ -1,12 +1,14 @@
 package drift
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tools/types"
 
+	"github.com/FlintyLemming/orciny/hub/internal/configsets"
 	"github.com/FlintyLemming/orciny/hub/internal/events"
 	"github.com/FlintyLemming/orciny/protocol"
 )
@@ -129,6 +131,21 @@ func (s *Service) Ignore(eventIDs []string, global bool) error {
 		path := rec.GetString("path")
 		machineID := rec.GetString("machine")
 
+		// 退管与覆盖层互斥：退管意味着中台根本不下发它，覆盖层无处可盖。
+		// 用户的意图很明确（整个路径都不要了），拦住他没有意义（spec §2.3）。
+		if s.d.Overrides != nil {
+			n, err := s.d.Overrides.DropPath(machineID, path)
+			if err != nil {
+				return err
+			}
+			if n > 0 {
+				if err := s.d.Events.Write(events.KindOverrideDropped, machineID,
+					map[string]any{"path": path, "reason": "path_unmanaged", "count": n}); err != nil {
+					s.log.Warn("写 override.dropped 事件失败", "error", err)
+				}
+			}
+		}
+
 		rule := core.NewRecord(col)
 		if !global {
 			rule.Set("machine", machineID)
@@ -226,4 +243,64 @@ func (s *Service) groupOpenPaths(eventIDs []string) (map[string][]string, error)
 		sort.Strings(byMachine[m])
 	}
 	return byMachine, nil
+}
+
+// ErrGlobalRule：全局忽略规则不由单机的「恢复受管」删除，
+// 那会悄悄改掉全机队的行为。
+var ErrGlobalRule = errors.New(
+	"drift: 这是一条全局规则，请到设置里解除，或改为只对这台机器建例外")
+
+// Remanage 恢复受管（spec §3.1）：**原子地**置 survey 并删掉该机器
+// 在这个路径上的 ignore 规则。
+//
+// 顺序不能反，survey 也不是可选项。若直接恢复受管，下一次 apply 会当场
+// 用中台版本盖掉他本机的改动——那份改动此后只剩在 drift_events.current_blob
+// 里，而他刚打开这个页面的**目的**就是把它捞回来。
+func (s *Service) Remanage(machineID, path string) error {
+	rules, err := s.d.App.FindRecordsByFilter("ignore_rules",
+		"path = {:p} && (machine = '' || machine = {:m})", "", 0, 0,
+		map[string]any{"p": path, "m": machineID})
+	if err != nil {
+		return fmt.Errorf("drift: 查询忽略规则: %w", err)
+	}
+	own := make([]*core.Record, 0, len(rules))
+	for _, r := range rules {
+		if r.GetString("machine") == "" {
+			return fmt.Errorf("%w：%s", ErrGlobalRule, path)
+		}
+		own = append(own, r)
+	}
+	if len(own) == 0 {
+		return nil // 本来就受管，幂等返回
+	}
+
+	err = s.d.App.RunInTransaction(func(tx core.App) error {
+		assign, err := s.d.Sets.Assignment(machineID)
+		if err != nil {
+			return err
+		}
+		// 先置 survey：让差异先进收件箱，别让下一次 apply 抹掉本机改动。
+		assign.Set("mode", configsets.ModeSurvey)
+		assign.Set("state", configsets.StatePending)
+		if err := tx.Save(assign); err != nil {
+			return fmt.Errorf("drift: 打回 survey: %w", err)
+		}
+		// 再删规则。
+		for _, r := range own {
+			if err := tx.Delete(r); err != nil {
+				return fmt.Errorf("drift: 删忽略规则 %s: %w", path, err)
+			}
+		}
+		return s.d.Events.WriteTx(tx, events.KindAssignChanged, machineID, map[string]any{
+			"reason": "remanage", "path": path, "mode": configsets.ModeSurvey,
+		})
+	})
+	if err != nil {
+		return err
+	}
+
+	if s.d.Sync == nil {
+		return nil
+	}
+	return s.d.Sync.NotifyMachine(machineID, protocol.ReasonAssigned)
 }

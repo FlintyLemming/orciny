@@ -5,6 +5,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/FlintyLemming/orciny/hub/internal/configsets"
+	"github.com/FlintyLemming/orciny/hub/internal/drift"
 	"github.com/FlintyLemming/orciny/hub/internal/events"
 	"github.com/FlintyLemming/orciny/protocol"
 )
@@ -134,4 +136,56 @@ func TestSupersedeOnlyTouchesOpen(t *testing.T) {
 	rec, err := r.app.FindRecordById("drift_events", id)
 	require.NoError(t, err)
 	require.Equal(t, "ignored", rec.GetString("state"), "已忽略的不该被改成 superseded")
+}
+
+// 建 ignore 规则时该路径已有覆盖层 → 先删掉覆盖层（spec §2.3）。
+// 用户的意图很明确（整个路径都不要了），拦住他没有意义。
+func TestIgnoreDropsExistingOverrides(t *testing.T) {
+	r := newRig(t)
+	id := r.jsonDrift(t, []byte(`{"a":1}`), []byte(`{"a":2}`))
+	require.NoError(t, r.svc.Override([]string{id}, nil, nil))
+	require.Len(t, r.overridesOf(t, r.machineID), 1)
+
+	r.report(t, protocol.DriftItem{
+		Path: ".claude/settings.json", Kind: protocol.DriftModified,
+		Mode: 0o644, Content: []byte(`{"a":3}`),
+	})
+	id2 := r.driftsByPath(t)[".claude/settings.json"].Id
+	require.NoError(t, r.svc.Ignore([]string{id2}, false))
+
+	require.Empty(t, r.overridesOf(t, r.machineID), "退管必须清掉覆盖层")
+	r.requireEvent(t, "override.dropped")
+}
+
+// 恢复受管必须**原子地**做两件事，且顺序不能反：先置 survey，再删规则。
+// 直接恢复受管的话，下一次 apply 会当场用中台版本盖掉他本机的改动
+// ——而他打开这个页面的目的就是把那份改动捞回来（spec §3.1）。
+func TestRemanageSetsSurveyAndDropsRule(t *testing.T) {
+	r := newRig(t)
+	r.assign(t)
+	r.addIgnoreRule(t, r.machineID, ".claude/settings.json")
+
+	require.NoError(t, r.svc.Remanage(r.machineID, ".claude/settings.json"))
+
+	assign, err := r.sets.Assignment(r.machineID)
+	require.NoError(t, err)
+	require.Equal(t, configsets.ModeSurvey, assign.GetString("mode"))
+
+	paths, err := r.svc.IgnorePaths(r.machineID)
+	require.NoError(t, err)
+	require.NotContains(t, paths, ".claude/settings.json")
+}
+
+// 全局规则不由单机的「恢复受管」删除——那会悄悄改掉全机队的行为。
+func TestRemanageLeavesGlobalRule(t *testing.T) {
+	r := newRig(t)
+	r.assign(t)
+	r.addIgnoreRule(t, "", ".claude/settings.json")
+
+	require.ErrorIs(t, r.svc.Remanage(r.machineID, ".claude/settings.json"),
+		drift.ErrGlobalRule)
+
+	paths, err := r.svc.IgnorePaths(r.machineID)
+	require.NoError(t, err)
+	require.Contains(t, paths, ".claude/settings.json")
 }

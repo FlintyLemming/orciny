@@ -11,6 +11,7 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/configsets"
 	"github.com/FlintyLemming/orciny/hub/internal/configsync"
 	"github.com/FlintyLemming/orciny/hub/internal/events"
+	"github.com/FlintyLemming/orciny/hub/internal/overrides"
 	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/hub/internal/revisions"
 	"github.com/FlintyLemming/orciny/protocol"
@@ -26,6 +27,9 @@ type Deps struct {
 	Sync   *configsync.Service // 子计划 14 发 DriftCommand 用；HandleReport 暂不需要
 	// Providers 供绑定漂移的反查（M1.5 spec §6.3）。
 	Providers *providers.Store
+	// Overrides 是本机覆盖层（M1.8 spec §4）。Override() 建记录、
+	// Ignore() 删记录都走它。
+	Overrides *overrides.Service
 	Logger    *slog.Logger
 }
 
