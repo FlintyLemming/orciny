@@ -16,6 +16,7 @@ import {
 } from '@/types/collections'
 import { StatusDot } from '@/components/StatusDot'
 import { $overrides, subscribeOverrides } from '@/stores/overrides'
+import { OverrideBadge } from '@/components/OverrideBadge'
 import { navigate } from '@/router'
 import { AddMachineDialog } from '@/components/AddMachineDialog'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
@@ -175,11 +176,7 @@ export function Machines() {
                     用户建了几十个覆盖层之后面板上全是「已对齐」，
                     而机队实际配置各不相同（M1.8 spec R1）。
                   */}
-                  {(overrideCount.get(m.id) ?? 0) > 0 && (
-                    <span className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-700 dark:text-amber-300">
-                      <Trans>+{overrideCount.get(m.id)} 本机覆盖</Trans>
-                    </span>
-                  )}
+                  <OverrideBadge count={overrideCount.get(m.id) ?? 0} />
                 </td>
                 <td className="py-2 font-mono text-xs text-ink2">{m.os}/{m.arch}</td>
                 <td className="py-2 font-mono text-xs text-ink2">{m.agent_version}</td>

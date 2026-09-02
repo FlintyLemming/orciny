@@ -17,6 +17,14 @@ msgstr ""
 msgid " （无 Claude 端点）"
 msgstr " （无 Claude 端点）"
 
+#: src/components/OverrideDialog.tsx
+msgid "（删掉这个键）"
+msgstr "（删掉这个键）"
+
+#: src/components/OverrideDialog.tsx
+msgid "（无此键）"
+msgstr "（无此键）"
+
 #: src/components/BindingBar.tsx
 msgid "（空）"
 msgstr "（空）"
@@ -30,6 +38,16 @@ msgstr "{0} 个模型"
 #: src/lib/inbox.ts
 msgid "{0} 内容未能安全脱敏，无法自动收编"
 msgstr "{0} 内容未能安全脱敏，无法自动收编"
+
+#. placeholder {0}: g.items.length
+#: src/components/MachineOverrides.tsx
+msgid "{0} 处"
+msgstr "{0} 处"
+
+#. placeholder {0}: items.length
+#: src/components/AttentionBanner.tsx
+msgid "{0} 处本机覆盖挡下了中台更新"
+msgstr "{0} 处本机覆盖挡下了中台更新"
 
 #. placeholder {0}: m.name
 #: src/components/ProviderDialog.tsx
@@ -48,6 +66,10 @@ msgstr "{label} 端点"
 #: src/components/ThreeWayCompare.tsx
 msgid "∅"
 msgstr "∅"
+
+#: src/components/OverrideBadge.tsx
+msgid "+{count} 本机覆盖"
+msgstr "+{count} 本机覆盖"
 
 #: src/pages/ImportWizard.tsx
 msgid "1. 采集"
@@ -124,6 +146,7 @@ msgstr "v{0} · {1}"
 msgid "一键修复：把 {0} 改成 {1}"
 msgstr "一键修复：把 {0} 改成 {1}"
 
+#: src/components/AttentionBanner.tsx
 #: src/pages/Inbox.tsx
 msgid "三方对比"
 msgstr "三方对比"
@@ -140,6 +163,14 @@ msgstr "下一步：发布"
 msgid "下一步：敏感项"
 msgstr "下一步：敏感项"
 
+#: src/pages/MachineDetail.tsx
+msgid "不再受管的路径"
+msgstr "不再受管的路径"
+
+#: src/pages/Inbox.tsx
+msgid "不再管这个路径 ▾"
+msgstr "不再管这个路径 ▾"
+
 #: src/components/AssignDialog.tsx
 msgid "不写盘，差异进收件箱"
 msgstr "不写盘，差异进收件箱"
@@ -151,6 +182,26 @@ msgstr "不能跨配置集收编：所选条目属于不同配置集"
 #: src/components/ProviderDialog.tsx
 msgid "两个端点默认都用它"
 msgstr "两个端点默认都用它"
+
+#: src/components/AttentionBanner.tsx
+msgid "两边改法不同，已取本机的说法"
+msgstr "两边改法不同，已取本机的说法"
+
+#: src/pages/Inbox.tsx
+msgid "中台不再向这台机器下发该路径，也不再提醒。 想只保留几处差异请用「本机保留」。"
+msgstr "中台不再向这台机器下发该路径，也不再提醒。 想只保留几处差异请用「本机保留」。"
+
+#: src/pages/Inbox.tsx
+msgid "中台不再向这台机器下发该路径，也不再提醒。想只保留几处差异请用「本机保留」"
+msgstr "中台不再向这台机器下发该路径，也不再提醒。想只保留几处差异请用「本机保留」"
+
+#: src/components/AttentionBanner.tsx
+msgid "中台也改了同一处，本机的值挡下了它"
+msgstr "中台也改了同一处，本机的值挡下了它"
+
+#: src/components/AttentionBanner.tsx
+msgid "中台这份内容不是合法的 JSON 对象，本轮放弃合并"
+msgstr "中台这份内容不是合法的 JSON 对象，本轮放弃合并"
 
 #: src/pages/MachineDetail.tsx
 msgid "主机名"
@@ -192,6 +243,10 @@ msgstr "从草稿中移除 {pendingDeletePath}？"
 msgid "以下条目变量还原不完整（restore_partial）。请逐条查看 diff 并勾选确认后再收编。"
 msgstr "以下条目变量还原不完整（restore_partial）。请逐条查看 diff 并勾选确认后再收编。"
 
+#: src/components/UnmanagedPaths.tsx
+msgid "会把这台机器打回「先看看」模式，差异先进收件箱，再由你决定保留哪几处"
+msgstr "会把这台机器打回「先看看」模式，差异先进收件箱，再由你决定保留哪几处"
+
 #: src/components/AddFileDialog.tsx
 msgid "例如 .claude/CLAUDE.md"
 msgstr "例如 .claude/CLAUDE.md"
@@ -228,9 +283,17 @@ msgstr "保存后回落平台级。"
 msgid "保存后清空平台级 key。"
 msgstr "保存后清空平台级 key。"
 
+#: src/components/AttentionBanner.tsx
+msgid "保持"
+msgstr "保持"
+
 #: src/components/FindingList.tsx
 msgid "保留明文"
 msgstr "保留明文"
+
+#: src/components/OverrideDialog.tsx
+msgid "保留选中的 {total} 处"
+msgstr "保留选中的 {total} 处"
 
 #: src/components/DriftCard.tsx
 msgid "修改"
@@ -260,9 +323,17 @@ msgstr "克隆"
 msgid "克隆配置集"
 msgstr "克隆配置集"
 
+#: src/components/UnmanagedPaths.tsx
+msgid "全局"
+msgstr "全局"
+
 #: src/pages/Inbox.tsx
-msgid "全局忽略"
-msgstr "全局忽略"
+#~ msgid "全局忽略"
+#~ msgstr "全局忽略"
+
+#: src/components/UnmanagedPaths.tsx
+msgid "全局规则请到设置里解除"
+msgstr "全局规则请到设置里解除"
 
 #: src/pages/Inbox.tsx
 msgid "全部"
@@ -358,6 +429,10 @@ msgstr "删除后该机器的 agent 会停止重试，需要重新 enroll。确�
 msgid "删除机器"
 msgstr "删除机器"
 
+#: src/components/MachineOverrides.tsx
+msgid "删除这处覆盖"
+msgstr "删除这处覆盖"
+
 #: src/pages/ConfigSets.tsx
 msgid "删除配置集"
 msgstr "删除配置集"
@@ -369,6 +444,14 @@ msgstr "删除配置集"
 #: src/pages/Providers.tsx
 msgid "加载中…"
 msgstr "加载中…"
+
+#: src/components/OverrideDialog.tsx
+msgid "勾上的差异点归这台机器所有，中台以后改到别处照旧同步过来。 默认全选，取消勾选的那些会退回中台的值。"
+msgstr "勾上的差异点归这台机器所有，中台以后改到别处照旧同步过来。 默认全选，取消勾选的那些会退回中台的值。"
+
+#: src/pages/Inbox.tsx
+msgid "勾出的差异点归这台机器所有，中台以后改到别处照旧同步过来"
+msgstr "勾出的差异点归这台机器所有，中台以后改到别处照旧同步过来"
 
 #: src/pages/ImportWizard.tsx
 msgid "勾选取消不想纳管的文件，然后继续。"
@@ -413,6 +496,7 @@ msgstr "发现 {conflictCount} 处两边改法不同的冲突行，请选定一�
 #: src/components/ConfirmDialog.tsx
 #: src/components/DegradedBanner.tsx
 #: src/components/ExtractDialog.tsx
+#: src/components/OverrideDialog.tsx
 #: src/components/PromptDialog.tsx
 #: src/components/ProviderDialog.tsx
 #: src/components/PublishDialog.tsx
@@ -529,6 +613,10 @@ msgstr "安装 agent 时可用 --hub-key 带上这个指纹做带外校验，防
 msgid "密码"
 msgstr "密码"
 
+#: src/pages/Inbox.tsx
+msgid "对全机队生效"
+msgstr "对全机队生效"
+
 #: src/components/VersionHistory.tsx
 msgid "对比"
 msgstr "对比"
@@ -560,6 +648,10 @@ msgstr "尚未发布任何版本。"
 #: src/pages/MachineDetail.tsx
 msgid "尚未指派配置集。"
 msgstr "尚未指派配置集。"
+
+#: src/components/AttentionBanner.tsx
+msgid "展开"
+msgstr "展开"
 
 #: src/pages/ConfigSetDetail.tsx
 msgid "已保存"
@@ -598,8 +690,8 @@ msgid "已应用版本"
 msgstr "已应用版本"
 
 #: src/pages/Inbox.tsx
-msgid "已忽略"
-msgstr "已忽略"
+#~ msgid "已忽略"
+#~ msgstr "已忽略"
 
 #: src/pages/Inbox.tsx
 msgid "已恢复"
@@ -618,6 +710,11 @@ msgstr "已断开"
 msgid "已暂停"
 msgstr "已暂停"
 
+#: src/pages/Inbox.tsx
+#: src/pages/MachineDetail.tsx
+msgid "已本机保留"
+msgstr "已本机保留"
+
 #: src/pages/MachineDetail.tsx
 msgid "已注册"
 msgstr "已注册"
@@ -630,6 +727,10 @@ msgstr "已被覆盖"
 #: src/pages/MachineDetail.tsx
 msgid "已连接"
 msgstr "已连接"
+
+#: src/pages/Inbox.tsx
+msgid "已退管"
+msgstr "已退管"
 
 #. placeholder {0}: selected.size
 #: src/pages/Inbox.tsx
@@ -691,8 +792,8 @@ msgid "快切模型至 透传"
 msgstr "快切模型至 透传"
 
 #: src/pages/Inbox.tsx
-msgid "忽略"
-msgstr "忽略"
+#~ msgid "忽略"
+#~ msgstr "忽略"
 
 #: src/components/Sidebar.tsx
 msgid "总览"
@@ -701,6 +802,10 @@ msgstr "总览"
 #: src/pages/Inbox.tsx
 msgid "恢复"
 msgstr "恢复"
+
+#: src/components/UnmanagedPaths.tsx
+msgid "恢复受管"
+msgstr "恢复受管"
 
 #: src/pages/Settings.tsx
 msgid "打开备份设置"
@@ -744,6 +849,10 @@ msgstr "指派配置集"
 msgid "指纹"
 msgstr "指纹"
 
+#: src/pages/Inbox.tsx
+msgid "排除那一刻的基线"
+msgstr "排除那一刻的基线"
+
 #: src/components/ProviderDialog.tsx
 msgid "探测"
 msgstr "探测"
@@ -759,6 +868,10 @@ msgstr "提示（不影响发布）"
 #: src/components/BindingBar.tsx
 msgid "插入 env 片段"
 msgstr "插入 env 片段"
+
+#: src/components/AttentionBanner.tsx
+msgid "撤掉排除"
+msgstr "撤掉排除"
 
 #: src/components/Toast.tsx
 msgid "撤销"
@@ -785,9 +898,18 @@ msgstr "收编会把 {BASE_URL_TOKEN} 拍平成硬编码地址，服务绑定会
 msgid "收编前复核"
 msgstr "收编前复核"
 
+#: src/components/AttentionBanner.tsx
+msgid "收起"
+msgstr "收起"
+
 #: src/components/BindingDriftActions.tsx
 msgid "改成它"
 msgstr "改成它"
+
+#: src/components/AttentionBanner.tsx
+#: src/components/MachineOverrides.tsx
+msgid "整份文件"
+msgstr "整份文件"
 
 #: src/pages/ConfigSetDetail.tsx
 msgid "文件"
@@ -909,7 +1031,6 @@ msgid "未指定默认模型"
 msgstr "未指定默认模型"
 
 #: src/components/BindingBar.tsx
-#: src/components/ModelQuickSwitch.tsx
 #: src/pages/Machines.tsx
 msgid "未绑定"
 msgstr "未绑定"
@@ -923,6 +1044,23 @@ msgstr "未配置"
 msgid "未配置 Claude 端点"
 msgstr "未配置 Claude 端点"
 
+#: src/components/OverrideDialog.tsx
+#: src/pages/Inbox.tsx
+msgid "本机保留"
+msgstr "本机保留"
+
+#: src/pages/MachineDetail.tsx
+msgid "本机保留已撤销"
+msgstr "本机保留已撤销"
+
+#: src/pages/MachineDetail.tsx
+msgid "本机保留已替换"
+msgstr "本机保留已替换"
+
+#: src/pages/MachineDetail.tsx
+msgid "本机保留已确认"
+msgstr "本机保留已确认"
+
 #: src/components/DegradedBanner.tsx
 msgid "本机处于降级状态"
 msgstr "本机处于降级状态"
@@ -934,6 +1072,10 @@ msgstr "本机漂移"
 #: src/components/DegradedBanner.tsx
 msgid "本机的一次配置应用失败，且自动回滚也未成功。为避免进一步破坏，orciny 已停止向这台机器应用任何配置。请先在机器上确认 ~/.claude 的状态，再点击解除——解除后本机会转为「先看看」模式，差异会进收件箱而不是直接覆盖。"
 msgstr "本机的一次配置应用失败，且自动回滚也未成功。为避免进一步破坏，orciny 已停止向这台机器应用任何配置。请先在机器上确认 ~/.claude 的状态，再点击解除——解除后本机会转为「先看看」模式，差异会进收件箱而不是直接覆盖。"
+
+#: src/pages/MachineDetail.tsx
+msgid "本机覆盖"
+msgstr "本机覆盖"
 
 #: src/components/Sidebar.tsx
 #: src/pages/Machines.tsx
@@ -952,6 +1094,10 @@ msgstr "机器变量"
 #: src/pages/Machines.tsx
 msgid "机器名称"
 msgstr "机器名称"
+
+#: src/components/UnmanagedPaths.tsx
+msgid "机器级"
+msgstr "机器级"
 
 #: src/components/VersionHistory.tsx
 msgid "查看 diff"
@@ -1000,6 +1146,10 @@ msgstr "正在签发注册 token…"
 #: src/pages/ImportWizard.tsx
 msgid "没有待处理的敏感项。"
 msgstr "没有待处理的敏感项。"
+
+#: src/components/UnmanagedPaths.tsx
+msgid "没有退管的路径。"
+msgstr "没有退管的路径。"
 
 #: src/components/ThemeToggle.tsx
 msgid "浅色"
@@ -1148,6 +1298,10 @@ msgstr "确认解除"
 #: src/pages/Credentials.tsx
 #~ msgid "确认轮换"
 #~ msgstr "确认轮换"
+
+#: src/pages/Inbox.tsx
+msgid "确认退管"
+msgstr "确认退管"
 
 #: src/components/StatusDot.tsx
 msgid "离线"
@@ -1385,6 +1539,10 @@ msgstr "还没有机器。点「添加机器」拿到一行安装命令。"
 msgid "还没有配置集。从一台机器导入，或点右上角新建。"
 msgstr "还没有配置集。从一台机器导入，或点右上角新建。"
 
+#: src/components/AttentionBanner.tsx
+msgid "这个路径已不在中台的下发范围里，本轮没有生效"
+msgstr "这个路径已不在中台的下发范围里，本轮没有生效"
+
 #: src/components/BindingDriftActions.tsx
 msgid "这台机器改用了「{name}」。把配置集的绑定改成它？"
 msgstr "这台机器改用了「{name}」。把配置集的绑定改成它？"
@@ -1393,6 +1551,10 @@ msgstr "这台机器改用了「{name}」。把配置集的绑定改成它？"
 #: src/components/DriftCard.tsx
 msgid "这台机器改用了别的 API 地址：<0>{0}</0>"
 msgstr "这台机器改用了别的 API 地址：<0>{0}</0>"
+
+#: src/components/MachineOverrides.tsx
+msgid "这台机器没有本机覆盖。"
+msgstr "这台机器没有本机覆盖。"
 
 #: src/components/BindingDriftActions.tsx
 msgid "这台机器用的地址可能是「{name}」。把配置集的绑定改成它？"
@@ -1418,13 +1580,13 @@ msgstr "退出"
 msgid "选择左侧文件开始编辑"
 msgstr "选择左侧文件开始编辑"
 
-#: src/components/ModelQuickSwitch.tsx
 #: src/pages/ConfigSetDetail.tsx
 #: src/pages/Machines.tsx
 msgid "透传"
 msgstr "透传"
 
 #: src/components/BindingBar.tsx
+#: src/components/ModelQuickSwitch.tsx
 msgid "透传（不指定模型）"
 msgstr "透传（不指定模型）"
 

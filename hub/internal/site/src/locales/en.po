@@ -17,6 +17,14 @@ msgstr ""
 msgid " （无 Claude 端点）"
 msgstr " (no Claude endpoint)"
 
+#: src/components/OverrideDialog.tsx
+msgid "（删掉这个键）"
+msgstr "(remove this key)"
+
+#: src/components/OverrideDialog.tsx
+msgid "（无此键）"
+msgstr "(no such key)"
+
 #: src/components/BindingBar.tsx
 msgid "（空）"
 msgstr "(none)"
@@ -30,6 +38,16 @@ msgstr "{0} models"
 #: src/lib/inbox.ts
 msgid "{0} 内容未能安全脱敏，无法自动收编"
 msgstr "{0}: content could not be safely redacted; cannot adopt automatically"
+
+#. placeholder {0}: g.items.length
+#: src/components/MachineOverrides.tsx
+msgid "{0} 处"
+msgstr "{0} point(s)"
+
+#. placeholder {0}: items.length
+#: src/components/AttentionBanner.tsx
+msgid "{0} 处本机覆盖挡下了中台更新"
+msgstr "{0} local override(s) blocked a hub update"
 
 #. placeholder {0}: m.name
 #: src/components/ProviderDialog.tsx
@@ -48,6 +66,10 @@ msgstr "{label} endpoint"
 #: src/components/ThreeWayCompare.tsx
 msgid "∅"
 msgstr "∅"
+
+#: src/components/OverrideBadge.tsx
+msgid "+{count} 本机覆盖"
+msgstr "+{count} local overrides"
 
 #: src/pages/ImportWizard.tsx
 msgid "1. 采集"
@@ -124,6 +146,7 @@ msgstr "v{0} · {1}"
 msgid "一键修复：把 {0} 改成 {1}"
 msgstr "Fix it: change {0} to {1}"
 
+#: src/components/AttentionBanner.tsx
 #: src/pages/Inbox.tsx
 msgid "三方对比"
 msgstr "Three-way compare"
@@ -140,6 +163,14 @@ msgstr "Next: Publish"
 msgid "下一步：敏感项"
 msgstr "Next: Secrets"
 
+#: src/pages/MachineDetail.tsx
+msgid "不再受管的路径"
+msgstr "Unmanaged paths"
+
+#: src/pages/Inbox.tsx
+msgid "不再管这个路径 ▾"
+msgstr "Stop managing this path ▾"
+
 #: src/components/AssignDialog.tsx
 msgid "不写盘，差异进收件箱"
 msgstr "No writes; diffs go to the inbox"
@@ -151,6 +182,26 @@ msgstr "Cannot adopt across config sets: selection spans multiple sets"
 #: src/components/ProviderDialog.tsx
 msgid "两个端点默认都用它"
 msgstr "Used by both endpoints by default"
+
+#: src/components/AttentionBanner.tsx
+msgid "两边改法不同，已取本机的说法"
+msgstr "Both sides changed it differently; this machine's version was kept"
+
+#: src/pages/Inbox.tsx
+msgid "中台不再向这台机器下发该路径，也不再提醒。 想只保留几处差异请用「本机保留」。"
+msgstr "The hub will stop delivering this path to this machine and stop reporting it. To keep only a few differences, use \"Keep local\" instead."
+
+#: src/pages/Inbox.tsx
+msgid "中台不再向这台机器下发该路径，也不再提醒。想只保留几处差异请用「本机保留」"
+msgstr "The hub will stop delivering this path to this machine and stop reporting it. To keep only a few differences, use \"Keep local\" instead"
+
+#: src/components/AttentionBanner.tsx
+msgid "中台也改了同一处，本机的值挡下了它"
+msgstr "The hub changed the same spot; this machine's value blocked it"
+
+#: src/components/AttentionBanner.tsx
+msgid "中台这份内容不是合法的 JSON 对象，本轮放弃合并"
+msgstr "The hub's content is not a valid JSON object; merging was skipped this round"
 
 #: src/pages/MachineDetail.tsx
 msgid "主机名"
@@ -192,6 +243,10 @@ msgstr "Remove {pendingDeletePath} from the draft?"
 msgid "以下条目变量还原不完整（restore_partial）。请逐条查看 diff 并勾选确认后再收编。"
 msgstr "These items have incomplete variable restore (restore_partial). Review each diff and check to confirm before adopting."
 
+#: src/components/UnmanagedPaths.tsx
+msgid "会把这台机器打回「先看看」模式，差异先进收件箱，再由你决定保留哪几处"
+msgstr "Puts this machine back into survey mode; differences go to the inbox first, then you decide which ones to keep local"
+
 #: src/components/AddFileDialog.tsx
 msgid "例如 .claude/CLAUDE.md"
 msgstr "e.g. .claude/CLAUDE.md"
@@ -228,9 +283,17 @@ msgstr "Falls back to the platform-level key after saving."
 msgid "保存后清空平台级 key。"
 msgstr "Clears the platform-level key after saving."
 
+#: src/components/AttentionBanner.tsx
+msgid "保持"
+msgstr "Keep as is"
+
 #: src/components/FindingList.tsx
 msgid "保留明文"
 msgstr "Keep plaintext"
+
+#: src/components/OverrideDialog.tsx
+msgid "保留选中的 {total} 处"
+msgstr "Keep the {total} selected"
 
 #: src/components/DriftCard.tsx
 msgid "修改"
@@ -260,9 +323,17 @@ msgstr "Clone"
 msgid "克隆配置集"
 msgstr "Clone config set"
 
+#: src/components/UnmanagedPaths.tsx
+msgid "全局"
+msgstr "Global"
+
 #: src/pages/Inbox.tsx
-msgid "全局忽略"
-msgstr "Ignore globally"
+#~ msgid "全局忽略"
+#~ msgstr "Ignore globally"
+
+#: src/components/UnmanagedPaths.tsx
+msgid "全局规则请到设置里解除"
+msgstr "Global rules must be removed in Settings"
 
 #: src/pages/Inbox.tsx
 msgid "全部"
@@ -358,6 +429,10 @@ msgstr "Once deleted, this machine's agent stops retrying and must enroll again.
 msgid "删除机器"
 msgstr "Delete machine"
 
+#: src/components/MachineOverrides.tsx
+msgid "删除这处覆盖"
+msgstr "Delete this override"
+
 #: src/pages/ConfigSets.tsx
 msgid "删除配置集"
 msgstr "Delete config set"
@@ -369,6 +444,14 @@ msgstr "Delete config set"
 #: src/pages/Providers.tsx
 msgid "加载中…"
 msgstr "Loading…"
+
+#: src/components/OverrideDialog.tsx
+msgid "勾上的差异点归这台机器所有，中台以后改到别处照旧同步过来。 默认全选，取消勾选的那些会退回中台的值。"
+msgstr "The points you check belong to this machine; changes the hub makes elsewhere still sync as usual. Everything is selected by default; whatever you uncheck falls back to the hub's value."
+
+#: src/pages/Inbox.tsx
+msgid "勾出的差异点归这台机器所有，中台以后改到别处照旧同步过来"
+msgstr "The points you check belong to this machine; changes the hub makes elsewhere still sync as usual"
 
 #: src/pages/ImportWizard.tsx
 msgid "勾选取消不想纳管的文件，然后继续。"
@@ -413,6 +496,7 @@ msgstr "Found {conflictCount} conflicting lines changed differently on both side
 #: src/components/ConfirmDialog.tsx
 #: src/components/DegradedBanner.tsx
 #: src/components/ExtractDialog.tsx
+#: src/components/OverrideDialog.tsx
 #: src/components/PromptDialog.tsx
 #: src/components/ProviderDialog.tsx
 #: src/components/PublishDialog.tsx
@@ -529,6 +613,10 @@ msgstr "Pass this fingerprint to the agent via --hub-key for out-of-band verific
 msgid "密码"
 msgstr "Password"
 
+#: src/pages/Inbox.tsx
+msgid "对全机队生效"
+msgstr "Apply to the whole fleet"
+
 #: src/components/VersionHistory.tsx
 msgid "对比"
 msgstr "Diff"
@@ -560,6 +648,10 @@ msgstr "No revisions published yet."
 #: src/pages/MachineDetail.tsx
 msgid "尚未指派配置集。"
 msgstr "No config set assigned yet."
+
+#: src/components/AttentionBanner.tsx
+msgid "展开"
+msgstr "Expand"
 
 #: src/pages/ConfigSetDetail.tsx
 msgid "已保存"
@@ -598,8 +690,8 @@ msgid "已应用版本"
 msgstr "Applied revision"
 
 #: src/pages/Inbox.tsx
-msgid "已忽略"
-msgstr "Ignored"
+#~ msgid "已忽略"
+#~ msgstr "Ignored"
 
 #: src/pages/Inbox.tsx
 msgid "已恢复"
@@ -618,6 +710,11 @@ msgstr "Disconnected"
 msgid "已暂停"
 msgstr "Paused"
 
+#: src/pages/Inbox.tsx
+#: src/pages/MachineDetail.tsx
+msgid "已本机保留"
+msgstr "Kept local"
+
 #: src/pages/MachineDetail.tsx
 msgid "已注册"
 msgstr "Enrolled"
@@ -630,6 +727,10 @@ msgstr "Superseded"
 #: src/pages/MachineDetail.tsx
 msgid "已连接"
 msgstr "Connected"
+
+#: src/pages/Inbox.tsx
+msgid "已退管"
+msgstr "Unmanaged"
 
 #. placeholder {0}: selected.size
 #: src/pages/Inbox.tsx
@@ -691,8 +792,8 @@ msgid "快切模型至 透传"
 msgstr "Quick switch model to passthrough"
 
 #: src/pages/Inbox.tsx
-msgid "忽略"
-msgstr "Ignore"
+#~ msgid "忽略"
+#~ msgstr "Ignore"
 
 #: src/components/Sidebar.tsx
 msgid "总览"
@@ -701,6 +802,10 @@ msgstr "Overview"
 #: src/pages/Inbox.tsx
 msgid "恢复"
 msgstr "Restore"
+
+#: src/components/UnmanagedPaths.tsx
+msgid "恢复受管"
+msgstr "Resume managing"
 
 #: src/pages/Settings.tsx
 msgid "打开备份设置"
@@ -744,6 +849,10 @@ msgstr "Assign config set"
 msgid "指纹"
 msgstr "Fingerprint"
 
+#: src/pages/Inbox.tsx
+msgid "排除那一刻的基线"
+msgstr "Baseline when overridden"
+
 #: src/components/ProviderDialog.tsx
 msgid "探测"
 msgstr "Probe"
@@ -759,6 +868,10 @@ msgstr "Notices (do not block publishing)"
 #: src/components/BindingBar.tsx
 msgid "插入 env 片段"
 msgstr "Insert env snippet"
+
+#: src/components/AttentionBanner.tsx
+msgid "撤掉排除"
+msgstr "Undo override"
 
 #: src/components/Toast.tsx
 msgid "撤销"
@@ -785,9 +898,18 @@ msgstr "Adopting would flatten {BASE_URL_TOKEN} into a hard-coded address and br
 msgid "收编前复核"
 msgstr "Review before adopt"
 
+#: src/components/AttentionBanner.tsx
+msgid "收起"
+msgstr "Collapse"
+
 #: src/components/BindingDriftActions.tsx
 msgid "改成它"
 msgstr "Switch to it"
+
+#: src/components/AttentionBanner.tsx
+#: src/components/MachineOverrides.tsx
+msgid "整份文件"
+msgstr "Whole file"
 
 #: src/pages/ConfigSetDetail.tsx
 msgid "文件"
@@ -909,7 +1031,6 @@ msgid "未指定默认模型"
 msgstr "No default model"
 
 #: src/components/BindingBar.tsx
-#: src/components/ModelQuickSwitch.tsx
 #: src/pages/Machines.tsx
 msgid "未绑定"
 msgstr "Not bound"
@@ -923,6 +1044,23 @@ msgstr "Not configured"
 msgid "未配置 Claude 端点"
 msgstr "Claude endpoint not configured"
 
+#: src/components/OverrideDialog.tsx
+#: src/pages/Inbox.tsx
+msgid "本机保留"
+msgstr "Keep local"
+
+#: src/pages/MachineDetail.tsx
+msgid "本机保留已撤销"
+msgstr "Local override removed"
+
+#: src/pages/MachineDetail.tsx
+msgid "本机保留已替换"
+msgstr "Local override replaced"
+
+#: src/pages/MachineDetail.tsx
+msgid "本机保留已确认"
+msgstr "Local override confirmed"
+
 #: src/components/DegradedBanner.tsx
 msgid "本机处于降级状态"
 msgstr "This machine is degraded"
@@ -934,6 +1072,10 @@ msgstr "Local drift"
 #: src/components/DegradedBanner.tsx
 msgid "本机的一次配置应用失败，且自动回滚也未成功。为避免进一步破坏，orciny 已停止向这台机器应用任何配置。请先在机器上确认 ~/.claude 的状态，再点击解除——解除后本机会转为「先看看」模式，差异会进收件箱而不是直接覆盖。"
 msgstr "A config apply failed on this machine, and automatic rollback also failed. To avoid further damage, orciny has stopped applying any config to this machine. Confirm the state of ~/.claude on the machine, then clear degradation — the machine will switch to survey mode so diffs go to the inbox instead of being overwritten."
+
+#: src/pages/MachineDetail.tsx
+msgid "本机覆盖"
+msgstr "Local overrides"
 
 #: src/components/Sidebar.tsx
 #: src/pages/Machines.tsx
@@ -952,6 +1094,10 @@ msgstr "Machine variables"
 #: src/pages/Machines.tsx
 msgid "机器名称"
 msgstr "Machine name"
+
+#: src/components/UnmanagedPaths.tsx
+msgid "机器级"
+msgstr "Machine"
 
 #: src/components/VersionHistory.tsx
 msgid "查看 diff"
@@ -1000,6 +1146,10 @@ msgstr "Issuing enroll token…"
 #: src/pages/ImportWizard.tsx
 msgid "没有待处理的敏感项。"
 msgstr "No pending secrets."
+
+#: src/components/UnmanagedPaths.tsx
+msgid "没有退管的路径。"
+msgstr "No unmanaged paths."
 
 #: src/components/ThemeToggle.tsx
 msgid "浅色"
@@ -1148,6 +1298,10 @@ msgstr "Confirm clear"
 #: src/pages/Credentials.tsx
 #~ msgid "确认轮换"
 #~ msgstr "Confirm rotate"
+
+#: src/pages/Inbox.tsx
+msgid "确认退管"
+msgstr "Confirm"
 
 #: src/components/StatusDot.tsx
 msgid "离线"
@@ -1385,6 +1539,10 @@ msgstr "No machines yet. Click \"Add machine\" to get a one-line install command
 msgid "还没有配置集。从一台机器导入，或点右上角新建。"
 msgstr "No config sets yet. Import from a machine, or create one at the top right."
 
+#: src/components/AttentionBanner.tsx
+msgid "这个路径已不在中台的下发范围里，本轮没有生效"
+msgstr "This path is no longer delivered by the hub; the override had no effect this round"
+
 #: src/components/BindingDriftActions.tsx
 msgid "这台机器改用了「{name}」。把配置集的绑定改成它？"
 msgstr "This machine switched to \"{name}\". Change the config set binding to it?"
@@ -1393,6 +1551,10 @@ msgstr "This machine switched to \"{name}\". Change the config set binding to it
 #: src/components/DriftCard.tsx
 msgid "这台机器改用了别的 API 地址：<0>{0}</0>"
 msgstr "This machine switched to a different API address: <0>{0}</0>"
+
+#: src/components/MachineOverrides.tsx
+msgid "这台机器没有本机覆盖。"
+msgstr "This machine has no local overrides."
 
 #: src/components/BindingDriftActions.tsx
 msgid "这台机器用的地址可能是「{name}」。把配置集的绑定改成它？"
@@ -1418,13 +1580,13 @@ msgstr "Sign out"
 msgid "选择左侧文件开始编辑"
 msgstr "Select a file on the left to start editing"
 
-#: src/components/ModelQuickSwitch.tsx
 #: src/pages/ConfigSetDetail.tsx
 #: src/pages/Machines.tsx
 msgid "透传"
 msgstr "Passthrough"
 
 #: src/components/BindingBar.tsx
+#: src/components/ModelQuickSwitch.tsx
 msgid "透传（不指定模型）"
 msgstr "Passthrough (no model)"
 

@@ -20,6 +20,7 @@ import { DriftCard } from '@/components/DriftCard'
 import { MachineOverrides } from '@/components/MachineOverrides'
 import { UnmanagedPaths } from '@/components/UnmanagedPaths'
 import { $overrides, subscribeOverrides } from '@/stores/overrides'
+import { OverrideBadge } from '@/components/OverrideBadge'
 import { navigate } from '@/router'
 import { assignConfigSet, clearDegraded } from '@/lib/api'
 import { pb } from '@/lib/pb'
@@ -204,11 +205,7 @@ export function MachineDetail({ id }: { id: string }) {
                   {/*
                     光看「已对齐」会以为这台机器和别人一样（spec R1）。
                   */}
-                  {overrideCount > 0 && (
-                    <span className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-700 dark:text-amber-300">
-                      <Trans>+{overrideCount} 本机覆盖</Trans>
-                    </span>
-                  )}
+                  <OverrideBadge count={overrideCount} />
                   {assignment.last_error && (
                     <span className="mt-1 block text-xs text-rose-600">{assignment.last_error}</span>
                   )}
