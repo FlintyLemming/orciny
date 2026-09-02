@@ -17,6 +17,9 @@ import { VariablesEditor } from '@/components/VariablesEditor'
 import { DegradedBanner } from '@/components/DegradedBanner'
 import { ApplyHistory } from '@/components/ApplyHistory'
 import { DriftCard } from '@/components/DriftCard'
+import { MachineOverrides } from '@/components/MachineOverrides'
+import { UnmanagedPaths } from '@/components/UnmanagedPaths'
+import { $overrides, subscribeOverrides } from '@/stores/overrides'
 import { navigate } from '@/router'
 import { assignConfigSet, clearDegraded } from '@/lib/api'
 import { pb } from '@/lib/pb'
@@ -45,6 +48,10 @@ const eventLabel: Partial<Record<EventKind, React.ReactNode>> = {
   'drift.restored': <Trans>漂移已恢复</Trans>,
   'drift.ignored': <Trans>漂移已忽略</Trans>,
   'drift.superseded': <Trans>漂移已覆盖</Trans>,
+  'override.created': <Trans>已本机保留</Trans>,
+  'override.dropped': <Trans>本机保留已撤销</Trans>,
+  'override.replaced': <Trans>本机保留已替换</Trans>,
+  'override.kept': <Trans>本机保留已确认</Trans>,
   'credential.created': <Trans>凭据已创建</Trans>,
   'credential.rotated': <Trans>凭据已轮换</Trans>,
   'credential.deleted': <Trans>凭据已删除</Trans>,
@@ -65,6 +72,7 @@ export function MachineDetail({ id }: { id: string }) {
   const events = useStore($events)
   const configSets = useStore($configSets)
   const drifts = useStore($drifts)
+  const overrides = useStore($overrides)
   const machine = machines.find((m) => m.id === id)
 
   const [assignment, setAssignment] = useState<AssignmentRecord | null>(null)
@@ -77,6 +85,7 @@ export function MachineDetail({ id }: { id: string }) {
   useEffect(() => subscribeEvents(id), [id])
   useEffect(() => subscribeConfigSets(), [])
   useEffect(() => subscribeDrifts(), [])
+  useEffect(() => subscribeOverrides(), [])
 
   useEffect(() => {
     let cancelled = false
@@ -96,6 +105,11 @@ export function MachineDetail({ id }: { id: string }) {
       cancelled = true
     }
   }, [id, showAssign, assignTick])
+
+  const overrideCount = useMemo(
+    () => overrides.filter((o) => o.machine === id).length,
+    [overrides, id],
+  )
 
   const openDrifts = useMemo(
     () => filterDrifts(drifts, 'open', id).map(toDriftEvent),
@@ -187,6 +201,14 @@ export function MachineDetail({ id }: { id: string }) {
                 <dt className="text-xs text-ink3"><Trans>状态</Trans></dt>
                 <dd>
                   {stateLabel[assignment.state] ?? assignment.state}
+                  {/*
+                    光看「已对齐」会以为这台机器和别人一样（spec R1）。
+                  */}
+                  {overrideCount > 0 && (
+                    <span className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-700 dark:text-amber-300">
+                      <Trans>+{overrideCount} 本机覆盖</Trans>
+                    </span>
+                  )}
                   {assignment.last_error && (
                     <span className="mt-1 block text-xs text-rose-600">{assignment.last_error}</span>
                   )}
@@ -262,6 +284,22 @@ export function MachineDetail({ id }: { id: string }) {
             <Trans>机器变量</Trans>
           </h2>
           <VariablesEditor machineId={id} />
+        </section>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <section className="rounded-lg border border-line bg-surface p-5">
+          <h2 className="mb-3 text-sm font-semibold">
+            <Trans>本机覆盖</Trans>
+          </h2>
+          <MachineOverrides machineId={id} />
+        </section>
+
+        <section className="rounded-lg border border-line bg-surface p-5">
+          <h2 className="mb-3 text-sm font-semibold">
+            <Trans>不再受管的路径</Trans>
+          </h2>
+          <UnmanagedPaths machineId={id} />
         </section>
       </div>
 

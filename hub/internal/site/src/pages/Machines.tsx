@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '@nanostores/react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Plus, Trash2 } from 'lucide-react'
@@ -15,6 +15,7 @@ import {
   type MachineRecord,
 } from '@/types/collections'
 import { StatusDot } from '@/components/StatusDot'
+import { $overrides, subscribeOverrides } from '@/stores/overrides'
 import { navigate } from '@/router'
 import { AddMachineDialog } from '@/components/AddMachineDialog'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
@@ -32,6 +33,14 @@ export function Machines() {
   useEffect(() => subscribeMachines(), [])
   useEffect(() => subscribeConfigSets(), [])
   useEffect(() => subscribeProviders(), [])
+  useEffect(() => subscribeOverrides(), [])
+
+  const overrides = useStore($overrides)
+  const overrideCount = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const o of overrides) m.set(o.machine, (m.get(o.machine) ?? 0) + 1)
+    return m
+  }, [overrides])
 
   useEffect(() => {
     let cancelled = false
@@ -159,7 +168,19 @@ export function Machines() {
                     className="w-full rounded bg-transparent px-1 py-0.5 hover:bg-wash focus:bg-page"
                   />
                 </td>
-                <td className="py-2"><StatusDot status={m.status} /></td>
+                <td className="py-2">
+                  <StatusDot status={m.status} />
+                  {/*
+                    有覆盖层的机器即使「已对齐」也和别人不一样。不加这枚角标，
+                    用户建了几十个覆盖层之后面板上全是「已对齐」，
+                    而机队实际配置各不相同（M1.8 spec R1）。
+                  */}
+                  {(overrideCount.get(m.id) ?? 0) > 0 && (
+                    <span className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-700 dark:text-amber-300">
+                      <Trans>+{overrideCount.get(m.id)} 本机覆盖</Trans>
+                    </span>
+                  )}
+                </td>
                 <td className="py-2 font-mono text-xs text-ink2">{m.os}/{m.arch}</td>
                 <td className="py-2 font-mono text-xs text-ink2">{m.agent_version}</td>
                 <td className="py-2 font-mono text-xs text-ink2">
