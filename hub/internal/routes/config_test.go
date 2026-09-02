@@ -24,6 +24,16 @@ type fakeAdmin struct {
 	assigns   []assignCall
 	deleteErr error
 
+	// —— M1.8 本机覆盖层 ——
+	overrideEvents   []string
+	overridePoints   map[string]drift.Selection
+	overrideReviewed []string
+	overrideErr      error
+	droppedOverride  string
+	keptOverride     string
+	remanageMachine  string
+	remanagePath     string
+
 	// —— M1.5 服务绑定 ——
 	providerDeleteErr error
 	lastBinding       *providers.Binding
@@ -72,7 +82,20 @@ func (f *fakeAdmin) AdoptDriftReviewed([]string, []string) (string, error) {
 }
 func (f *fakeAdmin) RestoreDrift([]string) error      { return nil }
 func (f *fakeAdmin) IgnoreDrift([]string, bool) error { return nil }
-func (f *fakeAdmin) ClearDegraded(string) error       { return nil }
+
+// —— M1.8 本机覆盖层 ——
+
+func (f *fakeAdmin) OverrideDrift(events []string, points map[string]drift.Selection, reviewed []string) error {
+	f.overrideEvents, f.overridePoints, f.overrideReviewed = events, points, reviewed
+	return f.overrideErr
+}
+func (f *fakeAdmin) DropOverride(id string) error { f.droppedOverride = id; return nil }
+func (f *fakeAdmin) KeepOverride(id string) error { f.keptOverride = id; return nil }
+func (f *fakeAdmin) Remanage(machineID, path string) error {
+	f.remanageMachine, f.remanagePath = machineID, path
+	return nil
+}
+func (f *fakeAdmin) ClearDegraded(string) error { return nil }
 
 func (f *fakeAdmin) CreateProvider(in providers.Input) (string, error) {
 	f.plainCreateCalled = true
@@ -83,7 +106,7 @@ func (f *fakeAdmin) UpdateProvider(_ string, in providers.Input) error {
 	f.lastUpdateInput = in
 	return nil
 }
-func (f *fakeAdmin) DeleteProvider(string) error                  { return f.providerDeleteErr }
+func (f *fakeAdmin) DeleteProvider(string) error { return f.providerDeleteErr }
 func (f *fakeAdmin) SetBinding(_ string, b *providers.Binding) error {
 	f.bindingCalls++
 	f.lastBinding = b
@@ -232,4 +255,80 @@ func TestCredentialRoutesAreGone(t *testing.T) {
 		require.Equal(t, http.StatusNotFound, rec.Code,
 			"%s %s 必须已删除", c.method, c.path)
 	}
+}
+
+func TestOverrideDriftEndpoint(t *testing.T) {
+	admin := &fakeAdmin{}
+	srv := newRouterServer(t, routes.Deps{Admin: admin})
+
+	rec := doSuperuser(t, srv, "POST", "/api/orciny/drift/override", `{
+		"events": ["e1", "e2"],
+		"points": {
+			"e1": {"selectors": ["env.ANTHROPIC_MODEL"]},
+			"e2": {"hunks": [0, 2]}
+		},
+		"reviewed": ["e2"]
+	}`)
+	require.Equal(t, http.StatusNoContent, rec.Code)
+
+	require.Equal(t, []string{"e1", "e2"}, admin.overrideEvents)
+	require.Equal(t, []string{"e2"}, admin.overrideReviewed)
+	require.True(t, admin.overridePoints["e1"].Given)
+	require.Equal(t, []string{"env.ANTHROPIC_MODEL"}, admin.overridePoints["e1"].Selectors)
+	require.Equal(t, []int{0, 2}, admin.overridePoints["e2"].Hunks)
+}
+
+// points 里缺席的 event 视为全选：Given 必须是 false。
+func TestOverrideDriftAbsentPointsMeansAll(t *testing.T) {
+	admin := &fakeAdmin{}
+	srv := newRouterServer(t, routes.Deps{Admin: admin})
+	rec := doSuperuser(t, srv, "POST", "/api/orciny/drift/override", `{"events":["e1"]}`)
+	require.Equal(t, http.StatusNoContent, rec.Code)
+	require.False(t, admin.overridePoints["e1"].Given)
+}
+
+func TestOverrideDriftMapsPathUnmanagedTo409(t *testing.T) {
+	admin := &fakeAdmin{overrideErr: drift.ErrPathUnmanaged}
+	srv := newRouterServer(t, routes.Deps{Admin: admin})
+	rec := doSuperuser(t, srv, "POST", "/api/orciny/drift/override", `{"events":["e1"]}`)
+	require.Equal(t, http.StatusConflict, rec.Code)
+	require.Contains(t, rec.Body.String(), "path_unmanaged")
+}
+
+func TestOverrideDriftMapsNotOverridableTo409(t *testing.T) {
+	admin := &fakeAdmin{overrideErr: drift.ErrNotOverridable}
+	srv := newRouterServer(t, routes.Deps{Admin: admin})
+	rec := doSuperuser(t, srv, "POST", "/api/orciny/drift/override", `{"events":["e1"]}`)
+	require.Equal(t, http.StatusConflict, rec.Code)
+	require.Contains(t, rec.Body.String(), "not_overridable")
+}
+
+func TestOverrideDriftMapsNoPointsTo400(t *testing.T) {
+	admin := &fakeAdmin{overrideErr: drift.ErrNoPoints}
+	srv := newRouterServer(t, routes.Deps{Admin: admin})
+	rec := doSuperuser(t, srv, "POST", "/api/orciny/drift/override", `{"events":["e1"]}`)
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestDropAndKeepOverrideEndpoints(t *testing.T) {
+	admin := &fakeAdmin{}
+	srv := newRouterServer(t, routes.Deps{Admin: admin})
+
+	rec := doSuperuser(t, srv, "DELETE", "/api/orciny/overrides/ov1", "")
+	require.Equal(t, http.StatusNoContent, rec.Code)
+	require.Equal(t, "ov1", admin.droppedOverride)
+
+	rec = doSuperuser(t, srv, "POST", "/api/orciny/overrides/ov2/keep", "")
+	require.Equal(t, http.StatusNoContent, rec.Code)
+	require.Equal(t, "ov2", admin.keptOverride)
+}
+
+func TestRemanageEndpoint(t *testing.T) {
+	admin := &fakeAdmin{}
+	srv := newRouterServer(t, routes.Deps{Admin: admin})
+	rec := doSuperuser(t, srv, "POST", "/api/orciny/machines/m1/remanage",
+		`{"path":".claude/settings.json"}`)
+	require.Equal(t, http.StatusNoContent, rec.Code)
+	require.Equal(t, "m1", admin.remanageMachine)
+	require.Equal(t, ".claude/settings.json", admin.remanagePath)
 }

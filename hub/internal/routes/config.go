@@ -49,6 +49,12 @@ type Admin interface {
 	MatchBindingDrift(eventID string) (drift.BindingMatch, error)
 	RebindFromDrift(eventID, providerID string) (string, error)
 	CreateProviderFromDrift(eventID, location, credName string, in providers.Input) (string, error)
+
+	// —— M1.8 本机覆盖层 ——
+	OverrideDrift(events []string, points map[string]drift.Selection, reviewed []string) error
+	DropOverride(id string) error
+	KeepOverride(id string) error
+	Remanage(machineID, path string) error
 }
 
 // ---------- config sets ----------
@@ -429,6 +435,79 @@ func (d Deps) ignoreDrift(e *core.RequestEvent) error {
 	return e.NoContent(http.StatusNoContent)
 }
 
+// overrideDrift 把选中的漂移转成本机覆盖层（M1.8 spec §7）。
+//
+// points 里缺席的 event 视为「全选」，这样 UI 的默认路径不必先算一遍
+// 差异点；一个 event 显式给出空数组则是错误——它多半是前端漏传，
+// 而不是用户想做一次空操作。
+func (d Deps) overrideDrift(e *core.RequestEvent) error {
+	if d.Admin == nil {
+		return e.InternalServerError("管理服务未就绪", nil)
+	}
+	var req struct {
+		Events []string `json:"events"`
+		Points map[string]struct {
+			Selectors []string `json:"selectors"`
+			Hunks     []int    `json:"hunks"`
+		} `json:"points"`
+		Reviewed []string `json:"reviewed"`
+	}
+	if err := e.BindBody(&req); err != nil || len(req.Events) == 0 {
+		return e.BadRequestError("需要 events", nil)
+	}
+	points := make(map[string]drift.Selection, len(req.Points))
+	for id, p := range req.Points {
+		points[id] = drift.Selection{
+			Given: true, Selectors: p.Selectors, Hunks: p.Hunks,
+		}
+	}
+	if err := d.Admin.OverrideDrift(req.Events, points, req.Reviewed); err != nil {
+		return mapErr(e, err)
+	}
+	return e.NoContent(http.StatusNoContent)
+}
+
+// dropOverride 撤掉一处排除：下次快照这台机器就拿到中台的值。
+func (d Deps) dropOverride(e *core.RequestEvent) error {
+	if d.Admin == nil {
+		return e.InternalServerError("管理服务未就绪", nil)
+	}
+	if err := d.Admin.DropOverride(e.Request.PathValue("id")); err != nil {
+		return mapErr(e, err)
+	}
+	return e.NoContent(http.StatusNoContent)
+}
+
+// keepOverride 清掉提醒：用户看过了，决定保持本机的说法。
+func (d Deps) keepOverride(e *core.RequestEvent) error {
+	if d.Admin == nil {
+		return e.InternalServerError("管理服务未就绪", nil)
+	}
+	if err := d.Admin.KeepOverride(e.Request.PathValue("id")); err != nil {
+		return mapErr(e, err)
+	}
+	return e.NoContent(http.StatusNoContent)
+}
+
+// remanage 恢复受管：原子地置 survey 并删掉该路径的忽略规则
+// （M1.8 spec §3.1）。survey 不是可选项——直接恢复受管的话，
+// 下一次 apply 会当场用中台版本盖掉用户想捞回来的那份改动。
+func (d Deps) remanage(e *core.RequestEvent) error {
+	if d.Admin == nil {
+		return e.InternalServerError("管理服务未就绪", nil)
+	}
+	var req struct {
+		Path string `json:"path"`
+	}
+	if err := e.BindBody(&req); err != nil || req.Path == "" {
+		return e.BadRequestError("需要 path", nil)
+	}
+	if err := d.Admin.Remanage(e.Request.PathValue("id"), req.Path); err != nil {
+		return mapErr(e, err)
+	}
+	return e.NoContent(http.StatusNoContent)
+}
+
 func (d Deps) clearDegraded(e *core.RequestEvent) error {
 	if d.Admin == nil {
 		return e.InternalServerError("管理服务未就绪", nil)
@@ -498,6 +577,23 @@ func mapErr(e *core.RequestEvent, err error) error {
 			"message": err.Error(),
 			"data":    map[string]any{"reason": "needs_review"},
 		})
+	case errors.Is(err, drift.ErrPathUnmanaged):
+		return e.JSON(http.StatusConflict, map[string]any{
+			"message": err.Error(),
+			"data":    map[string]any{"reason": "path_unmanaged"},
+		})
+	case errors.Is(err, drift.ErrNotOverridable):
+		return e.JSON(http.StatusConflict, map[string]any{
+			"message": err.Error(),
+			"data":    map[string]any{"reason": "not_overridable"},
+		})
+	case errors.Is(err, drift.ErrGlobalRule):
+		return e.JSON(http.StatusConflict, map[string]any{
+			"message": err.Error(),
+			"data":    map[string]any{"reason": "global_rule"},
+		})
+	case errors.Is(err, drift.ErrNoPoints):
+		return e.BadRequestError(err.Error(), nil)
 	case errors.Is(err, drift.ErrMixedConfigSets):
 		return e.BadRequestError(err.Error(), nil)
 	case errors.Is(err, secretbox.ErrShortValue),

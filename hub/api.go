@@ -3,6 +3,7 @@ package hub
 import (
 	"fmt"
 
+	"github.com/FlintyLemming/orciny/hub/internal/drift"
 	"github.com/FlintyLemming/orciny/hub/internal/importer"
 	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/protocol"
@@ -127,4 +128,31 @@ func (h *Hub) IgnoreDrift(eventIDs []string, global bool) error {
 // ClearDegraded 解除机器的 degraded 状态，打回 survey 让差异先进收件箱。
 func (h *Hub) ClearDegraded(machineID string) error {
 	return h.sync.ClearDegraded(machineID)
+}
+
+// —— M1.8 本机覆盖层 ——
+
+// OverrideDrift 把选中的漂移转成本机覆盖层，并通知相关机器。
+func (h *Hub) OverrideDrift(events []string, points map[string]drift.Selection, reviewed []string) error {
+	return h.drift.Override(events, points, reviewed)
+}
+
+// DropOverride 撤掉一处排除，并通知该机器重新拉取。
+func (h *Hub) DropOverride(id string) error {
+	machineID, err := h.overrides.Delete(id)
+	if err != nil {
+		return err
+	}
+	return h.sync.NotifyOverride(machineID)
+}
+
+// KeepOverride 清掉提醒。不必通知——合并结果一个字节都没变。
+func (h *Hub) KeepOverride(id string) error {
+	_, err := h.overrides.Keep(id)
+	return err
+}
+
+// Remanage 恢复受管：原子地置 survey 并删掉该路径的忽略规则。
+func (h *Hub) Remanage(machineID, path string) error {
+	return h.drift.Remanage(machineID, path)
 }

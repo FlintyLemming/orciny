@@ -24,6 +24,7 @@ import (
 	"github.com/FlintyLemming/orciny/hub/internal/identity"
 	"github.com/FlintyLemming/orciny/hub/internal/importer"
 	"github.com/FlintyLemming/orciny/hub/internal/machines"
+	"github.com/FlintyLemming/orciny/hub/internal/overrides"
 	"github.com/FlintyLemming/orciny/hub/internal/providers"
 	"github.com/FlintyLemming/orciny/hub/internal/revisions"
 	"github.com/FlintyLemming/orciny/hub/internal/routes"
@@ -55,6 +56,9 @@ type Hub struct {
 	importer *importer.Service
 	sync     *configsync.Service
 	drift    *drift.Service
+	// overrides 是本机覆盖层（M1.8 spec §4）。configsync 组装快照时用它
+	// 合并，drift 建 / 删记录时用它落库。
+	overrides *overrides.Service
 
 	// pb 仅在 New 创建时非 nil。Attach 出来的实例由调用方驱动 serve。
 	pb *pocketbase.PocketBase
@@ -116,6 +120,7 @@ func Attach(app core.App, cfg Config) (*Hub, error) {
 		h.vars = variables.NewStore(e.App)
 
 		h.blobs = blobs.New(e.App)
+		h.overrides = overrides.NewService(e.App, h.blobs, h.events, e.App.Logger())
 		h.provs = providers.NewStore(e.App, key, h.events)
 		if err := h.provs.VerifyAll(); err != nil {
 			return err
@@ -129,13 +134,14 @@ func Attach(app core.App, cfg Config) (*Hub, error) {
 			App: e.App, Blobs: h.blobs, Sets: h.sets, Revs: h.revs,
 			Vars: h.vars, Providers: h.provs, Events: h.events, Sender: h.machines,
 			Importer: h.importer, Logger: e.App.Logger(),
+			Overrides: h.overrides,
 		})
 		// drift 需要 configsync（发 DriftCommand），configsync 需要 drift（转交上报）：
 		// 先建 configsync（Drift 留空），再建 drift，最后 SetDrift。
 		h.drift = drift.NewService(drift.Deps{
 			App: e.App, Blobs: h.blobs, Sets: h.sets, Revs: h.revs,
 			Events: h.events, Sync: h.sync,
-			Providers: h.provs, Logger: e.App.Logger(),
+			Providers: h.provs, Overrides: h.overrides, Logger: e.App.Logger(),
 		})
 		h.sync.SetDrift(h.drift)
 		// 离线补发：agent 一上线就无条件通知一次，幂等保证它在无事可做时

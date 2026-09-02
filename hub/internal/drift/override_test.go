@@ -241,3 +241,37 @@ func TestOverrideNotifiesMachine(t *testing.T) {
 	n := sent[len(sent)-1].payload.(protocol.ConfigNotify)
 	require.Equal(t, protocol.ReasonOverride, n.Reason)
 }
+
+// 端到端（spec §9）：建覆盖层 → drift 置 overridden → 发布新版本
+// （改同一文件的**其它**键）→ 该机器拿到的快照里，被排除的键是本机值、
+// 其余键是中台新值。
+func TestOverrideSurvivesNewRevision(t *testing.T) {
+	r := newRig(t)
+	id := r.jsonDrift(t,
+		[]byte(`{"env":{"A":"中台","B":"旧"}}`),
+		[]byte(`{"env":{"A":"本机","B":"旧"}}`))
+	require.NoError(t, r.svc.Override([]string{id}, nil, nil))
+
+	// 中台改了别的键并发布。
+	_, err := r.sets.SetDraftFile(r.setID, ".claude/settings.json",
+		[]byte(`{"env":{"A":"中台","B":"新"}}`), 0o644, nil)
+	require.NoError(t, err)
+	_, err = r.revs.Publish(r.setID, "v2", "publish")
+	require.NoError(t, err)
+
+	snap, err := r.sync.Snapshot(r.machineID)
+	require.NoError(t, err)
+	var hash string
+	for _, f := range snap.Files {
+		if f.Path == ".claude/settings.json" {
+			hash = f.Hash
+		}
+	}
+	content, err := r.blobs.Get(hash)
+	require.NoError(t, err)
+	require.JSONEq(t, `{"env":{"A":"本机","B":"新"}}`, string(content),
+		"被排除的键是本机值，其余键跟着中台走")
+
+	// 中台没碰 env.A，因此不该有撞车提醒。
+	require.Empty(t, r.overridesOf(t, r.machineID)[0].GetString("attention"))
+}
