@@ -47,6 +47,13 @@ const (
 	KindProviderUpdated = "provider.updated"
 	KindProviderDeleted = "provider.deleted"
 	KindBindingChanged  = "binding.changed"
+
+	// M1.8 本机覆盖层（spec §2、§8.5）。覆盖层的增删不产生新 Revision，
+	// 因此这几条事件是唯一的审计痕迹。
+	KindOverrideCreated  = "override.created"
+	KindOverrideDropped  = "override.dropped"
+	KindOverrideReplaced = "override.replaced"
+	KindOverrideKept     = "override.kept"
 )
 
 // Writer 往 events collection 写记录。
