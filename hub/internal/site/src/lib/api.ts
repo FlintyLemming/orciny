@@ -208,6 +208,36 @@ export function ignoreDrift(events: string[], global = false) {
   return postJSON('/api/orciny/drift/ignore', { events, global })
 }
 
+/** 一个 event 的勾选结果。缺席 = 全选（M1.8 spec §7） */
+export interface OverrideSelection {
+  selectors?: string[]
+  hunks?: number[]
+}
+
+/** 本机保留：把选中的漂移转成覆盖层。 */
+export function overrideDrift(
+  events: string[],
+  points: Record<string, OverrideSelection> = {},
+  reviewed: string[] = [],
+) {
+  return postJSON('/api/orciny/drift/override', { events, points, reviewed })
+}
+
+/** 撤掉排除：下次快照这台机器就拿到中台的值。 */
+export function dropOverride(id: string) {
+  return deleteJSON(`/api/orciny/overrides/${id}`)
+}
+
+/** 保持：清掉提醒，横幅上消失。 */
+export function keepOverride(id: string) {
+  return postJSON(`/api/orciny/overrides/${id}/keep`)
+}
+
+/** 恢复受管：原子地置 survey 并删掉该路径的忽略规则。 */
+export function remanage(machineId: string, path: string) {
+  return postJSON(`/api/orciny/machines/${machineId}/remanage`, { path })
+}
+
 export function clearDegraded(machineId: string) {
   return postJSON(`/api/orciny/machines/${machineId}/clear-degraded`)
 }

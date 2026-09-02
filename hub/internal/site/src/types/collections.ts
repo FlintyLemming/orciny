@@ -44,6 +44,10 @@ export type EventKind =
   | 'drift.restored'
   | 'drift.ignored'
   | 'drift.superseded'
+  | 'override.created'
+  | 'override.dropped'
+  | 'override.replaced'
+  | 'override.kept'
   // 以下三个 kind 在 M1.6 之后不再产生，但历史事件仍带着它们，
   // 留在联合类型里是为了让收件箱与事件流能把老记录渲染出来。
   | 'credential.created'
@@ -241,7 +245,13 @@ export interface VariableRecord {
 }
 
 export type DriftKind = 'added' | 'modified' | 'deleted'
-export type DriftState = 'open' | 'adopted' | 'restored' | 'ignored' | 'superseded'
+export type DriftState =
+  | 'open'
+  | 'adopted'
+  | 'restored'
+  | 'ignored'
+  | 'superseded'
+  | 'overridden'
 
 export interface BlobRecord {
   id: string
@@ -287,6 +297,45 @@ export interface IgnoreRuleRecord {
   created: string
 }
 
+export type OverrideKind = 'json_key' | 'text'
+
+/** 空串 = 一切正常；非空 = 需要用户看一眼（M1.8 spec §4.5） */
+export type OverrideAttention =
+  | ''
+  | 'hub_changed'
+  | 'merge_conflict'
+  | 'path_gone'
+  | 'unmergeable'
+
+/** 一条记录 = 一个差异点，不是一个文件（M1.8 spec §2.1） */
+export interface MachineOverrideRecord {
+  id: string
+  machine: string
+  path: string
+  kind: OverrideKind
+  /** json_key：已转义的 sjson 键路径。text 恒为空串 */
+  selector: string
+  /** 原始 JSON 片段；空串 = 该键在这一侧不存在 */
+  base_value: string
+  mine_value: string
+  base_blob: string
+  mine_blob: string
+  attention: OverrideAttention
+  shadowed_value: string
+  shadowed_blob: string
+  shadowed_rev: string
+  origin_drift: string
+  note: string
+  created: string
+  updated: string
+  expand?: {
+    machine?: MachineRecord
+    base_blob?: BlobRecord
+    mine_blob?: BlobRecord
+    shadowed_blob?: BlobRecord
+  }
+}
+
 export interface Finding {
   path: string
   location: string
@@ -320,6 +369,7 @@ export const COLLECTION_ASSIGNMENTS = 'assignments'
 export const COLLECTION_VARIABLES = 'variables'
 export const COLLECTION_DRIFT_EVENTS = 'drift_events'
 export const COLLECTION_IGNORE_RULES = 'ignore_rules'
+export const COLLECTION_MACHINE_OVERRIDES = 'machine_overrides'
 export const COLLECTION_BLOBS = 'blobs'
 export const COLLECTION_PROVIDERS = 'providers'
 

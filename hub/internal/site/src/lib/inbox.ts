@@ -6,7 +6,13 @@
 
 import { t } from '@lingui/core/macro'
 
-export type DriftState = 'open' | 'adopted' | 'restored' | 'ignored' | 'superseded'
+export type DriftState =
+  | 'open'
+  | 'adopted'
+  | 'restored'
+  | 'ignored'
+  | 'superseded'
+  | 'overridden'
 export type DriftKind = 'added' | 'modified' | 'deleted'
 
 export interface DriftEvent {
