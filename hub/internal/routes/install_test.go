@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/FlintyLemming/orciny/hub/internal/routes"
 )
 
 func TestInstallScriptIsPubliclyServed(t *testing.T) {
@@ -70,6 +72,41 @@ func TestInstallScriptHasWorkerAndGitHubFallback(t *testing.T) {
 	require.Contains(t, s, "https://github.com/FlintyLemming/orciny/releases/download")
 	// 兜底源也必须钉版本：脚本里 GitHub 直连那段不带版本号，靠和主源同一轮
 	// 注入的 $VERSION 拼路径，所以这里只校验主源带版本即可（上一条用例已覆盖）。
+}
+
+// Makefile 注入的是 git describe 的输出，形如 v0.3.0-34-g9ff2b3a：带 v 前缀，
+// 还挂着「tag 之后第几个提交」的后缀，没有哪个 release 叫这个名字。脚本必须
+// 回到它所基于的那个 tag 去下载，否则 Worker 主源与 GitHub 兜底一起 404
+// （2026-09 线上踩过：地址被拼成了 /vv0.3.0-34-g9ff2b3a/）。
+func TestInstallScriptDownloadsTagBehindGitDescribe(t *testing.T) {
+	for _, ver := range []string{
+		"v0.3.0-34-g9ff2b3a",
+		"v0.3.0-34-g9ff2b3a-dirty",
+		"v0.3.0-dirty",
+		"v0.3.0",
+		"0.3.0",
+	} {
+		t.Run(ver, func(t *testing.T) {
+			s := routes.InstallScript(ver, "")
+			require.Contains(t, s, `VERSION="0.3.0"`)
+			require.Contains(t, s, `DOWNLOAD_BASES="https://github-dl.flinty.moe/v0.3.0"`)
+		})
+	}
+}
+
+// 预发布 tag（v0.4.0-rc1）本身就是一个 release，不能当成 describe 后缀剥掉——
+// 剥成 0.4.0 反而指向一个还不存在的版本。
+func TestInstallScriptKeepsPrereleaseTag(t *testing.T) {
+	for ver, want := range map[string]string{
+		"0.4.0-rc1":             "0.4.0-rc1",
+		"v0.4.0-rc1-3-gabcdef0": "0.4.0-rc1",
+	} {
+		t.Run(ver, func(t *testing.T) {
+			s := routes.InstallScript(ver, "")
+			require.Contains(t, s, `VERSION="`+want+`"`)
+			require.Contains(t, s, `DOWNLOAD_BASES="https://github-dl.flinty.moe/v`+want+`"`)
+		})
+	}
 }
 
 func TestInstallScriptServedAsShellText(t *testing.T) {

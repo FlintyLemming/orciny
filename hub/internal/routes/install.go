@@ -3,6 +3,7 @@ package routes
 import (
 	_ "embed"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/pocketbase/pocketbase/core"
@@ -41,12 +42,31 @@ func DefaultDownloadBase(version string) string {
 	return dlFlintyMoe + "/v" + version
 }
 
+// describeSuffix 是 git describe 挂在 tag 后面的部分：
+// -<tag 之后的提交数>-g<短哈希>，以及 --dirty 追加的 -dirty。
+var describeSuffix = regexp.MustCompile(`(-[0-9]+-g[0-9a-f]+)?(-dirty)?$`)
+
+// releaseVersion 把构建版本号还原成它所基于的 release 版本号（不带 v）。
+//
+// 发版流水线注入的是去掉 v 前缀的 tag（0.3.0），原样可用；Makefile 注入的是
+// git describe 的输出（v0.3.0-34-g9ff2b3a），没有哪个 release 叫这个名字。
+// configsync 的版本门槛也认这种形态，但那边是丢掉整个 pre-release 再比大小；
+// 这里不能照搬——v0.4.0-rc1 本身就是一个 release，剥成 0.4.0 反而指向还
+// 不存在的版本。所以只剥 describe 自己加的后缀。
+func releaseVersion(version string) string {
+	return describeSuffix.ReplaceAllString(strings.TrimPrefix(version, "v"), "")
+}
+
 // InstallScript 返回注入了版本与下载源的脚本文本。
+//
+// version 是 hub 的构建版本号，注入前先经 releaseVersion 还原成 release 版本：
+// 脚本拿它拼归档名与下载路径，只认真实存在的 release。
 //
 // downloadBase 为空时走 DefaultDownloadBase(version)，即 Worker 主源。
 // downloadBase 用于开发期指向本地构建产物；GitHub 直连兜底始终由脚本侧
 // 按 $VERSION 追加，不在此处注入。
 func InstallScript(version, downloadBase string) string {
+	version = releaseVersion(version)
 	if downloadBase == "" {
 		downloadBase = DefaultDownloadBase(version)
 	}
