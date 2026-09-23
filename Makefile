@@ -1,6 +1,10 @@
 MODULE  := github.com/FlintyLemming/orciny
-VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-LDFLAGS := -s -w -X $(MODULE).Version=$(VERSION)
+# 与发版产物同一约定：去掉 v 前缀（0.3.0-37-g104876f）。hub 握手严格按 semver
+# 解析 agent 版本，带 v 的会被当成「版本过旧」拒掉。找不到 tag（源码包、没拉 tag
+# 的克隆）就不覆盖，沿用 orciny.go 里写的版本号——以前编进的 dev 与裸哈希都不是
+# semver，agent 连不上 hub，install.sh 也下载不到。
+VERSION ?= $(patsubst v%,%,$(shell git describe --tags --dirty 2>/dev/null))
+LDFLAGS := -s -w $(if $(VERSION),-X $(MODULE).Version=$(VERSION))
 
 .PHONY: all build build-hub build-agent build-web dev test lint clean
 

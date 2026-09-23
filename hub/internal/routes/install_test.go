@@ -74,10 +74,10 @@ func TestInstallScriptHasWorkerAndGitHubFallback(t *testing.T) {
 	// 注入的 $VERSION 拼路径，所以这里只校验主源带版本即可（上一条用例已覆盖）。
 }
 
-// Makefile 注入的是 git describe 的输出，形如 v0.3.0-34-g9ff2b3a：带 v 前缀，
-// 还挂着「tag 之后第几个提交」的后缀，没有哪个 release 叫这个名字。脚本必须
-// 回到它所基于的那个 tag 去下载，否则 Worker 主源与 GitHub 兜底一起 404
-// （2026-09 线上踩过：地址被拼成了 /vv0.3.0-34-g9ff2b3a/）。
+// 手工 docker build 常直接传 git describe 的输出，形如 v0.3.0-34-g9ff2b3a：带 v
+// 前缀（Makefile 会去掉），还挂着「tag 之后第几个提交」的后缀，没有哪个 release
+// 叫这个名字。脚本必须回到它所基于的那个 tag 去下载，否则 Worker 主源与 GitHub
+// 兜底一起 404（2026-09 线上踩过：地址被拼成了 /vv0.3.0-34-g9ff2b3a/）。
 func TestInstallScriptDownloadsTagBehindGitDescribe(t *testing.T) {
 	for _, ver := range []string{
 		"v0.3.0-34-g9ff2b3a",

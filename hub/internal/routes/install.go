@@ -48,8 +48,9 @@ var describeSuffix = regexp.MustCompile(`(-[0-9]+-g[0-9a-f]+)?(-dirty)?$`)
 
 // releaseVersion 把构建版本号还原成它所基于的 release 版本号（不带 v）。
 //
-// 发版流水线注入的是去掉 v 前缀的 tag（0.3.0），原样可用；Makefile 注入的是
-// git describe 的输出（v0.3.0-34-g9ff2b3a），没有哪个 release 叫这个名字。
+// 发版流水线注入的是去掉 v 前缀的 tag（0.3.0），原样可用；Makefile 与手工
+// docker build 注入的是 git describe 的输出（0.3.0-34-g9ff2b3a，手工构建常带 v），
+// 没有哪个 release 叫这个名字。
 // configsync 的版本门槛也认这种形态，但那边是丢掉整个 pre-release 再比大小；
 // 这里不能照搬——v0.4.0-rc1 本身就是一个 release，剥成 0.4.0 反而指向还
 // 不存在的版本。所以只剥 describe 自己加的后缀。
