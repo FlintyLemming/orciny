@@ -476,4 +476,3 @@ func TestValidateOneMUnsupportedQuietWhenSupported(t *testing.T) {
 	hit := findProblem(problems, configsets.ProblemOneMUnsupported)
 	require.Nil(t, hit, "支持 1M 的模型不报警告")
 }
-

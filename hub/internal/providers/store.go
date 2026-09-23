@@ -72,7 +72,6 @@ type Input struct {
 	OpenAI OpenAIEndpointInput
 }
 
-
 type Store struct {
 	app core.App
 	key []byte
@@ -489,7 +488,6 @@ func orEmptyStrings(xs []string) []string {
 	}
 	return xs
 }
-
 
 // write 记事件。事件里只有名字与平台，不含 key、不含 base_url 之外的值。
 func (s *Store) write(kind string, r *core.Record) {

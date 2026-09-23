@@ -129,7 +129,6 @@ func TestCreateStoresBothEndpoints(t *testing.T) {
 	require.Equal(t, "glm-5.2", oa.DefaultModel)
 }
 
-
 // 只配一个端点是常态，另一个必须是「未配置」而不是校验失败。
 func TestCreateWithOnlyClaudeEndpoint(t *testing.T) {
 	_, s, _ := newStore(t)
@@ -370,7 +369,6 @@ func TestMatchBaseURLScansClaudeEndpointOnly(t *testing.T) {
 	}
 	r, err := s.Create(in)
 	require.NoError(t, err)
-
 
 	// claude 端点：精确命中
 	m, err := s.MatchBaseURL("https://open.bigmodel.cn/api/anthropic/")

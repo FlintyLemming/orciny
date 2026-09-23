@@ -82,4 +82,3 @@ func TestClaudeModelJSONRoundTrip(t *testing.T) {
 	require.Equal(t, "test", decoded.Name)
 	require.False(t, decoded.OneM)
 }
-

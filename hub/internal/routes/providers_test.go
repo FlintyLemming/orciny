@@ -256,4 +256,3 @@ func TestProviderPresetsOutputsClaudeModels(t *testing.T) {
 	}
 	require.True(t, zhipuFound)
 }
-

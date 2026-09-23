@@ -406,7 +406,6 @@ var presets = []Preset{
 	},
 }
 
-
 // Presets 返回种子表的副本。调用方改它不影响下一次调用。
 func Presets() []Preset {
 	out := make([]Preset, len(presets))
