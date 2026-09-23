@@ -3,9 +3,10 @@
 #
 # 两件产物的版本号必须一致，都用「去掉 v 前缀的 tag」：
 #   - goreleaser 的 {{.Version}} 天然就是这个形式，归档名形如 orciny-agent_0.1.0_linux_amd64.tar.gz
-#   - 镜像的 --build-arg VERSION 要显式传，否则 Dockerfile 的默认值 dev 会被
-#     编进 hub 的 orciny.Version，于是 GET /install.sh 注入 dev，脚本去下载
-#     orciny-agent_dev_… 直接 404。这是 2026-07 踩过的坑。
+#   - 镜像的 --build-arg VERSION 要显式传。不传时镜像沿用 orciny.go 里写的
+#     版本号，而它未必跟着 tag 改（v0.2.0 发版时它还写着 0.1.0），于是镜像
+#     自称旧版本，GET /install.sh 也去装旧 agent。更早 Dockerfile 默认编进
+#     dev，install.sh 直接 404——这是 2026-07 踩过的坑。
 name: release
 
 on:

@@ -14,9 +14,11 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 COPY --from=web /src/hub/internal/site/dist ./hub/internal/site/dist
-ARG VERSION=dev
+# 不传 VERSION 就不覆盖，沿用 orciny.go 里写的版本号。以前默认编进 dev：
+# 没有哪个 release 叫 dev，GET /install.sh 拿它去下载必然 404。
+ARG VERSION
 RUN CGO_ENABLED=0 go build -trimpath \
-      -ldflags "-s -w -X github.com/FlintyLemming/orciny.Version=${VERSION}" \
+      -ldflags "-s -w ${VERSION:+-X github.com/FlintyLemming/orciny.Version=${VERSION}}" \
       -o /out/orciny ./cmd/orciny
 
 FROM alpine:3.22
